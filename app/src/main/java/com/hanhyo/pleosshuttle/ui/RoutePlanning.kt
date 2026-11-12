@@ -25,6 +25,17 @@ internal val routeCriteria = listOf(
 )
 
 /** 경로 확인에 보여줄 순서. 운행 시작 때 자동 계산될 순서라면 그 결과(RoutePlanner.plan)를 미리 보여준다. */
+/** 등원(V-25) 경로 확인 기준. 하원 기준의 "하차"를 "탑승"으로 바꾼 것. */
+internal val pickupRouteCriteria = listOf(
+    "기관이 승인한 정류장만 들러요",
+    "아이가 인도 쪽에서 탈 수 있게 진입 방향을 맞춰요",
+    "길을 건너는 탑승을 줄여요",
+    "보호자와 약속한 시간보다 일찍 도착하지 않게 해요",
+    "결석·직접 등원으로 타지 않을 아이는 탑승 인원에서 빼요",
+)
+
+internal fun routeCriteriaFor(trip: TripState): List<String> = if (trip.isPickup) pickupRouteCriteria else routeCriteria
+
 internal fun displayedRouteOrder(trip: TripState): List<String> = departureRouteOrder(trip)
 
 /** V-08 출발 전 확인 칩. [warn]이면 경고 톤(벨트 미확인 > 0, 아직 결정 안 된 어린이 > 0). */

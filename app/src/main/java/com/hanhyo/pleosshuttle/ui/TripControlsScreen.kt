@@ -124,7 +124,7 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
 @Composable internal fun EndReview(vm: ShuttleViewModel) {
     Section("06  운행 종료 전 직접 확인", "명단 · 센서 · 미확인 정보 · 직접 확인을 따로 검토합니다") {
         StationaryStatus(vm)
-        Text("기록상 미하차 ${vm.trip.onboardChildren.size}명", style = AppTheme.typography.titleBold)
+        Text(if (vm.trip.isPickup) "기관 인계 전 ${vm.trip.onboardChildren.size}명" else "기록상 미하차 ${vm.trip.onboardChildren.size}명", style = AppTheme.typography.titleBold)
         if (vm.trip.isPickup) {
             // V-29: 탄 아이마다 기관 담당자 인계(하차 기록). 처리 안 된 아이 미탑승 확인은 운행 화면(시트)에서 한다.
             val unresolved = PickupFlow.unresolvedAtInstitution(vm.trip)

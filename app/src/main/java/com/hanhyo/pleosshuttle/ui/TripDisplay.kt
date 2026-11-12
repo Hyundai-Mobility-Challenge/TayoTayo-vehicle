@@ -32,6 +32,28 @@ internal fun phaseLabel(trip: TripState): String = if (!trip.isPickup) trip.phas
     else -> trip.phase.label
 }
 
+/**
+ * 명단(명단 · 상세) 요약 줄. 하원은 기존 문구 그대로("4명 · 차내 기록 n명 · 하차 n명[ · 미탑승 확인 n명]").
+ * 등원은 "4명 · 탑승 n명 · 기관 인계 n명 · 미탑승 확인 n명 · 탑승 전 n명"(0명 항목은 탑승·기관 인계만 늘 보임).
+ */
+internal fun rosterSummary(trip: TripState): String {
+    val count = { s: Attendance -> trip.children.count { it.status == s } }
+    val confirmed = count(Attendance.CONFIRMED_NOT_BOARDED)
+    if (!trip.isPickup) return "${trip.children.size}명 · 차내 기록 ${trip.onboardChildren.size}명 · 하차 ${count(Attendance.ALIGHTED)}명" +
+        if (confirmed > 0) " · 미탑승 확인 ${confirmed}명" else ""
+    return buildList {
+        add("${trip.children.size}명")
+        add("탑승 ${count(Attendance.ONBOARD)}명")
+        add("기관 인계 ${count(Attendance.ALIGHTED)}명")
+        if (confirmed > 0) add("미탑승 확인 ${confirmed}명")
+        if (count(Attendance.NOT_BOARDED) > 0) add("탑승 전 ${count(Attendance.NOT_BOARDED)}명")
+    }.joinToString(" · ")
+}
+
+/** 명단·기록 화면의 아이 상태 문구. 하원은 출결 라벨 그대로, 등원은 탑승 명단 보드와 같은 등원 표기(3.5절). */
+internal fun childStatusText(trip: TripState, child: ChildRecord): String =
+    if (trip.isPickup) com.hanhyo.pleosshuttle.domain.PickupFlow.statusLabel(trip, child) else child.status.label
+
 /** 운행 화면 제목: 준비·완료 단계 이름 또는 지금 처리할 지점. */
 internal fun flowTitle(trip: TripState): String = when (trip.phase) {
     TripPhase.PREPARING -> "탑승 준비"

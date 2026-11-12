@@ -229,6 +229,21 @@ class PickupScreenRulesTest {
         assertFalse(e.callGuardian("child-a", now + 60_000)) // 재호출 없음(D30)
     }
 
+    @Test fun `명단 요약과 상태 문구는 등원 표기, 하원은 그대로`() {
+        val e = atForest()
+        board(e, "child-a")
+        assertTrue(e.confirmNotBoardedAtStop("child-b", notifyGuardian = false, now))
+        assertEquals("4명 · 탑승 1명 · 기관 인계 0명 · 미탑승 확인 1명 · 탑승 전 2명", rosterSummary(e.state))
+        assertEquals("탑승", childStatusText(e.state, e.child("child-a")))
+        assertEquals("미탑승 확인", childStatusText(e.state, e.child("child-b")))
+        assertEquals("탑승 전", childStatusText(e.state, e.child("child-c")))
+        assertTrue(routeCriteriaFor(e.state).none { it.contains("하차") })
+        val dropoff = SampleTrip.create().let { t -> t.copy(children = t.children.map { if (it.id == "child-a") it.copy(status = Attendance.ONBOARD) else it }) }
+        assertEquals("4명 · 차내 기록 1명 · 하차 0명", rosterSummary(dropoff))
+        assertEquals("탑승 기록", childStatusText(dropoff, dropoff.children.first()))
+        assertEquals(routeCriteria, routeCriteriaFor(dropoff))
+    }
+
     @Test fun `등원 단계 칩과 출발지 행`() {
         val e = atForest()
         assertEquals("정류장 탑승", phaseLabel(e.state))

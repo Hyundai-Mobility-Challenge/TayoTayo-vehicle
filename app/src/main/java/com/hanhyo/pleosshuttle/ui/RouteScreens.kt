@@ -76,7 +76,7 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
     // V-08: 차량 화면(2560x1440)에서 [운행 시작]이 스크롤 없이 보이도록 정류장 메모는 접어 둔다(펼치면 그대로 보임).
     Foldout("정류장 메모", "${order.size}곳 · 필요할 때 펼쳐 보기", "stop-memos") { StopMemoLines(vm, order) }
     Text(if (trip.integrationMode == com.hanhyo.pleosshuttle.domain.IntegrationMode.SIMULATION)
-        "출발하면 모의 이동·보호자 공유 시작 · 도착·인계·하차는 직접 확인"
+        (if (trip.isPickup) "출발하면 모의 이동·보호자 공유 시작 · 도착·인계받음·탑승은 직접 확인" else "출발하면 모의 이동·보호자 공유 시작 · 도착·인계·하차는 직접 확인")
         else "출발하면 위치·예상 도착 시간을 보호자에게 공유(처음엔 위치 권한 필요)",
         style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
     // V-08 출발 전 확인 요약 + 기사 확인 체크: [운행 시작] 바로 위(flow VS-06). 출발은 막지 않는다(D15).
@@ -195,7 +195,7 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
             Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card)).padding(AppSpacing.lg).testTag("route-criteria-list"),
             verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
-            routeCriteria.forEach { Text("• $it", style = AppTheme.typography.body3Regular) }
+            routeCriteriaFor(vm.trip).forEach { Text("• $it", style = AppTheme.typography.body3Regular) }
             Text("순서를 바꿔 기준에 어긋나면 순서 바꾸기 화면에서 경고로 알려줘요.", style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
         }
     }

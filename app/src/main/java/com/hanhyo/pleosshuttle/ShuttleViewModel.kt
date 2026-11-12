@@ -536,14 +536,15 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     fun openArrival(tripId: String?, stopId: String?, version: Long) {
         if (trip.tripId == tripId && trip.currentStop?.id == stopId && trip.routeVersion == version && trip.phase == TripPhase.DRIVING) {
             panel = "flow"
-            message = "하차 지점 근처입니다. 정차 후 도착·정차 확인을 눌러 주세요."
+            message = if (trip.isPickup) "정류장 근처입니다. 정차 후 도착·정차 확인을 눌러 주세요." else "하차 지점 근처입니다. 정차 후 도착·정차 확인을 눌러 주세요."
         }
     }
     fun showNativeNavigation() { realNavi?.showNavigation() }
     fun cancelOwnNavigation() { realNavi?.cancelOwnRoute() }
     fun handleIntent(action: String?) {
         when(action) {
-            "OPEN_DROPOFF_PREPARATION" -> { panel = "flow"; message = "현재 운행 흐름을 열었습니다. 도착·정차를 확인한 뒤 선생님이 인계와 하차를 기록합니다." }
+            "OPEN_DROPOFF_PREPARATION" -> { panel = "flow"; message = if (trip.isPickup) "현재 운행 흐름을 열었습니다. 도착·정차를 확인한 뒤 선생님이 인계받음과 탑승을 기록합니다."
+                else "현재 운행 흐름을 열었습니다. 도착·정차를 확인한 뒤 선생님이 인계와 하차를 기록합니다." }
             "SHOW_NEXT_STOP" -> { panel = "flow"; message = "다음 지점: ${(trip.currentStop ?: trip.origin).name} · 로컬 Intent 실행, Gleo 음성은 미검증" }
             "PLAY_TEST_MUSIC" -> audio.play()
         }

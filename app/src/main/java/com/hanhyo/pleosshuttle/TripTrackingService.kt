@@ -45,8 +45,8 @@ class TripTrackingService : Service() {
             .putExtra("tripId",trip.tripId).putExtra("stopId",trip.currentStop?.id).putExtra("routeVersion",trip.routeVersion)
         val pending=PendingIntent.getActivity(this,key.hashCode(),intent,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         manager.notify(92,NotificationCompat.Builder(this,"trip_arrival").setSmallIcon(R.drawable.ic_shuttle)
-            .setCategory(NotificationCompat.CATEGORY_NAVIGATION).setContentTitle("하차 지점 근처 · 정차 확인")
-            .setContentText("${trip.currentStop?.name} · 눌러서 도착·인계를 확인해 주세요.")
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION).setContentTitle(if (trip.isPickup) "정류장 근처 · 정차 확인" else "하차 지점 근처 · 정차 확인")
+            .setContentText(if (trip.isPickup) "${trip.currentStop?.name} · 눌러서 도착·인계받음을 확인해 주세요." else "${trip.currentStop?.name} · 눌러서 도착·인계를 확인해 주세요.")
             .setContentIntent(pending).addAction(0,"도착·정차 확인",pending).setOnlyAlertOnce(true).setAutoCancel(true).build())
         arrivalNoticeKey=key
     }
