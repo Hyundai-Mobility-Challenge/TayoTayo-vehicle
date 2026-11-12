@@ -159,6 +159,29 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (child.status != Attendance.NOT_BOARDED) return reject("이미 탑승 또는 하차 기록이 있습니다. 정정 기능을 이용하세요.")
         return changeAttendance(child, Attendance.ONBOARD, "선생님 탑승 확인", now)
     }
+    /**
+     * V-02: 탑승 기록이 없는 아이를 선생님이 "미탑승"으로 확정한다(탑승 예정·미탑승 예정 모두). 자동 판정하지 않는다.
+     * board()와 같은 조건(운행 준비 · 정차 확인, V-11)에서만 허용하고, 확정된 아이는 탑승 안내·하차 인원에서 빠진다.
+     */
+    fun confirmNotBoarded(childId: String, now: Long): Boolean {
+        if (state.phase != TripPhase.PREPARING) return reject("미탑승 확인은 운행 준비(탑승 단계)에서 입력합니다.")
+        if (state.noTripToday) return reject(NO_TRIP_TODAY)
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.status == Attendance.CONFIRMED_NOT_BOARDED) return reject("이미 미탑승 확인한 어린이입니다.")
+        if (child.status != Attendance.NOT_BOARDED) return reject("탑승 또는 하차 기록이 있습니다. 정정 기능을 이용하세요.")
+        val reason = if (child.expectedToBoard) "선생님 미탑승 확인"
+            else "선생님 미탑승 확인 · 오늘 미탑승 예정(${notBoardingReasonLabel(child.notBoardingReason) ?: "사유 없음"})"
+        return changeAttendance(child, Attendance.CONFIRMED_NOT_BOARDED, reason, now)
+    }
+    /** 미탑승 확인 취소. 출발 전(운행 준비)·정차 중에만. 아이는 다시 "탑승 기록 없음"으로 돌아간다. */
+    fun undoNotBoarded(childId: String, now: Long): Boolean {
+        if (state.phase != TripPhase.PREPARING) return reject("미탑승 확인 취소는 출발 전에만 할 수 있습니다. 정정 기능을 이용하세요.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.status != Attendance.CONFIRMED_NOT_BOARDED) return reject("미탑승 확인 기록이 없습니다.")
+        return changeAttendance(child, Attendance.NOT_BOARDED, "미탑승 확인 취소", now)
+    }
     private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long): Boolean {
         val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason)
         return update(state.copy(
@@ -174,6 +197,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (reason.isBlank()) return reject("정정 사유가 필요합니다.")
         val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
         if (child.status == target) return reject("현재 기록과 같은 상태입니다.")
+        if (target == Attendance.CONFIRMED_NOT_BOARDED) return reject("미탑승 확인은 탑승 단계의 [미탑승 확인]으로 기록합니다.")
         if (target == Attendance.ALIGHTED && (child.status != Attendance.ONBOARD || child.id !in state.handoverChildIds)) return reject("탑승 기록과 선생님의 보호자 대면 인계 확인이 필요합니다.")
         return changeAttendance(child, target, "정정: $reason", now)
     }

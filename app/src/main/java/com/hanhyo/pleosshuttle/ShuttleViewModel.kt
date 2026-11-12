@@ -534,7 +534,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     }
     fun restartSimulation(stage: Int) {
         if (institutionBusy || syncing || institution.pending(trip) > 0) { actionError = "기관 기록 전송을 먼저 완료해 주세요."; return }
-        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..3) return
+        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..4) return
         val fresh = SampleTrip.create().copy(tripId = "fictional-demo-${java.util.UUID.randomUUID()}")
         val prepared = when(stage) {
             1 -> fresh.copy(phase = TripPhase.ALIGHTING, children = fresh.children.map { it.copy(status = Attendance.ONBOARD) })
@@ -542,6 +542,12 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                 children = fresh.children.map { it.copy(status = Attendance.ALIGHTED) })
             // 테스트 도구 전용: 전원 미탑승 예정(결석) 명단 → D34 "오늘 운행 없음" 화면 확인.
             3 -> fresh.copy(children = fresh.children.map { it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT") })
+            // 테스트 도구 전용: 일부 미탑승 예정(나 결석, 라 직접 픽업) → V-02 배지·미탑승 확인 화면 확인.
+            4 -> fresh.copy(children = fresh.children.map { when (it.id) {
+                "child-b" -> it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT")
+                "child-d" -> it.copy(notExpectedToBoard = true, notBoardingReason = "SELF_PICKUP")
+                else -> it
+            } })
             else -> fresh
         }.let { it.copy(diagnostics = listOf(DiagnosticEntry(System.currentTimeMillis(), "체험 시작", ResultStatus.UNVERIFIED,
             "가상 단계 $stage 사전 설정. 실제 탑승·인계·하차 기록이 아닙니다."))) }

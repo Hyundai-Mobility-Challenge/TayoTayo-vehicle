@@ -122,7 +122,7 @@ class InstitutionConnection(context: Context) {
         val sentEvents = prefs.getStringSet("sentEvents", emptySet()).orEmpty().toMutableSet()
         val stopByChild = trip.children.associate { it.id to it.stopId }
         val ledgerRows = trip.ledger.map { entry ->
-            val eventType = when (entry.after) { Attendance.ONBOARD -> "CHILD_BOARDED"; Attendance.NOT_BOARDED -> "CHILD_NOT_BOARDED"; Attendance.ALIGHTED -> "CHILD_DROPPED_OFF" }
+            val eventType = InstitutionTrips.ledgerEventType(entry.before, entry.after)
             Triple(entry.id, eventType, JSONObject().put("tripChildId", entry.childId).put("tripStopId", stopByChild[entry.childId]))
         }
         val handovers = trip.handoverChildIds.map { id -> Triple("handover-$id", "CHILD_HANDED_OVER", JSONObject().put("tripChildId", id).put("tripStopId", stopByChild[id])) }
@@ -160,10 +160,34 @@ internal object InstitutionTrips {
         else -> true
     }
 
+    /**
+     * 장부(LedgerEntry) 한 건 → 서버 이벤트 유형(TripController.updateChildFromEvent).
+     * - 미탑승 확인: TEACHER_CONFIRMED_NOT_BOARDED → trip_children.status=NOT_BOARDED (boarding_expected·사유는 그대로).
+     *   CHILD_NOT_BOARDED는 boarding_expected=0·사유까지 덮어쓰므로 선생님 확인에는 쓰지 않는다.
+     * - 미탑승 확인 취소(CONFIRMED_NOT_BOARDED → NOT_BOARDED): 서버에 상태를 EXPECTED로 되돌리는 이벤트가 없어
+     *   스키마의 CORRECTION으로 이력만 남긴다(서버 상태는 NOT_BOARDED로 남음).
+     */
+    fun ledgerEventType(before: Attendance, after: Attendance): String = when (after) {
+        Attendance.ONBOARD -> "CHILD_BOARDED"
+        Attendance.ALIGHTED -> "CHILD_DROPPED_OFF"
+        Attendance.CONFIRMED_NOT_BOARDED -> "TEACHER_CONFIRMED_NOT_BOARDED"
+        Attendance.NOT_BOARDED -> if (before == Attendance.CONFIRMED_NOT_BOARDED) "CORRECTION" else "CHILD_NOT_BOARDED"
+    }
+
+    /**
+     * 서버 status=NOT_BOARDED는 두 경우다: 운행 생성 때 승인된 결석·직접 픽업으로 미리 넣은 값(boardingExpected=0),
+     * 또는 선생님 미탑승 확인(TEACHER_CONFIRMED_NOT_BOARDED, boardingExpected 유지=1). 앞의 것은 아직 선생님이 확인하지
+     * 않았으므로 미결정(NOT_BOARDED), 뒤의 것은 이미 확인된 상태로 유지한다(D16).
+     */
     fun childRecord(id: String, name: String, stopId: String, status: String, boardingExpected: Any?, notBoardedReason: String?): ChildRecord {
         val expected = boardingExpected(boardingExpected)
         return ChildRecord(id, name, stopId, "미배정",
-            when (status) { "BOARDED" -> Attendance.ONBOARD; "NOT_BOARDED" -> Attendance.NOT_BOARDED; "DROPPED_OFF" -> Attendance.ALIGHTED; else -> Attendance.NOT_BOARDED },
+            when (status) {
+                "BOARDED" -> Attendance.ONBOARD
+                "NOT_BOARDED" -> if (expected) Attendance.CONFIRMED_NOT_BOARDED else Attendance.NOT_BOARDED
+                "DROPPED_OFF" -> Attendance.ALIGHTED
+                else -> Attendance.NOT_BOARDED
+            },
             notExpectedToBoard = !expected,
             notBoardingReason = notBoardedReason?.takeIf { it.isNotBlank() })
     }

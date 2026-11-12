@@ -9,7 +9,14 @@ enum class ResultStatus(val label: String) {
     UNVERIFIED("미검증"), PERMISSION_REQUIRED("권한 필요"), UNSUPPORTED_HERE("현재 환경 미지원"),
     ACCEPTED("요청 수락"), TARGET_OBSERVED("목표 상태 관측"), PARTIAL("부분 반영"), ERROR("오류"), TIMEOUT("시간 초과")
 }
-enum class Attendance(val label: String) { NOT_BOARDED("미탑승"), ONBOARD("탑승 기록"), ALIGHTED("하차 기록") }
+/**
+ * 출결 상태. Java 직렬화는 enum을 이름으로 저장하므로 상수 추가는 기존 저장 파일과 호환된다(이름 변경·삭제 금지).
+ * NOT_BOARDED는 "아직 탑승 기록 없음(미결정)", CONFIRMED_NOT_BOARDED는 선생님이 직접 확정한 미탑승(V-02, 7절 사람이 확인).
+ */
+enum class Attendance(val label: String) {
+    NOT_BOARDED("미탑승"), ONBOARD("탑승 기록"), ALIGHTED("하차 기록"),
+    CONFIRMED_NOT_BOARDED("미탑승 확인"),
+}
 enum class Gear(val label: String) { PARK("P"), REVERSE("R"), NEUTRAL("N"), DRIVE("D"), UNKNOWN("미확인") }
 enum class SurroundingKind(val label: String) { WARNING("위험 정보 있음"), UNKNOWN("정보 미확인"), DIRECT_CHECK_REQUIRED("직접 확인 필요") }
 enum class ResumePolicy { REQUIRE_REASON_AND_DRIVER_CONFIRM, REQUIRE_ALL_RESOLVED, WARN_AND_CONFIRM }
@@ -90,12 +97,37 @@ data class ChildRecord(
 ) : Serializable {
     /** 오늘 탑승 예정 여부. 기본값 탑승(D20). */
     val expectedToBoard: Boolean get() = !notExpectedToBoard
+    /** 탑승 기록도 미탑승 확인도 없는 상태. 탑승 단계에서 선생님이 결정해야 하는 아이. */
+    val awaitingBoardingDecision: Boolean get() = status == Attendance.NOT_BOARDED
+    /**
+     * 오늘 이 차로 가는 아이인지(정류장 하차 인원 계산용). 탑승·하차 기록이 있으면 탄 것, 미탑승 확인이면 안 탄 것,
+     * 아직 결정 전이면 탑승 예정(expectedToBoard)을 따른다. 계산 프로퍼티라 직렬화 형식은 바뀌지 않는다(UID 고정).
+     */
+    val ridesToday: Boolean get() = when (status) {
+        Attendance.ONBOARD, Attendance.ALIGHTED -> true
+        Attendance.CONFIRMED_NOT_BOARDED -> false
+        Attendance.NOT_BOARDED -> expectedToBoard
+    }
 
     companion object {
         /** 필드 추가 전 클래스의 기본 계산값을 고정해, 이미 저장된 운행 기록을 계속 복원할 수 있게 함. */
         private const val serialVersionUID: Long = 91676870627885723L
     }
 }
+
+/** 서버 미탑승 예정 사유 코드(attendance_requests.request_type) → 화면 문구. 코드가 없으면 null(사유 문구 없이 배지만). */
+fun notBoardingReasonLabel(code: String?): String? = when (code?.trim()?.uppercase()) {
+    null, "" -> null
+    "ABSENT" -> "결석"
+    "SELF_PICKUP" -> "직접 픽업"
+    "NOT_RIDING" -> "미탑승"
+    else -> "기타"
+}
+
+/** V-02 "오늘 미탑승 예정" 배지 문구. 탑승 예정인 아이는 null(배지 없음). 명단에서 빼지 않고 표시만 한다. */
+fun notBoardingBadge(child: ChildRecord): String? =
+    if (child.expectedToBoard) null
+    else notBoardingReasonLabel(child.notBoardingReason)?.let { "오늘 미탑승 예정 · $it" } ?: "오늘 미탑승 예정"
 
 data class Stop(val id: String, val name: String, val latitude: Double, val longitude: Double) : Serializable {
     companion object {
@@ -252,6 +284,9 @@ data class TripState(
      * 이미 탑승 기록이 있는 운행(복원 등)은 기록을 잃지 않도록 기존 흐름을 유지한다.
      */
     val noTripToday: Boolean get() = phase == TripPhase.PREPARING && expectedRiderCount == 0 && onboardChildren.isEmpty()
+    /** 탑승 단계에서 아직 탑승 기록도 미탑승 확인도 없는 아이. */
+    val undecidedChildren: List<ChildRecord> get() = children.filter { it.awaitingBoardingDecision }
+    val confirmedNotBoardedChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.CONFIRMED_NOT_BOARDED }
 
     companion object {
         /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */

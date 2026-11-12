@@ -9,20 +9,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import com.hanhyo.pleosshuttle.FlowGuide
+import com.hanhyo.pleosshuttle.NO_RIDERS_TAG
 import com.hanhyo.pleosshuttle.NO_TRIP_TODAY_TAG
 import com.hanhyo.pleosshuttle.ShuttleViewModel
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
+import com.hanhyo.pleosshuttle.domain.notBoardingBadge
 import com.hanhyo.pleosshuttle.sdk.SdkOutcome
 import com.hanhyo.pleosshuttle.ui.component.Action
+import com.hanhyo.pleosshuttle.ui.component.ChipTone
+import com.hanhyo.pleosshuttle.ui.component.StatusChip
 import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
 
 /** Teacher actions are explicit; destination and guidance advance after the last child record. */
 @Composable internal fun TeacherFlow(vm: ShuttleViewModel, guide: FlowGuide, onBoardingReviewed: () -> Unit, onOpenReorder: () -> Unit) {
     val tag = guide.targetTag
-    val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}") }
+    val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "not-boarded-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}") }
     val stationary = vm.engine.stationaryBlockers(vm.now).isEmpty()
     val uxLocked = vm.trip.integrationMode == IntegrationMode.SDK && vm.sdkVehicle.uxRestricted.value == true
     val type = AppTheme.typography
@@ -39,6 +43,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
         Text("동승 선생님 · ${flowTitle(vm.trip)}", style = type.body1SemiBold, color = AppTheme.colors.infoContent)
         val title = when {
             tag == NO_TRIP_TODAY_TAG -> "오늘 ${vm.tripDirectionLabel} 운행 없음"
+            tag == NO_RIDERS_TAG -> "탑승한 어린이가 없어요"
             child != null -> child.name.removePrefix("가상 ")
             tag == "start-trip" -> "하원 준비가 끝났어요"
             tag == "arrive-stop" -> "도착하면 확인해 주세요"
@@ -61,10 +66,32 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                     Action("기관 연결 열기", "open-institution", secondary = true) { vm.panel = "institution" }
                 }
             }
-            tag?.startsWith("board-") == true && child != null -> {
-                Text("차에 탔나요?", style = question)
-                Action("탑승 기록", tag, prominent = true) { vm.perform { board(child.id, it) } }
-                if (vm.trip.onboardChildren.isNotEmpty()) Action("탑승 마침 · ${vm.trip.onboardChildren.size}명", "review-boarding", secondary = true, action = onBoardingReviewed)
+            tag == NO_RIDERS_TAG -> {
+                // 모두 미탑승 확인 → 출발하지 않음. 되돌리기는 명단의 [취소](출발 전·정차 중).
+                Text("명단 ${vm.trip.children.size}명 모두 미탑승 확인했어요.", style = question, modifier = Modifier.testTag(tag))
+                Text("다시 태우려면 명단에서 미탑승 확인을 취소해 주세요.", style = hint, color = AppTheme.colors.textSecondary)
+                Action("명단 열기", "open-roster", secondary = true) { vm.panel = "details" }
+            }
+            (tag?.startsWith("board-") == true || tag?.startsWith("not-boarded-") == true) && child != null -> {
+                // V-02: 미탑승 예정 배지는 표시만 하고, 탑승·미탑승은 선생님이 정한다. 미탑승 예정이거나 탑승 마침 뒤면 [미탑승 확인]이 먼저.
+                notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("not-expected-badge-${child.id}")) }
+                val confirmFirst = tag.startsWith("not-boarded-")
+                Text(when {
+                    !confirmFirst -> "차에 탔나요?"
+                    child.expectedToBoard -> "탑승 기록이 없어요 · 오늘 안 탔나요?"
+                    else -> "오늘 안 타나요?"
+                }, style = question)
+                if (confirmFirst) {
+                    Action("미탑승 확인", "not-boarded-${child.id}", prominent = true) { vm.perform { confirmNotBoarded(child.id, it) } }
+                    Action("탑승 기록", "board-${child.id}", secondary = true) { vm.perform { board(child.id, it) } }
+                } else {
+                    Action("탑승 기록", "board-${child.id}", prominent = true) { vm.perform { board(child.id, it) } }
+                    Action("미탑승 확인", "not-boarded-${child.id}", secondary = true) { vm.perform { confirmNotBoarded(child.id, it) } }
+                }
+                if (vm.trip.onboardChildren.isNotEmpty() && !guide.confirmingRemaining) Action("탑승 마침 · ${vm.trip.onboardChildren.size}명", "review-boarding", secondary = true, action = onBoardingReviewed)
+                if (guide.confirmingRemaining) Text("탑승 기록이 없는 어린이 ${vm.trip.undecidedChildren.size}명 · 한 명씩 미탑승을 확인해 주세요.", style = hint, color = AppTheme.colors.textSecondary)
+                val confirmed = vm.trip.confirmedNotBoardedChildren.size
+                if (confirmed > 0) Text("미탑승 확인 ${confirmed}명 · 취소는 명단에서", style = hint, color = AppTheme.colors.textSecondary)
             }
             (tag?.startsWith("handover-") == true || tag?.startsWith("end-handover-") == true) && child != null -> {
                 Text("보호자에게 직접 인계했나요?", style = question)
@@ -82,6 +109,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
             }
             tag == "start-trip" -> {
                 Text("${vm.trip.onboardChildren.size}명 탑승 · ${vm.trip.children.filter { it.status == Attendance.ONBOARD }.map { it.stopId }.distinct().size}곳 방문", style = question)
+                if (vm.trip.confirmedNotBoardedChildren.isNotEmpty()) Text("미탑승 확인 ${vm.trip.confirmedNotBoardedChildren.size}명 · 출발 전에는 명단에서 취소할 수 있어요", style = hint, color = AppTheme.colors.textSecondary)
                 RouteCheckBody(vm, onOpenReorder)
             }
             tag in setOf("arrive-stop", "arrive-origin") -> {

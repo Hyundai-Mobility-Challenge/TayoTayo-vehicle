@@ -95,6 +95,8 @@ import com.hanhyo.pleosshuttle.ui.component.guideAnchor
             }
             // D34 확인용 시험 명단. 실제 기관 명단이 아님.
             Action("시험 · 탈 어린이 0명 (전원 미탑승 예정)", "restart-3", secondary = true) { selected = 3 }
+            // V-02 확인용 시험 명단: 일부 아이만 오늘 미탑승 예정.
+            Action("시험 · 일부 미탑승 예정 (결석·직접 픽업)", "restart-4", secondary = true) { selected = 4 }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             Action("보관 기록", "archived-trips") { history = vm.archiveSummary() }
@@ -114,6 +116,7 @@ import com.hanhyo.pleosshuttle.ui.component.guideAnchor
         AlertDialog(
             onDismissRequest = { selected = null }, containerColor = AppTheme.colors.surfaceRaised, title = { Text("기록 보관 후 새 체험") },
             text = { Text(if (stage == 3) "현재 운행은 그대로 보관합니다. 가상 어린이 4명이 모두 미탑승 예정(결석)인 시험 명단으로 '오늘 운행 없음' 화면을 확인합니다."
+                else if (stage == 4) "현재 운행은 그대로 보관합니다. 어린이 나(결석)·라(직접 픽업)가 오늘 미탑승 예정인 시험 명단으로 배지와 미탑승 확인을 확인합니다."
                 else "현재 운행은 그대로 보관합니다. 새 가상 운행에서 선택한 단계부터 체험합니다.") },
             confirmButton = { DialogButton("보관하고 시작") { selected = null; vm.restartSimulation(stage) } },
             dismissButton = { DialogButton("취소") { selected = null } },

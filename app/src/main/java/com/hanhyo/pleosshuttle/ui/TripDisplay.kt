@@ -1,6 +1,7 @@
 package com.hanhyo.pleosshuttle.ui
 
 import com.hanhyo.pleosshuttle.domain.Attendance
+import com.hanhyo.pleosshuttle.domain.ChildRecord
 import com.hanhyo.pleosshuttle.domain.Observation
 import com.hanhyo.pleosshuttle.domain.Stop
 import com.hanhyo.pleosshuttle.domain.TripPhase
@@ -29,21 +30,30 @@ internal fun flowTitle(trip: TripState): String = when (trip.phase) {
  * 출발 · 방문 순서 · 복귀를 타임라인 행으로 바꾼다. 선생님이 남긴 기록과 엔진 단계만 읽으며
  * 위치·센서로 완료를 추정하지 않는다.
  */
+/**
+ * 정류장 하차 인원에 들어가는 아이. 운행 준비에는 오늘 탈 아이(탑승 예정이고 미탑승 확인 전, 또는 탑승 기록 있음),
+ * 출발 뒤에는 실제 탑승·하차 기록이 있는 아이만. "오늘 운행 없음"이면 모두 0명으로 보인다. 정류장 자체는 빼지 않는다(V-09).
+ */
+internal fun ridesFrom(trip: TripState, child: ChildRecord): Boolean =
+    if (trip.phase == TripPhase.PREPARING) child.ridesToday
+    else child.status == Attendance.ONBOARD || child.status == Attendance.ALIGHTED
+
 internal fun timelineStops(trip: TripState): List<TimelineStop> {
     val preparing = trip.phase == TripPhase.PREPARING
     val visiting = trip.phase == TripPhase.DRIVING || trip.phase == TripPhase.ALIGHTING
     val ended = trip.phase == TripPhase.ENDED
     val returning = trip.phase == TripPhase.END_REVIEW || (visiting && trip.currentStop == null)
-    val boarded = trip.children.count { it.status != Attendance.NOT_BOARDED }
+    val boarded = trip.children.count { it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED }
     val origin = TimelineStop(
         marker = "출",
         name = "${trip.origin.shortName} 출발",
-        detail = if (preparing) "탑승 기록 ${trip.onboardChildren.size}/${trip.children.size}" else "탑승 ${boarded}명",
+        // 분모는 오늘 탈 아이(미탑승 예정·미탑승 확인 제외, 실제 탑승 기록은 포함).
+        detail = if (preparing) "탑승 기록 ${trip.onboardChildren.size}/${trip.children.count { it.ridesToday }}" else "탑승 ${boarded}명",
         progress = if (preparing) StopProgress.CURRENT else StopProgress.DONE,
     )
     val stops = trip.routeOrder.mapIndexedNotNull { index, id ->
         val stop = trip.stops.find { it.id == id } ?: return@mapIndexedNotNull null
-        val riders = trip.children.filter { it.stopId == id && (preparing || it.status != Attendance.NOT_BOARDED) }
+        val riders = trip.children.filter { it.stopId == id && ridesFrom(trip, it) }
         val alighted = riders.count { it.status == Attendance.ALIGHTED }
         val progress = when {
             ended || returning -> StopProgress.DONE

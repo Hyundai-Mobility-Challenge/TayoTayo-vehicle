@@ -54,19 +54,19 @@ internal fun routeWarnings(timeline: RouteTimeline): List<RouteWarning> =
 
 internal fun stopMemo(stopId: String): String? = SampleRoutePlan.rules.firstOrNull { it.stopId == stopId }?.memo
 
-/** 정류장에서 내릴 아이 이름. 운행 준비에는 명단 전체, 출발 뒤에는 탄 아이만. */
+/** 정류장에서 내릴 아이 이름. 운행 준비에는 오늘 탈 아이(미탑승 예정·미탑승 확인 제외), 출발 뒤에는 탄 아이만. */
 internal fun ridersAt(trip: TripState, stopId: String): List<String> = trip.children
-    .filter { it.stopId == stopId && (trip.phase == TripPhase.PREPARING || it.status != Attendance.NOT_BOARDED) }
+    .filter { it.stopId == stopId && ridesFrom(trip, it) }
     .map { it.name.removePrefix("가상 ") }
 
 /** 평소와 달라진 점(L2). 지금은 탑승 기록만으로 알 수 있는 것만 보여준다. 결석·인계자 변경 연동은 4단계. */
 internal data class RouteChange(val kind: String, val text: String)
 
 internal fun routeChanges(trip: TripState): List<RouteChange> = buildList {
-    trip.children.filter { it.status == Attendance.NOT_BOARDED }.forEach {
-        add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · 탑승 기록 없음"))
+    trip.children.filter { it.status == Attendance.NOT_BOARDED || it.status == Attendance.CONFIRMED_NOT_BOARDED }.forEach {
+        add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else "탑승 기록 없음"}"))
     }
-    trip.stops.filter { stop -> trip.children.none { it.stopId == stop.id && it.status != Attendance.NOT_BOARDED } }.forEach {
+    trip.stops.filter { stop -> trip.children.none { it.stopId == stop.id && (it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED) } }.forEach {
         add(RouteChange("하차 없음", "${it.shortName} · 내릴 친구가 없어도 순서에는 남아요"))
     }
 }

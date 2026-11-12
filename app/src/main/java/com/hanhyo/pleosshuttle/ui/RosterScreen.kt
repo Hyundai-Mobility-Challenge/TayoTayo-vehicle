@@ -10,11 +10,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import com.hanhyo.pleosshuttle.ShuttleViewModel
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.TripPhase
+import com.hanhyo.pleosshuttle.domain.notBoardingBadge
 import com.hanhyo.pleosshuttle.ui.component.Action
 import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.Foldout
@@ -22,14 +24,19 @@ import com.hanhyo.pleosshuttle.ui.component.Section
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
 
 @Composable internal fun RosterPanel(vm: ShuttleViewModel) {
-    Section("오늘의 명단", "${vm.trip.children.size}명 · 차내 기록 ${vm.trip.onboardChildren.size}명 · 하차 ${vm.trip.children.count { it.status == Attendance.ALIGHTED }}명") {
+    val confirmedNotBoarded = vm.trip.confirmedNotBoardedChildren.size
+    Section("오늘의 명단", "${vm.trip.children.size}명 · 차내 기록 ${vm.trip.onboardChildren.size}명 · 하차 ${vm.trip.children.count { it.status == Attendance.ALIGHTED }}명" +
+        if (confirmedNotBoarded > 0) " · 미탑승 확인 ${confirmedNotBoarded}명" else "") {
         vm.trip.children.forEachIndexed { index, child ->
             Row(Modifier.fillMaxWidth().padding(vertical = AppSpacing.xs), horizontalArrangement = Arrangement.spacedBy(AppSpacing.xl), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
                     Text(child.name.removePrefix("가상 "), style = AppTheme.typography.titleBold)
                     Text(vm.trip.stops.first { it.id == child.stopId }.shortName, style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
+                    // V-02: 결석·직접 픽업 등은 배지로만 표시하고 명단에서 빼지 않는다.
+                    notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("roster-badge-${child.id}")) }
                 }
                 StatusChip(child.status.label, tone = if (child.status == Attendance.ALIGHTED) ChipTone.INFO else ChipTone.NEUTRAL)
+                NotBoardedActions(child, vm, tagPrefix = "roster-")
                 Correction(child, vm, allowAlight = vm.trip.phase == TripPhase.END_REVIEW)
             }
             if (index < vm.trip.children.lastIndex) HorizontalDivider(color = AppTheme.colors.outline)

@@ -8,9 +8,13 @@ internal data class FlowGuide(
     val title: String,
     val detail: String,
     val targetTag: String?,
+    /** [탑승 마침] 뒤 남은 아이마다 미탑승 확인을 받는 중(V-02). [탑승 마침] 버튼을 다시 보이지 않는다. */
+    val confirmingRemaining: Boolean = false,
 )
 
 internal const val NO_TRIP_TODAY_TAG = "no-trip-today"
+/** 운행 준비에서 모든 아이가 미탑승 확인되어 탈 아이가 없는 상태(출발 불가, 취소는 명단에서). */
+internal const val NO_RIDERS_TAG = "no-riders"
 
 internal fun nextFlowGuide(
     trip: TripState,
@@ -27,10 +31,17 @@ internal fun nextFlowGuide(
     if (trip.phase != TripPhase.ENDED && !stationaryReady) return FlowGuide("선생님", "정차 상태 확인", "최신 정차 정보 필요", "stationary-status")
     return when(trip.phase) {
         TripPhase.PREPARING -> {
-            val child = trip.children.firstOrNull { it.status == Attendance.NOT_BOARDED }
-            if (trip.onboardChildren.isEmpty() || (!boardingReviewed && child != null))
-                FlowGuide("선생님", "탑승 기록", "한 명씩 확인", child?.let { "board-${it.id}" })
-            else FlowGuide("선생님", "운행 시작", "방문 순서는 자동 계산", "start-trip")
+            // 미탑승 확인한 아이(CONFIRMED_NOT_BOARDED)는 건너뛴다. 남은 아이는 탑승 기록도 미탑승 확인도 없는 아이뿐.
+            val child = trip.undecidedChildren.firstOrNull()
+            val reviewed = boardingReviewed && trip.onboardChildren.isNotEmpty()
+            when {
+                child == null && trip.onboardChildren.isEmpty() -> FlowGuide("선생님", "탑승한 어린이 없음", "모두 미탑승 확인", NO_RIDERS_TAG)
+                child == null -> FlowGuide("선생님", "운행 시작", "방문 순서는 자동 계산", "start-trip")
+                // V-02: 탑승 마침 뒤 탑승 기록이 없는 아이마다 선생님이 미탑승을 확인한다. 미탑승 예정 아이는 처음부터 미탑승 확인이 먼저.
+                reviewed -> FlowGuide("선생님", "미탑승 확인", "탑승 기록 없는 어린이", "not-boarded-${child.id}", confirmingRemaining = true)
+                !child.expectedToBoard -> FlowGuide("선생님", "미탑승 확인", "오늘 미탑승 예정", "not-boarded-${child.id}")
+                else -> FlowGuide("선생님", "탑승 기록", "한 명씩 확인", "board-${child.id}")
+            }
         }
         TripPhase.ALIGHTING -> {
             val child = trip.currentStopChildren.firstOrNull { it.status == Attendance.ONBOARD }
