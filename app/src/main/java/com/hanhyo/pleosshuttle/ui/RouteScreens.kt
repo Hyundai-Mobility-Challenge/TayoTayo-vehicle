@@ -186,7 +186,8 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
             }
         }
         SideTitle("보호자 자동 알림")
-        Text("하원 출발 · 내 아이 도착 약 2분 전 · 도착 확인 · 하차 완료를 알려요.", style = AppTheme.typography.body3Regular)
+        Text(if (vm.trip.isPickup) "등원 출발 · 정류장 도착 · 탑승 완료 · 기관 인계 완료를 알려요."
+            else "하원 출발 · 내 아이 도착 약 2분 전 · 도착 확인 · 하차 완료를 알려요.", style = AppTheme.typography.body3Regular)
         Text("도착 전 알림은 최신 예상 시간이 확인될 때 한 번 전송해요.", style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
         Action(if (showCriteria) "기준 접기" else "순서를 정하는 기준 보기", "route-criteria", secondary = true, action = onToggleCriteria)
         if (showCriteria) Column(
@@ -223,7 +224,7 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
         suggestions.forEach { stop ->
             Row(Modifier.fillMaxWidth().testTag("exclusion-suggestion-${stop.id}"), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
                 StatusChip("제외 제안", tone = ChipTone.ACCENT)
-                Text("${stop.shortName} · 내릴 어린이 없음", Modifier.weight(1f), style = AppTheme.typography.body2SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${stop.shortName} · ${if (trip.isPickup) "탈" else "내릴"} 어린이 없음", Modifier.weight(1f), style = AppTheme.typography.body2SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Action("이 정류장 빼기", "exclude-stop-${stop.id}", secondary = true, enabled = enabled) { vm.perform { excludeStop(stop.id, it) } }
             }
         }
@@ -261,7 +262,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
             ReorderRow(
                 number = "${index + 1}",
                 name = stop.shortName,
-                riders = ridersAt(trip, id).joinToString().ifBlank { "내릴 친구 없음" },
+                riders = ridersAt(trip, id).joinToString().ifBlank { if (trip.isPickup) "탈 친구 없음" else "내릴 친구 없음" },
                 arrival = timeline.arrivalOf(id),
                 original = base.arrivalOf(id),
                 highlighted = draft.lastMoved == id,

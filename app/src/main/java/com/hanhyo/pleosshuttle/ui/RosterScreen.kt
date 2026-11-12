@@ -44,7 +44,7 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
         Action(if (vm.trip.phase == TripPhase.ENDED) "완료 기록·새 운행" else "명단·방문 순서 조작", "open-controls", secondary = true) { vm.panel = "controls" }
-        Text("진행은 ‘하원으로’에서 이어가세요.", modifier = Modifier.align(Alignment.CenterVertically), color = AppTheme.colors.textSecondary)
+        Text("진행은 ‘${vm.tripDirectionLabel}으로’에서 이어가세요.", modifier = Modifier.align(Alignment.CenterVertically), color = AppTheme.colors.textSecondary)
     }
     Foldout("방문 순서", "남은 ${vm.trip.remainingStopCount}곳 · 마지막은 출발지", "route-summary") {
         vm.trip.routeOrder.forEachIndexed { index, id ->
@@ -55,7 +55,7 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
 }
 
 @Composable internal fun TripHistory(vm: ShuttleViewModel) {
-    Section("하원 기록", "선생님이 확인한 기록입니다") {
+    Section("${vm.tripDirectionLabel} 기록", "선생님이 확인한 기록입니다") {
         vm.trip.children.forEach { Text("${it.name.removePrefix("가상 ")} · ${it.status.label}", style = AppTheme.typography.body1SemiBold) }
         // V-08: 기사 확인은 시각만 기록. 체크 없이 출발했으면 "기사 확인 없음"(D15).
         if (vm.trip.phase != com.hanhyo.pleosshuttle.domain.TripPhase.PREPARING) Text(

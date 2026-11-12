@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.hanhyo.pleosshuttle.ShuttleViewModel
+import com.hanhyo.pleosshuttle.domain.TripDirections
 
 @Composable fun InstitutionPanel(vm: ShuttleViewModel) {
     var base by rememberSaveable { mutableStateOf(vm.institutionBase) }
@@ -26,11 +27,13 @@ import com.hanhyo.pleosshuttle.ShuttleViewModel
     }
     Text("운행 방향")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected = vm.institutionDirection == "PICK_UP", onClick = { vm.chooseInstitutionDirection("PICK_UP") },
-            label = { Text("등원 · PICK_UP") }, enabled = !vm.institutionBusy)
-        FilterChip(selected = vm.institutionDirection == "DROP_OFF", onClick = { vm.chooseInstitutionDirection("DROP_OFF") },
-            label = { Text("하원 · DROP_OFF") }, enabled = !vm.institutionBusy)
+        listOf(TripDirections.PICK_UP, TripDirections.DROP_OFF).forEach { direction ->
+            FilterChip(selected = vm.institutionDirection == direction, onClick = { vm.chooseInstitutionDirection(direction) },
+                label = { Text(TripDirections.label(direction)) }, enabled = !vm.institutionBusy,
+                modifier = Modifier.testTag("institution-direction-$direction"))
+        }
     }
+    Text("처음에는 시간대로 정해요(정오 전 등원, 그 뒤 하원). 고른 방향은 다음에도 유지돼요.")
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = vm::loadInstitutionTrip, enabled = !vm.institutionBusy && vm.institutionConnected, modifier = Modifier.testTag("institution-load")) { Text("배정 명단으로 운행 준비") }
         OutlinedButton(onClick = { vm.syncInstitution(true) }, enabled = !vm.institutionBusy && vm.institutionConnected) { Text("기록 전송 재시도") }

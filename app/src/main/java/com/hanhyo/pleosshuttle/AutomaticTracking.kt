@@ -9,7 +9,8 @@ fun automaticTrackingTransition(before: TripState, after: TripState): TrackingTr
     if (before.tripId != after.tripId) return TrackingTransition.NONE
     if (after.phase in listOf(TripPhase.END_REVIEW, TripPhase.ENDED) && before.phase != after.phase)
         return TrackingTransition.FINISH
-    if (after.phase != TripPhase.DRIVING || after.currentStop == null || after.onboardChildren.isEmpty())
+    // 등원(V-25)은 출발 때 탄 아이가 없어도 정류장으로 가므로 위치 공유를 켠다.
+    if (after.phase != TripPhase.DRIVING || after.currentStop == null || (after.onboardChildren.isEmpty() && !after.isPickup))
         return TrackingTransition.NONE
     if (before.phase == TripPhase.PREPARING) return TrackingTransition.DEPART
     if (before.currentStop?.id != after.currentStop?.id) return TrackingTransition.NEXT_STOP

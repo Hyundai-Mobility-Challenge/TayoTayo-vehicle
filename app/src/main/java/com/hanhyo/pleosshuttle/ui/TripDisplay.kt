@@ -4,6 +4,7 @@ import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.ChildRecord
 import com.hanhyo.pleosshuttle.domain.Observation
 import com.hanhyo.pleosshuttle.domain.Stop
+import com.hanhyo.pleosshuttle.domain.TripDirections
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
 import com.hanhyo.pleosshuttle.ui.component.StopProgress
@@ -13,6 +14,8 @@ import java.util.Date
 import java.util.Locale
 
 internal fun timeText(at: Long?): String = at?.let { SimpleDateFormat("HH:mm:ss", Locale.KOREA).format(Date(it)) } ?: "미수신"
+/** "08:06" — 등원 보호자 호출 시각 등 분 단위 표시(VS-18 "호출함 HH:mm"). */
+internal fun hourMinuteText(at: Long): String = SimpleDateFormat("HH:mm", Locale.KOREA).format(Date(at))
 internal fun boolText(value: Boolean?, yes: String, no: String) = when (value) { true -> yes; false -> no; null -> "미확인" }
 internal fun <T> valueLabel(value: Observation<T>, now: Long): String = if (value.isFresh(now)) value.value.toString() else "미확인/오래됨"
 
@@ -22,7 +25,7 @@ internal val Stop.shortName: String get() = com.hanhyo.pleosshuttle.domain.stopL
 /** 운행 화면 제목: 준비·완료 단계 이름 또는 지금 처리할 지점. */
 internal fun flowTitle(trip: TripState): String = when (trip.phase) {
     TripPhase.PREPARING -> "탑승 준비"
-    TripPhase.ENDED -> "하원 완료"
+    TripPhase.ENDED -> "${TripDirections.label(trip.direction)} 완료"
     else -> (trip.currentStop ?: trip.origin).shortName
 }
 
@@ -36,6 +39,8 @@ internal fun flowTitle(trip: TripState): String = when (trip.phase) {
  */
 internal fun ridesFrom(trip: TripState, child: ChildRecord): Boolean =
     if (trip.phase == TripPhase.PREPARING) child.ridesToday
+    // 등원(V-25): 출발 뒤에도 아직 정류장에서 결정 전인 아이는 그 정류장에서 탈 아이로 센다.
+    else if (trip.isPickup) child.status != Attendance.CONFIRMED_NOT_BOARDED
     else child.status == Attendance.ONBOARD || child.status == Attendance.ALIGHTED
 
 internal fun timelineStops(trip: TripState): List<TimelineStop> {
@@ -48,7 +53,8 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         marker = "출",
         name = "${trip.origin.shortName} 출발",
         // 분모는 오늘 탈 아이(미탑승 예정·미탑승 확인 제외, 실제 탑승 기록은 포함).
-        detail = if (preparing) "탑승 기록 ${trip.onboardChildren.size}/${trip.children.count { it.ridesToday }}" else "탑승 ${boarded}명",
+        detail = if (preparing && trip.isPickup) "탈 어린이 ${trip.children.count { it.ridesToday }}명"
+            else if (preparing) "탑승 기록 ${trip.onboardChildren.size}/${trip.children.count { it.ridesToday }}" else "탑승 ${boarded}명",
         progress = if (preparing) StopProgress.CURRENT else StopProgress.DONE,
     )
     val stops = trip.routeOrder.mapIndexedNotNull { index, id ->
@@ -62,7 +68,12 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
             index == trip.currentStopIndex -> StopProgress.CURRENT
             else -> StopProgress.UPCOMING
         }
-        val detail = when (progress) {
+        val boardedHere = riders.count { it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED }
+        val detail = if (trip.isPickup) when (progress) {
+            StopProgress.CURRENT -> if (trip.phase == TripPhase.ALIGHTING) "탑승 기록 $boardedHere/${riders.size}" else "탑승 예정 ${riders.size}명"
+            StopProgress.DONE -> "탑승 ${boardedHere}명"
+            StopProgress.UPCOMING -> "탑승 ${riders.size}명"
+        } else when (progress) {
             StopProgress.CURRENT -> if (trip.phase == TripPhase.ALIGHTING) "하차 기록 $alighted/${riders.size}" else "하차 예정 ${riders.size}명"
             StopProgress.DONE -> "하차 기록 ${alighted}명"
             StopProgress.UPCOMING -> "하차 ${riders.size}명"
@@ -70,9 +81,9 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         TimelineStop("${index + 1}", stop.shortName, detail, progress)
     }
     val back = TimelineStop(
-        marker = "복",
-        name = "${trip.origin.shortName} 복귀",
-        detail = if (ended) "종료 기록 저장" else "종료 점검",
+        marker = if (trip.isPickup) "기" else "복",
+        name = if (trip.isPickup) "기관 도착" else "${trip.origin.shortName} 복귀",
+        detail = if (ended) "종료 기록 저장" else if (trip.isPickup) "기관 인계 · 종료 점검" else "종료 점검",
         progress = when { ended -> StopProgress.DONE; returning -> StopProgress.CURRENT; else -> StopProgress.UPCOMING },
     )
     return listOf(origin) + stops + back

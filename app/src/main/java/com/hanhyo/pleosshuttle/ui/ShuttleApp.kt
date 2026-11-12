@@ -125,14 +125,14 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
             Modifier.fillMaxSize().padding(if (compact) AppSpacing.screenCompact else AppSpacing.screen),
             verticalArrangement = Arrangement.spacedBy(if (compact) AppSpacing.md else AppSpacing.lg),
         ) {
-            AppHeader(runName = "하원 한 바퀴", compact = compact) {
+            AppHeader(runName = "${vm.tripDirectionLabel} 한 바퀴", compact = compact) {
                 if (!compact) {
                     StatusChip(vm.trip.phase.label, tone = ChipTone.INFO)
                     StatusChip("차내 기록 ${vm.trip.onboardChildren.size}명")
                     StatusChip("남은 ${vm.trip.remainingStopCount}곳")
                 }
                 StatusChip(if (vm.trip.integrationMode == IntegrationMode.SIMULATION) "모의 체험" else "차량 연결", tone = ChipTone.ACCENT)
-                Action(if (vm.panel == "flow") "명단 · 상세" else "하원으로", if (vm.panel == "flow") "tab-details" else "tab-flow", secondary = true) {
+                Action(if (vm.panel == "flow") "명단 · 상세" else "${vm.tripDirectionLabel}으로", if (vm.panel == "flow") "tab-details" else "tab-flow", secondary = true) {
                     vm.panel = if (vm.panel == "flow") "details" else "flow"
                 }
             }
@@ -258,7 +258,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
                                 .verticalScroll(rememberScrollState())
                                 .padding(horizontal = AppSpacing.xl, vertical = AppSpacing.sidePanelVertical),
                         ) { side(Modifier.fillMaxWidth()) }
-                        else -> StopTimelinePanel("하원 경로 · 정류장 ${vm.trip.routeOrder.size}곳", stops, paneModifier)
+                        else -> StopTimelinePanel("${vm.tripDirectionLabel} 경로 · 정류장 ${vm.trip.routeOrder.size}곳", stops, paneModifier)
                     }
                 }
             } else if (reordering || routeCheck) {
@@ -269,7 +269,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
                         .padding(horizontal = AppSpacing.xl, vertical = AppSpacing.sidePanelVertical),
                 ) { side(Modifier.fillMaxWidth()) }
             } else {
-                StopTimelinePanel("하원 경로 · 정류장 ${vm.trip.routeOrder.size}곳", stops, sideModifier)
+                StopTimelinePanel("${vm.tripDirectionLabel} 경로 · 정류장 ${vm.trip.routeOrder.size}곳", stops, sideModifier)
             }
             body(Modifier.weight(1f).fillMaxHeight())
         }

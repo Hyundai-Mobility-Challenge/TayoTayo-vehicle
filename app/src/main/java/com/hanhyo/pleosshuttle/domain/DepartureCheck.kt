@@ -18,6 +18,14 @@ data class DepartureSummary(
     val driverChecked: Boolean,
     /** V-16: 벨트 미확인 아이의 음성용 이름(명단 순서). 이름은 차량 안 음성·화면에만 쓰고 키·원장·서버에는 넣지 않는다. */
     val beltUncheckedNames: List<String> = emptyList(),
+    /** V-25 등원 운행이면 true. 출발 때 탄 아이가 없어 벨트 줄·0명 탑승 경고가 없다(VS-05 등원). */
+    val pickup: Boolean = false,
+    /** 등원: 오늘 탈 아이(미탑승 확인 제외, 미탑승 예정 미확인 포함 안 함) 수. */
+    val pickupRiders: Int = 0,
+    /** 등원: 출발 전 미탑승 확인한 아이 수. */
+    val confirmedNotBoarded: Int = 0,
+    /** 등원: 미탑승 예정 알림이 있는데 아직 미탑승 확인 전인 아이 수(정류장에서 확인 가능, 막지 않음). */
+    val noticeUnconfirmed: Int = 0,
 ) {
     val firstStopName: String? get() = stopNames.firstOrNull()
 }
@@ -33,7 +41,9 @@ fun departureRouteOrder(trip: TripState): List<String> =
 
 /** 흐름 카드가 [운행 시작] 단계(start-trip)인 조건: 운행 준비 · 탈 아이 있음 · 모두 결정 · 탑승 1명 이상. */
 val TripState.awaitingDeparture: Boolean
-    get() = phase == TripPhase.PREPARING && !noTripToday && undecidedChildren.isEmpty() && onboardChildren.isNotEmpty()
+    get() = phase == TripPhase.PREPARING && !noTripToday &&
+        // 등원(V-25)은 정류장에서 태우므로 출발 전 결정·탑승 기록이 필요 없다. 알림 없는 아이는 정류장에서 확정(결정 31).
+        (isPickup || (undecidedChildren.isEmpty() && onboardChildren.isNotEmpty()))
 
 fun departureSummary(trip: TripState, order: List<String> = departureRouteOrder(trip)): DepartureSummary = DepartureSummary(
     boarded = trip.onboardChildren.size,
@@ -43,6 +53,10 @@ fun departureSummary(trip: TripState, order: List<String> = departureRouteOrder(
     stopNames = order.mapNotNull { id -> trip.stops.find { it.id == id }?.let(::stopLabel) },
     driverChecked = trip.driverCheckedAtMillis != null,
     beltUncheckedNames = trip.beltUncheckedChildren.map(::spokenChildName),
+    pickup = trip.isPickup,
+    pickupRiders = trip.children.count { it.ridesToday },
+    confirmedNotBoarded = trip.confirmedNotBoardedChildren.size,
+    noticeUnconfirmed = trip.children.count { !it.expectedToBoard && it.status == Attendance.NOT_BOARDED },
 )
 
 /** 음성으로 읽는 이름. 화면 표시와 같이 "가상 " 접두어를 뗀다(V-15·V-16 공통). */
@@ -61,7 +75,7 @@ fun spokenNameList(names: List<String>): String =
     else "${names.take(SPOKEN_NAMES_WHEN_TRUNCATED).joinToString(", ")} 외 ${names.size - SPOKEN_NAMES_WHEN_TRUNCATED}명"
 
 /** V-08 음성 요약(V-15·V-16과 같은 존댓말 짧은 문장). 기사님이 듣고 말로 답하면 선생님이 체크한다(D37). */
-fun departureSpeech(summary: DepartureSummary): String = buildString {
+fun departureSpeech(summary: DepartureSummary): String = if (summary.pickup) pickupDepartureSpeech(summary) else buildString {
     append("출발 전 확인입니다. 탑승 ${summary.boarded}명")
     if (summary.expected != summary.boarded) append(", 예정 ${summary.expected}명")
     summary.firstStopName?.let { append(", 첫 정류장 $it") }
@@ -75,6 +89,13 @@ fun departureSpeech(summary: DepartureSummary): String = buildString {
     })
     if (summary.undecided > 0) append("아직 결정 안 된 어린이 ${summary.undecided}명. ")
     append("기사님, 확인해 주세요.")
+}
+
+/** VS-05 등원 음성 요약. 예: "출발 전 확인입니다. 탈 어린이 3명, 첫 정류장 서울숲, 다음 기관. 기사님, 확인해 주세요." */
+fun pickupDepartureSpeech(summary: DepartureSummary): String = buildString {
+    append("출발 전 확인입니다. 탈 어린이 ${summary.pickupRiders}명")
+    summary.firstStopName?.let { append(", 첫 정류장 $it") }
+    append(", 다음 기관. 기사님, 확인해 주세요.")
 }
 
 /**

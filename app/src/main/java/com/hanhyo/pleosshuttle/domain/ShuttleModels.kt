@@ -464,6 +464,14 @@ data class TripState(
 }
 
 object SampleTrip {
+    /**
+     * 모의 체험용 등원(PICK_UP) 운행. 같은 가상 명단·정류장을 쓰고, 어린이 나만 결석 알림(미탑승 예정)이다.
+     * routeIsExample은 그대로 두어 [운행 시작] 때 하원과 같은 방식으로 순서를 계산한다.
+     */
+    fun createPickup(): TripState = create().let { trip ->
+        trip.copy(tripId = "fictional-morning-001", direction = TripDirections.PICK_UP,
+            children = trip.children.map { if (it.id == "child-b") it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT") else it })
+    }
     fun create(): TripState {
         val origin = Stop("origin", "가상 출발지 · 서울시청", 37.5665, 126.9780)
         val stops = listOf(

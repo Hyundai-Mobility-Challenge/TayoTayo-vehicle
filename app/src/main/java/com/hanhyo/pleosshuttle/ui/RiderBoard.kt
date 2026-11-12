@@ -25,6 +25,7 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.ChildRecord
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
+import com.hanhyo.pleosshuttle.domain.PickupFlow
 import com.hanhyo.pleosshuttle.domain.StayOnboardReasons
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
@@ -142,8 +143,8 @@ internal fun riderBoard(
     val beltShown = trip.phase == TripPhase.PREPARING || trip.phase == TripPhase.DRIVING || trip.phase == TripPhase.ALIGHTING
     // 출발 직전: 운행 준비에서 모두 결정되어 [운행 시작] 단계(흐름 카드 start-trip)일 때.
     val departing = trip.phase == TripPhase.PREPARING && !trip.noTripToday && trip.undecidedChildren.isEmpty() && trip.onboardChildren.isNotEmpty()
-    // 재출발 전: 정류장 정차(하차 단계) 중 이 정류장에서 내리지 않고 계속 타고 가는 아이.
-    val staysAfterStop = { child: ChildRecord -> trip.phase == TripPhase.ALIGHTING && child.stopId != trip.currentStop?.id }
+    // 재출발 전: 정류장 정차(하차 단계) 중 이 정류장에서 내리지 않고 계속 타고 가는 아이. 등원은 탄 아이 모두(기관까지 감).
+    val staysAfterStop = { child: ChildRecord -> trip.phase == TripPhase.ALIGHTING && (trip.isPickup || child.stopId != trip.currentStop?.id) }
     val focusStopId = if (trip.phase == TripPhase.DRIVING || trip.phase == TripPhase.ALIGHTING) trip.currentStop?.id else null
     val rows = trip.children
         .sortedWith(compareBy<ChildRecord>({ stopRank(it.stopId) }, { displayName(it) }))
@@ -152,14 +153,15 @@ internal fun riderBoard(
                 id = child.id,
                 name = displayName(child),
                 status = child.status,
-                statusLabel = riderStatusLabel(child),
-                tone = riderTone(child),
-                badge = if (moving) null else stayOnboardBadge(child) ?: notBoardingBadge(child),
+                statusLabel = if (trip.isPickup) PickupFlow.statusLabel(trip, child) else riderStatusLabel(child),
+                tone = if (trip.isPickup && child.receivedAtStop && child.status == Attendance.NOT_BOARDED) ChipTone.ACCENT else riderTone(child),
+                badge = if (moving) null else if (trip.isPickup) PickupFlow.notBoardingBadge(child) else stayOnboardBadge(child) ?: notBoardingBadge(child),
                 stopName = if (moving) null else trip.stops.find { it.id == child.stopId }?.shortName,
                 highlight = when {
                     trip.phase == TripPhase.END_REVIEW && child.status == Attendance.ONBOARD -> RiderHighlight.REMAINING
                     focusStopId != null && child.stopId == focusStopId &&
-                        (child.status == Attendance.ONBOARD || child.status == Attendance.ALIGHTED) -> RiderHighlight.CURRENT_STOP
+                        (child.status == Attendance.ONBOARD || child.status == Attendance.ALIGHTED ||
+                            (trip.isPickup && child.status == Attendance.NOT_BOARDED)) -> RiderHighlight.CURRENT_STOP
                     else -> RiderHighlight.NONE
                 },
                 actions = if (readOnly) emptyList() else rowActions(trip, child),
@@ -169,7 +171,14 @@ internal fun riderBoard(
             )
         }
     val count = { s: Attendance -> trip.children.count { it.status == s } }
-    val summary = buildList {
+    val summary = if (trip.isPickup) buildList {
+        add("${trip.children.size}명")
+        add("탑승 ${count(Attendance.ONBOARD)}")
+        if (count(Attendance.ALIGHTED) > 0 || trip.phase == TripPhase.END_REVIEW || trip.phase == TripPhase.ENDED) add("기관 인계 완료 ${count(Attendance.ALIGHTED)}")
+        if (count(Attendance.NOT_BOARDED) > 0) add("탑승 전 ${count(Attendance.NOT_BOARDED)}")
+        if (count(Attendance.CONFIRMED_NOT_BOARDED) > 0) add("미탑승 확인 ${count(Attendance.CONFIRMED_NOT_BOARDED)}")
+        if (beltShown && trip.onboardChildren.isNotEmpty()) add("벨트 미확인 ${trip.beltUncheckedCount}")
+    }.joinToString(" · ") else buildList {
         add("${trip.children.size}명")
         add("탑승 ${count(Attendance.ONBOARD)}")
         if (trip.phase != TripPhase.PREPARING || count(Attendance.ALIGHTED) > 0) add("하차 완료 ${count(Attendance.ALIGHTED)}")
@@ -182,12 +191,16 @@ internal fun riderBoard(
     val beltWarnings = rows.count { it.belt?.warn == true }
     val note = when {
         moving -> "운행 중에는 조회만 할 수 있어요"
+        trip.isPickup && trip.phase == TripPhase.END_REVIEW ->
+            if (remaining > 0) "기관 인계 전 ${remaining}명 · 아이마다 인계해 주세요" else "차 안에 남은 기록 없음 · 실내는 직접 확인해 주세요"
         trip.phase == TripPhase.END_REVIEW -> when {
             trip.stayOnboardChildren.isNotEmpty() -> "차 안에 남은 기록 ${remaining}명(동승 유지 ${trip.stayOnboardChildren.size}명 · 기관에 인계) · 직접 확인해 주세요"
             remaining > 0 -> "차 안에 남은 기록 ${remaining}명 · 직접 확인해 주세요"
             else -> "차 안에 남은 기록 없음 · 실내는 직접 확인해 주세요"
         }
         trip.phase == TripPhase.PREPARING && !stationary -> "정차 후 기록할 수 있어요"
+        // VS-17 결정 31: 출발 전에는 미탑승 예정(알림 있음) 아이만 확인한다.
+        trip.isPickup && trip.phase == TripPhase.PREPARING -> PICKUP_PREPARE_NOTE
         beltWarnings > 0 -> "벨트 미확인 ${beltWarnings}명 · 출발 전에 직접 확인해 주세요"
         else -> null
     }
@@ -195,7 +208,7 @@ internal fun riderBoard(
 }
 
 /** 흐름 카드와 같은 규칙(feature 3): 미탑승 예정 아이는 [미탑승 확인]이 먼저. "오늘 운행 없음"이면 탑승·미탑승 확인 없음(엔진도 거부). */
-private fun rowActions(trip: TripState, child: ChildRecord): List<RiderAction> = when (child.status) {
+private fun rowActions(trip: TripState, child: ChildRecord): List<RiderAction> = if (trip.isPickup) pickupRowActions(trip, child) else when (child.status) {
     Attendance.NOT_BOARDED -> when {
         trip.noTripToday -> emptyList()
         child.expectedToBoard -> listOf(RiderAction.BOARD, RiderAction.CONFIRM_NOT_BOARDED)
@@ -204,6 +217,18 @@ private fun rowActions(trip: TripState, child: ChildRecord): List<RiderAction> =
     Attendance.CONFIRMED_NOT_BOARDED -> listOf(RiderAction.UNDO_NOT_BOARDED)
     else -> emptyList()
 }
+
+/**
+ * VS-17 등원 운행 준비 행 동작. 출발 전 [탑승]은 없다(정류장에서 인계받은 뒤). 미탑승 예정 아이만 [미탑승 확인],
+ * 확인한 아이는 [미탑승 확인 취소](탑승 전으로). 알림 없는 아이는 정류장에서 확정하므로 버튼 없음(결정 31).
+ */
+internal fun pickupRowActions(trip: TripState, child: ChildRecord): List<RiderAction> = when {
+    PickupFlow.canConfirmBeforeDeparture(trip, child) -> listOf(RiderAction.CONFIRM_NOT_BOARDED)
+    PickupFlow.canUndoBeforeDeparture(trip, child) -> listOf(RiderAction.UNDO_NOT_BOARDED)
+    else -> emptyList()
+}
+
+internal const val PICKUP_PREPARE_NOTE = "알림 없는 아이는 정류장에서 확정"
 
 private fun displayName(child: ChildRecord) = child.name.removePrefix("가상 ")
 

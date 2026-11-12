@@ -14,7 +14,8 @@ class InstitutionConnection(context: Context) {
     val base get() = prefs.getString("base", "http://10.0.2.2:8080")!!
     val name get() = prefs.getString("name", "연결된 차량 없음")!!
     val connected get() = prefs.contains("credential")
-    val direction get() = prefs.getString("direction", "DROP_OFF")!!
+    /** VS-02: 선생님이 고른 방향. 한 번도 고르지 않았으면 시간대 기본값(TripDirections.defaultFor). */
+    val direction get() = InstitutionTrips.effectiveDirection(prefs.getString("direction", null), java.time.LocalTime.now().hour)
     private val credential get() = prefs.getString("credential", "")!!
     val boundTrip get() = prefs.getString("trip", "")!!
     private fun call(path: String, body: JSONObject? = null, method: String? = null) =
@@ -32,7 +33,7 @@ class InstitutionConnection(context: Context) {
 
     /** Trips are created by the organization web/API. The vehicle app selects today's prepared trip. */
     fun setDirection(value: String) {
-        require(value in setOf("PICK_UP", "DROP_OFF"))
+        require(value in setOf(TripDirections.PICK_UP, TripDirections.DROP_OFF))
         prefs.edit().putString("direction", value).apply()
     }
 
@@ -167,7 +168,11 @@ internal object InstitutionTrips {
     /** Server trip statuses that are still operable: PREPARING / IN_PROGRESS / RETURNING. COMPLETED·CANCELLED are finished. */
     val ACTIVE_TRIP_STATUSES = setOf("PREPARING", "IN_PROGRESS", "RETURNING")
 
-    fun directionLabel(direction: String) = if (direction == "PICK_UP") "등원" else "하원"
+    fun directionLabel(direction: String) = TripDirections.label(direction)
+
+    /** VS-02 방향: 저장된 선택이 있으면 그 값, 없으면 시간대 기본값(D25·OQ-26 제안안). 선생님 선택은 유지한다. */
+    fun effectiveDirection(stored: String?, hourOfDay: Int): String =
+        if (stored.isNullOrBlank()) TripDirections.defaultFor(hourOfDay) else TripDirections.of(stored)
 
     fun noTripMessage(direction: String) =
         "오늘 차량에 배정된 ${directionLabel(direction)} 운행이 없습니다. 기관에서 운행을 먼저 생성해 주세요."

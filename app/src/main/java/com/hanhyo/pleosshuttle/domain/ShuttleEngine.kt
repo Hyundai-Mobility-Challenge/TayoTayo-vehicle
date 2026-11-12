@@ -496,6 +496,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (state.isPickup) {
             // V-27: 등원 정류장은 그 정류장 아이가 모두 탑승 또는 미탑승 확인이어야 [다음 정류장으로].
             if (state.currentStopChildren.any { it.status == Attendance.NOT_BOARDED }) return reject(PICKUP_STOP_PENDING)
+            // VS-18 [기관으로 출발]: 마지막 정류장이면 운행의 모든 아이가 탑승 또는 미탑승 확인이어야 한다(V-26).
+            if (PickupFlow.isLastStop(state) && state.undecidedChildren.isNotEmpty()) return reject(PICKUP_INSTITUTION_PENDING)
         } else if (state.currentStopChildren.any { it.awaitingAlighting }) {
             // V-21: 동승 유지 아이는 처리된 것으로 본다(내리지 않고 계속 타고 감).
             return reject("현재 지점의 인계·하차 기록이 남아 있습니다.")
@@ -507,7 +509,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
             "현재 지점의 인계·하차 기록 완료로 다음 목적지 표시. 차량 출발 승인 또는 문·주변 안전 확인이 아님. 주변=${surroundings.kind}, 문시험=${state.unlockAttempt?.status}"))
         invalidate(now, "지점 기록 완료 후 다음 목적지 표시")
         return update(state.copy(phase = TripPhase.DRIVING, currentStopIndex = state.currentStopIndex + 1, handoverChildIds = emptySet()),
-            if (state.isPickup) "정류장 탑승 기록 완료 · 다음 지점을 안내합니다." else "하차 기록 완료 · 다음 지점을 안내합니다.")
+            if (state.isPickup) (if (state.currentStopIndex + 1 >= state.routeOrder.size) "정류장 탑승 기록 완료 · 기관으로 출발합니다." else "정류장 탑승 기록 완료 · 다음 지점을 안내합니다.") else "하차 기록 완료 · 다음 지점을 안내합니다.")
     }
     fun startOperationalTrip(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("이미 운행을 시작했습니다.")
@@ -785,6 +787,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         const val PICKUP_NO_STOP_ALIGHTING = "등원에서는 정류장 하차가 없습니다. 기관 도착 확인 뒤 기관 인계로 기록하세요."
         const val PICKUP_NO_STAY_ONBOARD = "등원의 기관 담당자 부재 처리는 아직 정해지지 않았습니다(OQ-29)."
         const val PICKUP_STOP_PENDING = "정류장의 어린이가 모두 탑승 또는 미탑승 확인이어야 다음 정류장으로 갈 수 있습니다."
+        const val PICKUP_INSTITUTION_PENDING = "운행의 어린이가 모두 탑승 또는 미탑승 확인이어야 기관으로 출발할 수 있습니다. 앞 정류장 어린이를 먼저 확인해 주세요."
         private val REAL_SOURCES = setOf(Source.SDK, Source.EMULATOR_INPUT)
     }
 }

@@ -69,8 +69,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     private val institution = InstitutionConnection(application)
     val institutionBase get() = institution.base
     var institutionDirection by mutableStateOf(institution.direction); private set
-    /** 화면 표시용 운행 방향(등원/하원). 기관 운행은 불러올 때 고른 방향, 모의 운행은 하원. */
-    val tripDirectionLabel get() = if (institutionConnected && trip.tripId == institution.boundTrip) InstitutionTrips.directionLabel(institutionDirection) else "하원"
+    /** 화면 표시용 운행 방향(등원/하원). 운행에 저장된 방향(TripState.direction, 이전 저장 파일은 하원)을 읽는다. */
+    val tripDirectionLabel get() = TripDirections.label(trip.direction)
     var institutionName by mutableStateOf(institution.name); private set
     var institutionConnected by mutableStateOf(institution.connected); private set
     var institutionStatus by mutableStateOf("기관 서버를 연결하면 보호자에게 하차 기록을 전달합니다."); private set
@@ -118,7 +118,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     }
     val trackingControls get() = vehicleTrackingControls(
         institutionConnected, trip.tripId == institution.boundTrip, trip.phase,
-        trip.onboardChildren.isNotEmpty(), trip.currentStop != null, trip.integrationMode,
+        trip.onboardChildren.isNotEmpty() || trip.isPickup, trip.currentStop != null, trip.integrationMode,
         trackingEnabled, storageError == null)
     var trackingPermissionRequested by mutableStateOf(false); private set
     private var trackingServiceRequested = false
@@ -184,6 +184,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     fun foreground() {
         if (foreground) return
         foreground = true
+        institutionDirection = institution.direction
         locationPermissionGranted = TripTrackingService.hasPermission(getApplication())
         trackingServiceRequested = TripTrackingService.running
         trackingEnabled = trialPrefs.getBoolean("trackingEnabled", false)
@@ -270,12 +271,13 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     fun prepareConnectedDemo() = loadInstitutionTrip(true)
     fun loadInstitutionTrip() = loadInstitutionTrip(false)
     fun chooseInstitutionDirection(direction: String) {
-        if (institutionBusy || direction !in setOf("PICK_UP", "DROP_OFF")) return
+        if (institutionBusy || direction !in setOf(TripDirections.PICK_UP, TripDirections.DROP_OFF)) return
         institution.setDirection(direction)
         institutionDirection = direction
     }
     private fun loadInstitutionTrip(archiveLocalDemo: Boolean) {
         if (institutionBusy) return
+        institutionDirection = institution.direction // 고른 적 없으면 지금 시간대 기본값(VS-02)
         if (!(if (archiveLocalDemo) canPrepareConnectedDemo else canReplaceInstitutionTrip())) { institutionStatus = "진행 중인 운행 또는 미전송 기록이 있습니다. 완료 후 다시 시도해 주세요."; return }
         institutionBusy = true
         viewModelScope.launch {
@@ -552,14 +554,17 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         try { store.archiveEnded(trip) }
         catch (error: Exception) { storageError = "완료 운행 보관 실패. 기존 운행을 유지합니다: ${error.javaClass.simpleName}"; return }
         realVehicle?.onStop(); realNavi?.onStop(); realToken = null
-        engine = ShuttleEngine(SampleTrip.create().copy(tripId = "fictional-afternoon-${System.currentTimeMillis()}"))
+        // 끝난 운행과 같은 방향으로 새 모의 운행을 만든다(하원이면 그대로 하원).
+        val pickup = trip.isPickup
+        engine = ShuttleEngine(if (pickup) SampleTrip.createPickup().copy(tripId = "fictional-morning-${System.currentTimeMillis()}")
+            else SampleTrip.create().copy(tripId = "fictional-afternoon-${System.currentTimeMillis()}"))
         scenario = TrialScenario.PARKED
         trialPrefs.edit().putString("scenario", scenario.name).commit()
         feedSimulation(); publish(); panel = "flow"
     }
     fun restartSimulation(stage: Int) {
         if (institutionBusy || syncing || institution.pending(trip) > 0) { actionError = "기관 기록 전송을 먼저 완료해 주세요."; return }
-        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..4) return
+        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..5) return
         val fresh = SampleTrip.create().copy(tripId = "fictional-demo-${java.util.UUID.randomUUID()}")
         val prepared = when(stage) {
             1 -> fresh.copy(phase = TripPhase.ALIGHTING, children = fresh.children.map { it.copy(status = Attendance.ONBOARD) })
@@ -573,6 +578,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                 "child-d" -> it.copy(notExpectedToBoard = true, notBoardingReason = "SELF_PICKUP")
                 else -> it
             } })
+            // 테스트 도구 전용: 등원(PICK_UP) 모의 운행(VS-17~VS-18). 나 결석 알림 → 출발 전 미탑승 확인 가능.
+            5 -> SampleTrip.createPickup().copy(tripId = "fictional-morning-${java.util.UUID.randomUUID()}")
             else -> fresh
         }.let { it.copy(diagnostics = listOf(DiagnosticEntry(System.currentTimeMillis(), "체험 시작", ResultStatus.UNVERIFIED,
             "가상 단계 $stage 사전 설정. 실제 탑승·인계·하차 기록이 아닙니다."))) }
