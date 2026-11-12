@@ -1,0 +1,11 @@
+{
+  "packageName": "com.hanhyo.pleosshuttle",
+  "appDescription": "An emulator-only shuttle workflow demonstration using fictional passengers and public test destinations.",
+  "invokeWord": "통학 체험",
+  "version": "0.1.0",
+  "actionCalls": [
+    {"type":"function","function":{"component":"activity","name":"OPEN_DROPOFF_PREPARATION","description":"Opens the drop-off preparation screen for the driver to review the current workflow.","parameters":{"type":"object","properties":{}},"required":[]}},
+    {"type":"function","function":{"component":"activity","name":"SHOW_NEXT_STOP","description":"Shows the next approved test stop and the remaining passenger records.","parameters":{"type":"object","properties":{}},"required":[]}},
+    {"type":"function","function":{"component":"activity","name":"PLAY_TEST_MUSIC","description":"Plays the local test melody subject to the current audio focus state.","parameters":{"type":"object","properties":{}},"required":[]}}
+  ]
+}

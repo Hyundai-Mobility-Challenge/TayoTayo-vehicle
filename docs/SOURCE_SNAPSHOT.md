@@ -1,0 +1,11 @@
+# 분리 기준
+
+- 원본: [Hyundai-Mobility-Challenge/PleosShuttlePoC](https://github.com/Hyundai-Mobility-Challenge/PleosShuttlePoC)
+- 원본 기준 커밋: `99670e7f8a02fb7834d71ca59cb91e79636504f2`
+- 분리 시점: 2026-11-06
+- 원본 브랜치: `codex/institution-invitations`
+- 위 커밋 이후 로컬 작업 파일의 수정과 추가도 포함한 작업본 스냅샷입니다.
+- 각 새 저장소는 독립적인 최초 커밋으로 시작합니다. 과거 Git 이력은 원본 저장소에 남아 있습니다.
+- 기존 소스의 작성자/라이선스 표기를 유지합니다. 이 분리는 새로운 소프트웨어 라이선스를 부여하지 않습니다.
+- 런타임 DB, 사용자/기기 토큰, Firebase 설정/서비스 계정 키, 빌드 산출물, IDE 설정, 로컬 증거 폴더는 포함하지 않습니다.
+- `source-files.json`은 복사한 원본 파일의 SHA-256 목록입니다. 새 README, Gradle 프로젝트 구성, 분리 안내는 이 저장소에 맞게 작성했습니다.

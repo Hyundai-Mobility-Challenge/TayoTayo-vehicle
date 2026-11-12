@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>통학메이트 클릭 프로토타입</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+button{font-family:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed}
+a{color:#7A5000}a:hover{color:#5C3C00}
+</style>
+</helmet>
+<div style="position: relative; width: 1280px; height: 920px; box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: #FFFFFF; color: #16191D; font-family: 'IBM Plex Sans KR', system-ui, sans-serif; overflow: hidden">
+
+<header style="height: 72px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<div style="display: flex; align-items: center; gap: 16px">
+<div style="width: 52px; height: 52px; border-radius: 16px; background: #FFC93C; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1F1600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="14" rx="3"></rect><path d="M4 11h16"></path><path d="M7 17v3M17 17v3"></path></svg></div>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 15px; line-height: 20px; font-weight: 500; color: #4F555E">통학메이트</span>
+<span style="font-size: 26px; line-height: 32px; font-weight: 700">{{ title }}</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<sc-if value="{{ stYellow }}" hint-placeholder-val="{{ false }}"><span style="height: 44px; padding: 0 18px; border-radius: 22px; background: #FFF3CC; color: #7A5000; display: flex; align-items: center; font-size: 18px; font-weight: 700">{{ statusText }}</span></sc-if>
+<sc-if value="{{ stBlue }}" hint-placeholder-val="{{ false }}"><span style="height: 44px; padding: 0 18px; border-radius: 22px; background: #E6F0FC; color: #1D5FAF; display: flex; align-items: center; font-size: 18px; font-weight: 700">{{ statusText }}</span></sc-if>
+<sc-if value="{{ stCoral }}" hint-placeholder-val="{{ false }}"><span style="height: 44px; padding: 0 18px; border-radius: 22px; background: #FDECE4; color: #A83E10; display: flex; align-items: center; font-size: 18px; font-weight: 700">{{ statusText }}</span></sc-if>
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="2"><span style="height: 44px; padding: 0 18px; border-radius: 22px; background: #F3F4F6; border: 1px solid #DDE0E5; display: flex; align-items: center; font-size: 18px; font-weight: 600">{{ c.t }}</span></sc-for>
+</div>
+</header>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px">
+
+<section style="min-height: 0; background: #F3F4F6; border-radius: 20px; padding: 20px 16px; display: flex; flex-direction: column; gap: 6px; overflow: hidden">
+<sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+<span style="padding: 0 8px 8px; font-size: 16px; font-weight: 600; color: #4F555E">오늘 운행</span>
+<sc-for list="{{ trips }}" as="t" hint-placeholder-count="2">
+<button type="button" onClick="{{ t.pick }}" aria-pressed="{{ t.pressed }}" style="margin-bottom: 6px; text-align: left; padding: 18px; border-radius: 16px; background: {{ t.bg }}; border: 2px solid {{ t.bd }}; color: #16191D; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 700; color: {{ t.tagFg }}">{{ t.tag }}</span>
+<span style="font-size: 26px; line-height: 34px; font-weight: 700">{{ t.label }}</span>
+<span style="font-size: 16px; line-height: 24px; color: #4F555E">{{ t.meta }}</span>
+</button>
+</sc-for>
+<p style="margin: 6px 8px 0; font-size: 15px; line-height: 24px; color: #646A73">체험에서는 등원과 하원을 모두 고를 수 있어요.</p>
+</sc-if>
+
+<sc-if value="{{ routeDiffs }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px">
+<span style="padding: 0 8px; font-size: 16px; font-weight: 600; color: #4F555E">평소와 달라진 점</span>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{ diffs }}" as="d" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: #FFFFFF; font-size: 17px; line-height: 24px"><span style="height: 28px; flex: none; padding: 0 10px; border-radius: 14px; background: {{ d.bg }}; color: {{ d.fg }}; display: flex; align-items: center; font-size: 14px; font-weight: 700">{{ d.tag }}</span><span>{{ d.text }}</span></div>
+</sc-for>
+</div>
+<div style="padding: 14px; border-radius: 14px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 17px; line-height: 24px; font-weight: 700">보호자 도착 알림</span><span style="font-size: 14px; line-height: 20px; color: #4F555E">출발하면 정류장별 도착 예정 시각을 보내요</span></span>
+<button type="button" role="switch" aria-checked="{{ notifyAria }}" aria-label="보호자 도착 알림" onClick="{{ toggleNotify }}" style="width: 64px; height: 36px; flex: none; padding: 4px; box-sizing: border-box; border: none; border-radius: 18px; background: {{ notifyBg }}; display: flex; justify-content: {{ notifyJust }}"><span style="width: 28px; height: 28px; border-radius: 14px; background: #FFFFFF"></span></button>
+</div>
+<span style="font-size: 14px; line-height: 20px; color: #646A73">보내는 방식 [확인 필요]</span>
+</div>
+<button type="button" onClick="{{ toggleRules }}" style="margin-top: auto; height: 56px; border-radius: 14px; background: transparent; border: 1px solid #CDD1D7; color: #16191D; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 16px; font-weight: 600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F555E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7.5v.5"></path></svg>순서를 정하는 기준 보기</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ routeRules }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="padding: 0 8px 8px; font-size: 16px; font-weight: 600; color: #4F555E">순서를 정하는 기준</span>
+<sc-for list="{{ rules }}" as="r" hint-placeholder-count="5">
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 10px 8px; font-size: 18px; line-height: 26px">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2A72C9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M5 12l5 5 9-10"></path></svg>
+<span>{{ r.t }}</span>
+</div>
+</sc-for>
+<p style="margin: 8px 8px 0; font-size: 15px; line-height: 24px; color: #646A73">처음 쓸 때 한 번 안내하고, 기준을 어기는 순서로 바꾸면 그 자리에서 알려줘요.</p>
+<button type="button" onClick="{{ toggleRules }}" style="margin-top: auto; height: 56px; border-radius: 14px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 16px; font-weight: 600">닫기</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isReorder }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 0 4px">
+<span style="font-size: 16px; font-weight: 600; color: #4F555E">바꾼 결과</span>
+<div style="padding: 16px; border-radius: 16px; background: #FFFFFF; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 15px; color: #4F555E">{{ endLabel }}</span>
+<div style="display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums">
+<span style="font-size: 20px; color: #646A73; text-decoration: line-through">{{ baseEnd }}</span>
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#646A73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+<span style="font-size: 32px; line-height: 40px; font-weight: 700">{{ draftEnd }}</span>
+<span style="height: 28px; padding: 0 10px; border-radius: 14px; background: {{ diffBg }}; color: {{ diffFg }}; display: flex; align-items: center; font-size: 15px; font-weight: 700">{{ diffText }}</span>
+</div>
+<span style="font-size: 15px; color: #646A73">{{ totalText }}</span>
+</div>
+<sc-if value="{{ hasWarns }}" hint-placeholder-val="{{ false }}"><div style="padding: 14px 16px; border-radius: 16px; background: #FDECE4; display: flex; align-items: center; gap: 12px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D0551F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3l10 18H2L12 3z"></path><path d="M12 10v5M12 18v.5"></path></svg><span style="font-size: 17px; line-height: 24px; font-weight: 600; color: #5A2410">확인할 점 {{ warnCount }}건</span></div></sc-if>
+<sc-if value="{{ noWarns }}" hint-placeholder-val="{{ true }}"><div style="padding: 14px 16px; border-radius: 16px; background: #E6F0FC; display: flex; align-items: center; gap: 12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2A72C9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M5 12l5 5 9-10"></path></svg><span style="font-size: 17px; line-height: 24px; font-weight: 600; color: #1D5FAF">기준에 어긋나는 곳이 없어요</span></div></sc-if>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 15px; font-weight: 600; color: #4F555E">바꾸는 이유 (선택)</span>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ reasons }}" as="r" hint-placeholder-count="3"><button type="button" onClick="{{ r.pick }}" aria-pressed="{{ r.pressed }}" style="height: 48px; padding: 0 16px; border-radius: 24px; background: {{ r.bg }}; border: {{ r.bw }} solid {{ r.bd }}; color: {{ r.fg }}; font-size: 16px; font-weight: 700">{{ r.t }}</button></sc-for>
+</div>
+</div>
+<p style="margin: auto 0 0; font-size: 15px; line-height: 24px; color: #646A73">운전 선생님과 함께 확인해요. 운행 중에는 차가 멈췄을 때만 바꿀 수 있어요.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMusic }}" hint-placeholder-val="{{ false }}">
+<div style="padding: 0 8px 8px; display: flex; align-items: baseline; justify-content: space-between"><span style="font-size: 16px; font-weight: 600; color: #4F555E">재생목록</span><span style="font-size: 14px; color: #646A73">예시 · 음원 권리 확인 전</span></div>
+<sc-for list="{{ playlists }}" as="p" hint-placeholder-count="6">
+<button type="button" onClick="{{ p.pick }}" aria-pressed="{{ p.pressed }}" style="text-align: left; padding: 10px 14px; border-radius: 14px; background: {{ p.bg }}; border: 2px solid {{ p.bd }}; color: #16191D; display: flex; align-items: center; gap: 12px">
+<span style="width: 40px; height: 40px; flex: none; border-radius: 12px; background: {{ p.icBg }}; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{ p.star }}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F1600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7L12 3z"></path></svg></sc-if>
+<sc-if value="{{ p.note }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="{{ p.icStroke }}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="17" cy="16" r="3"></circle></svg></sc-if>
+</span>
+<span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 19px; line-height: 26px; font-weight: 700">{{ p.name }}</span><span style="font-size: 14px; line-height: 20px; color: {{ p.subFg }}">{{ p.sub }}</span></span>
+</button>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{ showTimeline }}" hint-placeholder-val="{{ false }}">
+<span style="padding: 0 8px 8px; font-size: 16px; font-weight: 600; color: #4F555E">{{ tlTitle }}</span>
+<sc-for list="{{ tl }}" as="r" hint-placeholder-count="6">
+<div style="display: flex; gap: 14px; align-items: center; padding: 10px; border-radius: 14px; background: {{ r.bg }}; border: 2px solid {{ r.bd }}">
+<span style="width: 30px; height: 30px; flex: none; box-sizing: border-box; border-radius: 15px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; background: {{ r.mBg }}; border: 2px solid {{ r.mBd }}; color: {{ r.mFg }}">
+<sc-if value="{{ r.isDone }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></sc-if>
+<sc-if value="{{ r.notDone }}" hint-placeholder-val="{{ true }}">{{ r.num }}</sc-if>
+</span>
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+<span style="font-size: 19px; line-height: 26px; font-weight: 600; color: {{ r.fg }}">{{ r.name }}</span>
+<span style="font-size: 15px; line-height: 20px; color: {{ r.sub }}">{{ r.meta }}</span>
+</div>
+</div>
+</sc-for>
+</sc-if>
+</section>
+
+<section style="min-width: 0; min-height: 0; background: #F3F4F6; border-radius: 20px; padding: 28px 32px; display: flex; flex-direction: column; overflow: hidden">
+
+<sc-if value="{{ isToday }}" hint-placeholder-val="{{ true }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h1 style="margin: 0; font-size: 30px; line-height: 40px; font-weight: 700">출발 전 확인할 변경 {{ chTotal }}건</h1>
+<span style="font-size: 18px; font-weight: 700; color: #7A5000">{{ ackN }}/{{ chTotal }} 확인</span>
+</div>
+<sc-for list="{{ changes }}" as="c" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 20px; padding: 14px 20px; border-radius: 16px; background: #FFFFFF; border: 2px solid {{ c.bd }}">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="height: 30px; padding: 0 12px; border-radius: 15px; display: flex; align-items: center; font-size: 15px; font-weight: 700; background: {{ c.tagBg }}; color: {{ c.tagFg }}">{{ c.type }}</span>
+<span style="font-size: 24px; line-height: 32px; font-weight: 700">{{ c.kid }}</span>
+</div>
+<span style="font-size: 19px; line-height: 28px">{{ c.text }}</span>
+<span style="font-size: 15px; line-height: 20px; color: #646A73">{{ c.meta }}</span>
+</div>
+<sc-if value="{{ c.todo }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ c.ack }}" style="width: 132px; height: 64px; flex: none; border-radius: 16px; background: #FFFFFF; border: 2px solid #A86F00; color: #7A5000; font-size: 20px; font-weight: 700">확인</button></sc-if>
+<sc-if value="{{ c.done }}" hint-placeholder-val="{{ false }}"><span style="width: 132px; height: 64px; flex: none; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 18px; font-weight: 700; color: #1D5FAF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2A72C9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>확인함</span></sc-if>
+</div>
+</sc-for>
+<span style="font-size: 17px; line-height: 26px; color: #4F555E">탑승 예정 7명 · 결석 1명(지호) · 정류장 4곳</span>
+<div style="margin-top: auto">
+<sc-if value="{{ allAck }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ toRoute }}" style="width: 100%; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 24px; font-weight: 700">경로 확인하기</button></sc-if>
+<sc-if value="{{ notAllAck }}" hint-placeholder-val="{{ true }}"><button type="button" disabled="disabled" style="width: 100%; height: 80px; border: none; border-radius: 18px; background: #E4E7EB; color: #646A73; font-size: 20px; font-weight: 600">변경을 모두 확인하면 경로를 볼 수 있어요</button></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isRoute }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 12px"><h1 style="margin: 0; font-size: 30px; line-height: 40px; font-weight: 700">{{ routeTitle }}</h1><sc-if value="{{ isCustom }}" hint-placeholder-val="{{ false }}"><span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #FFF3CC; color: #7A5000; display: flex; align-items: center; font-size: 15px; font-weight: 700">직접 바꾼 순서</span></sc-if></div>
+<span style="font-size: 18px; line-height: 26px; color: #4F555E">{{ routeSub }}</span>
+</div>
+<sc-for list="{{ routeRows }}" as="r" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 18px; border-radius: 14px; background: #FFFFFF">
+<div style="display: flex; align-items: center; gap: 18px">
+<span style="width: 40px; height: 40px; flex: none; box-sizing: border-box; border-radius: 20px; border: 2px solid #A86F00; color: #8A5A00; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700">{{ r.num }}</span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 21px; line-height: 28px; font-weight: 700">{{ r.name }}</span>
+<span style="font-size: 16px; line-height: 22px; color: #4F555E">{{ r.who }}</span>
+</div>
+<span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #E6F0FC; color: #1D5FAF; display: flex; align-items: center; font-size: 15px; font-weight: 600">{{ r.tag }}</span>
+<span style="width: 64px; text-align: right; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums">{{ r.eta }}</span>
+</div>
+<sc-if value="{{ r.hasWarn }}" hint-placeholder-val="{{ false }}"><span style="padding-left: 58px; font-size: 15px; line-height: 20px; font-weight: 600; color: #A83E10">{{ r.warn }}</span></sc-if>
+</div>
+</sc-for>
+<div style="margin-top: auto; display: flex; gap: 12px">
+<button type="button" onClick="{{ openReorder }}" style="width: 220px; height: 80px; flex: none; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 20px; font-weight: 600">순서 바꾸기</button>
+<button type="button" onClick="{{ startRoute }}" style="flex: 1; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 24px; font-weight: 700">{{ routeCta }}</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isReorder }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 30px; line-height: 40px; font-weight: 700">순서 바꾸기</h1>
+<span style="font-size: 17px; line-height: 24px; color: #4F555E">위·아래 버튼으로 옮기면 도착 시간을 바로 다시 계산해요.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 18px; font-size: 17px; color: #4F555E">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#646A73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+<span style="flex: 1">출발 · 햇살어린이집</span><span style="font-variant-numeric: tabular-nums">{{ startTime }}</span>
+</div>
+<sc-for list="{{ draftRows }}" as="r" hint-placeholder-count="4">
+<div style="box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 6px 18px; border-radius: 16px; background: #FFFFFF; border: {{ r.bw }} solid {{ r.bd }}">
+<div style="height: 52px; display: flex; align-items: center; gap: 16px">
+<span style="width: 36px; height: 36px; flex: none; box-sizing: border-box; border-radius: 18px; background: {{ r.numBg }}; border: 2px solid {{ r.numBd }}; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: {{ r.numFg }}">{{ r.num }}</span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-size: 20px; line-height: 26px; font-weight: 700">{{ r.name }}</span><span style="font-size: 15px; line-height: 20px; color: #4F555E">{{ r.who }}</span></div>
+<span style="width: 96px; display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums"><span style="font-size: 20px; font-weight: 700">{{ r.eta }}</span><sc-if value="{{ r.changed }}" hint-placeholder-val="{{ false }}"><span style="font-size: 14px; color: #646A73; text-decoration: line-through">{{ r.old }}</span></sc-if></span>
+<sc-if value="{{ r.canUp }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ r.up }}" aria-label="위로 옮기기" style="width: 64px; height: 52px; flex: none; border-radius: 14px; background: #FFFFFF; border: 1px solid #CDD1D7; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button></sc-if>
+<sc-if value="{{ r.cantUp }}" hint-placeholder-val="{{ false }}"><button type="button" disabled="disabled" aria-label="위로 옮기기" style="width: 64px; height: 52px; flex: none; border-radius: 14px; background: #F3F4F6; border: 1px solid #DDE0E5; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A9AEB6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button></sc-if>
+<sc-if value="{{ r.canDown }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ r.down }}" aria-label="아래로 옮기기" style="width: 64px; height: 52px; flex: none; border-radius: 14px; background: #FFFFFF; border: 1px solid #CDD1D7; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></sc-if>
+<sc-if value="{{ r.cantDown }}" hint-placeholder-val="{{ false }}"><button type="button" disabled="disabled" aria-label="아래로 옮기기" style="width: 64px; height: 52px; flex: none; border-radius: 14px; background: #F3F4F6; border: 1px solid #DDE0E5; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A9AEB6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></sc-if>
+</div>
+<sc-if value="{{ r.hasWarn }}" hint-placeholder-val="{{ false }}"><div style="display: flex; align-items: center; gap: 8px; padding: 0 0 4px 52px; font-size: 15px; line-height: 20px; font-weight: 600; color: #A83E10"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D0551F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2L12 3z"></path><path d="M12 10v5M12 18v.5"></path></svg>{{ r.warn }}</div></sc-if>
+</div>
+</sc-for>
+<div style="height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 18px; font-size: 17px; color: #4F555E">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#646A73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+<span style="flex: 1">{{ endRowLabel }}</span><sc-if value="{{ hasEndWarn }}" hint-placeholder-val="{{ false }}"><span style="font-size: 15px; font-weight: 600; color: #A83E10">{{ endWarnText }}</span></sc-if><span style="font-variant-numeric: tabular-nums; font-weight: 600; color: #16191D">{{ draftEnd }}</span>
+</div>
+</div>
+<div style="margin-top: auto; display: flex; gap: 12px">
+<button type="button" onClick="{{ cancelDraft }}" style="width: 150px; height: 80px; flex: none; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 19px; font-weight: 600">취소</button>
+<button type="button" onClick="{{ resetDraft }}" style="width: 240px; height: 80px; flex: none; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 19px; font-weight: 600">제안 순서로 되돌리기</button>
+<button type="button" onClick="{{ commitDraft }}" style="flex: 1; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 22px; font-weight: 700">이 순서로 정하기</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMusic }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px">
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h1 style="margin: 0; font-size: 30px; line-height: 40px; font-weight: 700">{{ plName }}</h1>
+<span style="font-size: 16px; line-height: 24px; color: #4F555E">곡을 눌러 미리 들어요</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{ tracks }}" as="k" hint-placeholder-count="5">
+<div style="height: 60px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 0 6px 0 16px; border-radius: 14px; background: {{ k.bg }}; border: 2px solid {{ k.bd }}">
+<span style="width: 22px; font-size: 16px; font-weight: 700; color: #646A73">{{ k.n }}</span>
+<span style="flex: 1; min-width: 0; font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ k.t }}</span>
+<span style="font-size: 15px; color: #4F555E; font-variant-numeric: tabular-nums">{{ k.dur }}</span>
+<sc-if value="{{ k.on }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ k.tap }}" aria-label="미리 듣기 멈춤" style="width: 64px; height: 46px; flex: none; border: none; border-radius: 12px; background: #2A72C9; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg></button></sc-if>
+<sc-if value="{{ k.off }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ k.tap }}" aria-label="미리 듣기" style="width: 64px; height: 46px; flex: none; border-radius: 12px; background: #FFFFFF; border: 1px solid #CDD1D7; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8V4z"></path></svg></button></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="margin-top: auto; display: flex; gap: 12px">
+<button type="button" onClick="{{ closeMusic }}" style="width: 150px; height: 80px; flex: none; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 19px; font-weight: 600">돌아가기</button>
+<button type="button" onClick="{{ confirmMusic }}" style="flex: 1; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 22px; font-weight: 700">이 목록으로 정하기</button>
+</div>
+</div>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 18px; font-weight: 700">운행 중 자동 동작</span>
+<sc-for list="{{ autoRows }}" as="a" hint-placeholder-count="3">
+<div style="padding: 14px 16px; border-radius: 16px; background: #FFFFFF; display: flex; align-items: center; gap: 12px">
+<span style="flex: 1; font-size: 17px; line-height: 24px; font-weight: 600">{{ a.t }}</span>
+<button type="button" role="switch" aria-checked="{{ a.aria }}" aria-label="{{ a.t }}" onClick="{{ a.tap }}" style="width: 64px; height: 36px; flex: none; padding: 4px; box-sizing: border-box; border: none; border-radius: 18px; background: {{ a.bg }}; display: flex; justify-content: {{ a.just }}"><span style="width: 28px; height: 28px; border-radius: 14px; background: #FFFFFF"></span></button>
+</div>
+</sc-for>
+<div style="padding: 14px 16px; border-radius: 16px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 17px; line-height: 24px; font-weight: 600">정류장이 가까워지면 음량</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+<sc-for list="{{ duckOpts }}" as="o" hint-placeholder-count="3"><button type="button" onClick="{{ o.pick }}" aria-pressed="{{ o.pressed }}" style="height: 48px; border-radius: 12px; background: {{ o.bg }}; border: {{ o.bw }} solid {{ o.bd }}; color: {{ o.fg }}; font-size: 16px; font-weight: 700">{{ o.t }}</button></sc-for>
+</div>
+</div>
+<div style="padding: 14px 16px; border-radius: 16px; background: #FFFFFF; display: flex; align-items: center; gap: 12px">
+<span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 17px; line-height: 24px; font-weight: 600">정차·인계 중 일시정지</span><span style="font-size: 14px; line-height: 20px; color: #646A73">안전을 위해 항상 켜져 있어요</span></span>
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#646A73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+</div>
+<p style="margin: auto 0 0; font-size: 15px; line-height: 22px; color: #646A73">주행 중에는 목록을 열 수 없어요. 재생·일시정지만 할 수 있어요.</p>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h1 style="margin: 0; font-size: 30px; line-height: 40px; font-weight: 700">햇살어린이집 · 승차 확인</h1>
+<span style="font-size: 18px; font-weight: 700; color: #7A5000">{{ boardedN }}/7명</span>
+</div>
+<span style="font-size: 18px; line-height: 26px; color: #4F555E">아이가 자리에 앉아 안전벨트를 맨 것을 보고 한 명씩 눌러요.</span>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ boardKids }}" as="k" hint-placeholder-count="7">
+<button type="button" onClick="{{ k.tap }}" aria-pressed="{{ k.pressed }}" style="height: 132px; border-radius: 16px; background: {{ k.bg }}; border: 2px solid {{ k.bd }}; color: #16191D; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px">
+<span style="width: 52px; height: 52px; border-radius: 26px; background: {{ k.avBg }}; color: {{ k.avFg }}; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700">{{ k.init }}</span>
+<span style="font-size: 21px; line-height: 28px; font-weight: 700">{{ k.name }}</span>
+<span style="font-size: 15px; line-height: 20px; color: {{ k.stFg }}">{{ k.st }}</span>
+</button>
+</sc-for>
+</div>
+<div style="margin-top: auto">
+<sc-if value="{{ boardAll }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ depart }}" style="width: 100%; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 24px; font-weight: 700">출발 · 첫 정류장 안내</button></sc-if>
+<sc-if value="{{ boardNotAll }}" hint-placeholder-val="{{ true }}"><button type="button" disabled="disabled" style="width: 100%; height: 80px; border: none; border-radius: 18px; background: #E4E7EB; color: #646A73; font-size: 20px; font-weight: 600">{{ boardLeft }}명 더 확인하면 출발할 수 있어요</button></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMoving }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+<span style="font-size: 18px; font-weight: 700; color: #7A5000">{{ mvLabel }}</span>
+<span style="height: 40px; padding: 0 16px; border-radius: 20px; background: #E6F0FC; color: #1D5FAF; display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1D5FAF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8-8-2z"></path></svg>순정 내비로 안내 중</span>
+</div>
+<h1 style="margin: 0; font-size: 48px; line-height: 58px; font-weight: 700">{{ mvName }}</h1>
+<div style="display: flex; align-items: baseline; gap: 20px">
+<span style="font-size: 104px; line-height: 104px; font-weight: 700; font-variant-numeric: tabular-nums">{{ mvMin }}</span>
+<span style="font-size: 24px; line-height: 32px; color: #4F555E">{{ mvDist }} · {{ mvEta }} 도착 예정</span>
+</div>
+<div style="display: flex; gap: 10px"><span style="height: 36px; padding: 0 14px; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; display: flex; align-items: center; font-size: 16px; font-weight: 600">{{ mvTag }}</span></div>
+<span style="font-size: 18px; font-weight: 600; color: #4F555E">{{ mvKidsLabel }}</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ mvKids }}" as="k" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 16px; background: #FFFFFF">
+<span style="width: 52px; height: 52px; flex: none; border-radius: 26px; background: #DDE0E5; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700">{{ k.init }}</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 24px; line-height: 30px; font-weight: 700">{{ k.name }}</span>
+<span style="font-size: 17px; line-height: 24px; color: #4F555E">{{ k.line }}</span>
+<sc-if value="{{ k.hasNote }}" hint-placeholder-val="{{ false }}"><span style="align-self: flex-start; height: 28px; padding: 0 10px; border-radius: 14px; background: #FFF3CC; color: #7A5000; display: flex; align-items: center; font-size: 14px; font-weight: 700">{{ k.note }}</span></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="margin-top: auto; display: flex; gap: 12px; align-items: stretch">
+<div style="flex: 1; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-radius: 16px; background: #EBEDF0; border: 1px solid #DDE0E5; font-size: 17px; line-height: 24px; color: #4F555E"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4F555E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>주행 중에는 보기만 해요. 기록은 차가 멈춘 뒤에 해요.</div>
+<button type="button" onClick="{{ simApproach }}" style="height: 64px; flex: none; padding: 0 20px; border-radius: 16px; background: transparent; border: 2px dashed #8A9099; color: #4F555E; font-size: 17px; font-weight: 600">체험 · {{ demoApproach }}</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isApproach }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 16px; align-items: flex-start; padding: 18px 22px; border-radius: 16px; background: #FFF3CC">
+<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#7A5000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 16px; font-weight: 700; color: #7A5000">{{ ttsHead }}</span>
+<span style="font-size: 24px; line-height: 34px; font-weight: 600; color: #3D2E00">“{{ tts }}”</span>
+</div>
+</div>
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 16px">
+<h1 style="margin: 0; font-size: 40px; line-height: 50px; font-weight: 700">{{ mvName }}</h1>
+<span style="font-size: 24px; color: #4F555E; flex: none">300m · 약 1분</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ mvKids }}" as="k" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-radius: 16px; background: #FFFFFF">
+<span style="width: 48px; height: 48px; flex: none; border-radius: 24px; background: #DDE0E5; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 700">{{ k.init }}</span>
+<div style="min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 22px; line-height: 28px; font-weight: 700">{{ k.name }}</span>
+<span style="font-size: 17px; line-height: 24px; color: #4F555E">{{ k.line }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 17px; font-weight: 600; color: #4F555E">정차하면 할 일</span>
+<sc-for list="{{ steps }}" as="p" hint-placeholder-count="3">
+<div style="display: flex; align-items: center; gap: 14px; font-size: 19px; line-height: 28px">
+<span style="width: 30px; height: 30px; flex: none; box-sizing: border-box; border-radius: 15px; border: 2px solid #A9AEB6; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #4F555E">{{ p.n }}</span>
+<span>{{ p.t }}</span>
+</div>
+</sc-for>
+</div>
+<div style="margin-top: auto; display: flex; gap: 12px">
+<sc-if value="{{ notStopped }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ simStop }}" style="height: 80px; flex: none; padding: 0 22px; border-radius: 18px; background: transparent; border: 2px dashed #8A9099; color: #4F555E; font-size: 17px; font-weight: 600">체험 · 차량 정차</button></sc-if>
+<sc-if value="{{ stopped }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ startStop }}" style="flex: 1; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 24px; font-weight: 700">{{ approachCta }}</button></sc-if>
+<sc-if value="{{ notStopped }}" hint-placeholder-val="{{ true }}"><button type="button" disabled="disabled" style="flex: 1; height: 80px; border: none; border-radius: 18px; background: #E4E7EB; color: #646A73; font-size: 20px; font-weight: 600">차가 멈추면 시작할 수 있어요</button></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isStop }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 18px; font-weight: 700; color: #1D5FAF">{{ stopLabel }}</span>
+<h1 style="margin: 0; font-size: 36px; line-height: 46px; font-weight: 700">{{ stopTitle }}</h1>
+</div>
+<div style="display: flex; gap: 12px">
+<div style="flex: 1; height: 64px; box-sizing: border-box; padding: 0 18px; border-radius: 16px; background: #E6F0FC; border: 2px solid #2A72C9; display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2A72C9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>차량 정차 확인됨</div>
+<button type="button" onClick="{{ toggleSide }}" aria-pressed="{{ sidePressed }}" style="flex: 1.5; height: 64px; box-sizing: border-box; padding: 0 18px; border-radius: 16px; background: {{ sideBg }}; border: 2px solid {{ sideBd }}; color: #16191D; display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600; text-align: left">
+<span style="width: 28px; height: 28px; flex: none; box-sizing: border-box; border-radius: 8px; border: 2px solid {{ sideBd }}; background: {{ sideMk }}; display: flex; align-items: center; justify-content: center"><sc-if value="{{ side }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></sc-if></span>
+문 쪽 오토바이·자전거 없음 · 직접 확인
+</button>
+</div>
+<sc-for list="{{ sKids }}" as="k" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 16px; background: #FFFFFF; border: 2px solid {{ k.bd }}">
+<span style="width: 52px; height: 52px; flex: none; border-radius: 26px; background: #DDE0E5; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700">{{ k.init }}</span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="font-size: 24px; line-height: 30px; font-weight: 700">{{ k.name }}</span>
+<sc-if value="{{ k.hasNote }}" hint-placeholder-val="{{ false }}"><span style="height: 28px; padding: 0 10px; border-radius: 14px; background: #FFF3CC; color: #7A5000; display: flex; align-items: center; font-size: 14px; font-weight: 700">{{ k.note }}</span></sc-if>
+</div>
+<span style="font-size: 17px; line-height: 24px; color: #4F555E">{{ k.line }}</span>
+</div>
+<sc-if value="{{ k.showEx }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ k.ex }}" style="height: 64px; flex: none; padding: 0 18px; border-radius: 16px; background: #FFFFFF; border: 2px solid #D0551F; color: #A83E10; font-size: 17px; font-weight: 600">{{ exBtn }}</button></sc-if>
+<sc-if value="{{ k.actPrimary }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ k.act }}" style="width: 196px; height: 64px; flex: none; border: none; border-radius: 16px; background: #FFC93C; color: #1F1600; font-size: 20px; font-weight: 700">{{ k.actLabel }}</button></sc-if>
+<sc-if value="{{ k.actSecondary }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ k.act }}" style="width: 196px; height: 64px; flex: none; border-radius: 16px; background: #FFFFFF; border: 2px solid #A86F00; color: #7A5000; font-size: 20px; font-weight: 700">{{ k.actLabel }}</button></sc-if>
+<sc-if value="{{ k.actLocked }}" hint-placeholder-val="{{ false }}"><button type="button" disabled="disabled" style="width: 196px; height: 64px; flex: none; border: none; border-radius: 16px; background: #E4E7EB; color: #646A73; font-size: 19px; font-weight: 600">{{ k.actLabel }}</button></sc-if>
+<sc-if value="{{ k.isDone }}" hint-placeholder-val="{{ false }}"><span style="height: 44px; flex: none; padding: 0 16px; border-radius: 22px; background: #E6F0FC; color: #1D5FAF; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2A72C9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>{{ k.doneLabel }}</span></sc-if>
+<sc-if value="{{ k.isOut }}" hint-placeholder-val="{{ false }}"><span style="height: 44px; flex: none; padding: 0 16px; border-radius: 22px; background: #FDECE4; color: #A83E10; display: flex; align-items: center; font-size: 17px; font-weight: 700">{{ k.outLabel }}</span></sc-if>
+</div>
+</sc-for>
+<div style="margin-top: auto">
+<sc-if value="{{ advancing }}" hint-placeholder-val="{{ false }}"><div style="padding: 18px 22px; border-radius: 16px; background: #E6F0FC; color: #1D5FAF; font-size: 20px; font-weight: 700">모두 기록했어요 · {{ nextText }}</div></sc-if>
+<sc-if value="{{ notAdvancing }}" hint-placeholder-val="{{ true }}"><span style="font-size: 17px; line-height: 26px; color: #646A73">{{ stopHint }}</span></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isException }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 18px; font-weight: 700; color: #A83E10">{{ exHead }}</span>
+<h1 style="margin: 0; font-size: 36px; line-height: 46px; font-weight: 700">{{ exTitle }}</h1>
+<span style="font-size: 18px; line-height: 26px; color: #4F555E">{{ exInfo }}</span>
+</div>
+<sc-for list="{{ exOpts }}" as="o" hint-placeholder-count="3">
+<button type="button" onClick="{{ o.go }}" style="min-height: 96px; text-align: left; padding: 16px 24px; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; display: flex; align-items: center; gap: 18px">
+<span style="width: 52px; height: 52px; flex: none; border-radius: 14px; background: #F3F4F6; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{ o.isPhone }}" hint-placeholder-val="{{ false }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"></path></svg></sc-if>
+<sc-if value="{{ o.isClock }}" hint-placeholder-val="{{ false }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></sc-if>
+<sc-if value="{{ o.isBus }}" hint-placeholder-val="{{ false }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#A83E10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="14" rx="3"></rect><path d="M4 11h16"></path><path d="M7 17v3M17 17v3"></path></svg></sc-if>
+</span>
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 22px; line-height: 30px; font-weight: 700">{{ o.t }}</span><span style="font-size: 16px; line-height: 22px; color: #4F555E">{{ o.d }}</span></span>
+</button>
+</sc-for>
+<p style="margin: 0; font-size: 16px; line-height: 24px; color: #646A73">고른 내용과 시간이 운행 기록에 남아요.</p>
+<div style="margin-top: auto"><button type="button" onClick="{{ exCancel }}" style="width: 220px; height: 64px; border-radius: 16px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 19px; font-weight: 600">돌아가기</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isArrive }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 18px; font-weight: 700; color: #1D5FAF">도착 · 정차 중</span>
+<h1 style="margin: 0; font-size: 36px; line-height: 46px; font-weight: 700">햇살어린이집 · 기관 인계</h1>
+</div>
+<span style="font-size: 18px; line-height: 26px; color: #4F555E">기관 선생님과 함께 아이들이 모두 내리는 것을 확인해요.</span>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<sc-for list="{{ onboardKids }}" as="k" hint-placeholder-count="7"><span style="height: 48px; padding: 0 20px; border-radius: 24px; background: #FFFFFF; display: flex; align-items: center; font-size: 20px; font-weight: 600">{{ k.name }}</span></sc-for>
+</div>
+<div style="margin-top: auto"><button type="button" onClick="{{ instHand }}" style="width: 100%; height: 80px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 24px; font-weight: 700">기관 선생님께 {{ onboard }}명 인계 완료</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isEnd }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 30px; line-height: 40px; font-weight: 700">운행 종료 점검</h1>
+<span style="font-size: 17px; line-height: 24px; color: #4F555E">기록을 대조하고, 차 안을 직접 살펴본 뒤 종료해요.</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ tiles }}" as="t" hint-placeholder-count="4">
+<div style="height: 84px; box-sizing: border-box; padding: 10px 18px; border-radius: 16px; background: #FFFFFF; display: flex; flex-direction: column; justify-content: center; gap: 2px">
+<span style="font-size: 15px; line-height: 20px; color: #4F555E">{{ t.l }}</span>
+<span style="font-size: 36px; line-height: 42px; font-weight: 700; font-variant-numeric: tabular-nums; color: {{ t.fg }}">{{ t.v }}</span>
+</div>
+</sc-for>
+</div>
+<sc-for list="{{ unres }}" as="u" hint-placeholder-count="0">
+<div style="display: flex; align-items: center; gap: 16px; padding: 8px 8px 8px 18px; border-radius: 14px; background: #FDECE4">
+<span style="flex: 1; font-size: 18px; line-height: 26px; color: #5A2410"><b>{{ u.name }}</b> · 차 안에서 동승 유지 중</span>
+<button type="button" onClick="{{ u.go }}" style="height: 56px; padding: 0 18px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D0551F; color: #A83E10; font-size: 17px; font-weight: 700">기관 선생님께 인계함</button>
+</div>
+</sc-for>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{ checks }}" as="c" hint-placeholder-count="3">
+<button type="button" onClick="{{ c.tap }}" aria-pressed="{{ c.pressed }}" style="height: 56px; box-sizing: border-box; padding: 0 18px; border-radius: 14px; background: {{ c.bg }}; border: 2px solid {{ c.bd }}; color: #16191D; display: flex; align-items: center; gap: 14px; font-size: 19px; font-weight: 600; text-align: left">
+<span style="width: 28px; height: 28px; flex: none; box-sizing: border-box; border-radius: 8px; border: 2px solid {{ c.bd }}; background: {{ c.mk }}; display: flex; align-items: center; justify-content: center"><sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></sc-if></span>
+{{ c.t }}
+</button>
+</sc-for>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 14px; border: 2px dashed #A9AEB6">
+<span style="flex: none; font-size: 15px; font-weight: 700; color: #4F555E">확장</span>
+<span style="font-size: 16px; line-height: 22px; color: #4F555E">좌석 착석·벨트 신호(지원 차량)는 보조 정보예요. 직접 확인을 대신하지 않아요.</span>
+</div>
+<div style="margin-top: auto">
+<sc-if value="{{ endOpen }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ finish }}" style="width: 100%; height: 76px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 24px; font-weight: 700">직접 확인 완료 · 운행 종료</button></sc-if>
+<sc-if value="{{ endLocked }}" hint-placeholder-val="{{ true }}"><button type="button" disabled="disabled" style="width: 100%; height: 76px; border: none; border-radius: 18px; background: #E4E7EB; color: #646A73; font-size: 20px; font-weight: 600">{{ endLockedLabel }}</button></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; text-align: center">
+<span style="width: 96px; height: 96px; border-radius: 48px; background: #E6F0FC; display: flex; align-items: center; justify-content: center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2A72C9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>
+<h1 style="margin: 0; font-size: 40px; line-height: 50px; font-weight: 700">{{ doneTitle }}</h1>
+<span style="font-size: 20px; line-height: 30px; color: #4F555E">{{ doneSummary }}</span>
+<div style="display: flex; gap: 12px; margin-top: 12px">
+<button type="button" onClick="{{ restartOther }}" style="height: 72px; padding: 0 28px; border-radius: 18px; background: #FFFFFF; border: 1px solid #CDD1D7; color: #16191D; font-size: 20px; font-weight: 600">{{ otherLabel }} 체험하기</button>
+<button type="button" onClick="{{ restart }}" style="width: 260px; height: 72px; border: none; border-radius: 18px; background: #FFC93C; color: #1F1600; font-size: 22px; font-weight: 700">처음부터 다시</button>
+</div>
+</div>
+</sc-if>
+
+</section>
+</div>
+
+<div style="height: 88px; flex: none; box-sizing: border-box; padding: 0 12px 0 16px; border-radius: 20px; background: #F3F4F6; display: flex; align-items: center; gap: 16px">
+<span style="width: 56px; height: 56px; flex: none; border-radius: 14px; background: #E6F0FC; display: flex; align-items: center; justify-content: center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1D5FAF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="17" cy="16" r="3"></circle></svg></span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 15px; line-height: 20px; font-weight: 700; color: {{ mFg }}">{{ mLabel }}</span>
+<span style="font-size: 20px; line-height: 28px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ mLine }}</span>
+</div>
+<span style="font-size: 16px; color: #646A73">{{ mSub }}</span>
+<sc-if value="{{ canPick }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ openMusic }}" style="height: 64px; padding: 0 20px; border-radius: 16px; border: 1px solid #CDD1D7; background: #FFFFFF; color: #16191D; font-size: 18px; font-weight: 600">동요 고르기</button></sc-if>
+<button type="button" onClick="{{ replay }}" style="height: 64px; padding: 0 20px; border-radius: 16px; border: 1px solid #CDD1D7; background: #FFFFFF; color: #16191D; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>안내 다시 듣기</button>
+<sc-if value="{{ mCanToggle }}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{ toggleMusic }}" aria-label="{{ mToggleLabel }}" style="width: 64px; height: 64px; border-radius: 16px; border: 1px solid #CDD1D7; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{ mShowPause }}" hint-placeholder-val="{{ false }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg></sc-if>
+<sc-if value="{{ mShowPlay }}" hint-placeholder-val="{{ true }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16191D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8V4z"></path></svg></sc-if>
+</button></sc-if>
+<sc-if value="{{ mNoToggle }}" hint-placeholder-val="{{ true }}"><button type="button" disabled="disabled" aria-label="음악 조작은 이동 중에만 할 수 있어요" style="width: 64px; height: 64px; border-radius: 16px; border: 1px solid #DDE0E5; background: #F3F4F6; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{ mShowPause }}" hint-placeholder-val="{{ false }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#646A73" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg></sc-if>
+<sc-if value="{{ mShowPlay }}" hint-placeholder-val="{{ true }}"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#646A73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l13 8-13 8V4z"></path></svg></sc-if>
+</button></sc-if>
+</div>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div role="status" style="position: absolute; left: 404px; right: 24px; bottom: 124px; padding: 16px 22px; border-radius: 16px; background: #16191D; box-shadow: 0 12px 32px rgba(20, 24, 29, 0.22); font-size: 18px; line-height: 26px; color: #FFFFFF">{{ toast }}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":920}}'>
+var KIDS = {
+  harin: { name: '하린', init: '하', pm: '엄마', am: '엄마', note: '' },
+  doyun: { name: '도윤', init: '도', pm: '아빠', am: '엄마', note: '오늘 인계자 변경' },
+  yuna: { name: '유나', init: '유', pm: '엄마', am: '엄마', note: '' },
+  siwoo: { name: '시우', init: '시', pm: '아빠', am: '아빠', note: '' },
+  chaewon: { name: '채원', init: '채', pm: '할머니', am: '할머니', note: '' },
+  seoa: { name: '서아', init: '서', pm: '할머니', am: '아빠', note: '오늘 하차 지점 변경' },
+  ian: { name: '이안', init: '이', pm: '엄마', am: '엄마', note: '' }
+};
+var KID_IDS = ['harin', 'doyun', 'yuna', 'siwoo', 'chaewon', 'seoa', 'ian'];
+var STOPS = {
+  pm: {
+    A: { name: '푸른마을 3단지 정문', kids: ['harin', 'doyun'], tag: '우측 하차 · 단지 쪽 차로' },
+    B: { name: '새싹도서관 앞', kids: ['yuna', 'siwoo'], tag: '우측 하차 · 승인 구역' },
+    C: { name: '별빛초 후문', kids: ['chaewon'], tag: '우측 하차 · 후문 인도' },
+    D: { name: '하늘공원 입구', kids: ['seoa', 'ian'], tag: '우측 하차 · 공원 쪽 인도' }
+  },
+  am: {
+    A: { name: '푸른마을 3단지 정문', kids: ['harin', 'doyun'], tag: '우측 승차 · 단지 쪽 차로' },
+    B: { name: '새싹도서관 앞', kids: ['yuna', 'siwoo'], tag: '우측 승차 · 승인 구역' },
+    C: { name: '별빛초 후문', kids: ['seoa', 'chaewon'], tag: '우측 승차 · 후문 인도' },
+    D: { name: '하늘공원 입구', kids: ['ian'], tag: '우측 승차 · 공원 쪽 인도' }
+  }
+};
+var ROUTES = {
+  pm: { label: '하원', time: '15:30', base: '햇살어린이집', dwell: 3, def: ['A', 'B', 'C', 'D'],
+    legs: { 'A-S': 12, 'B-S': 10, 'C-S': 8, 'D-S': 9, 'A-B': 6, 'A-C': 9, 'A-D': 11, 'B-C': 4, 'B-D': 8, 'C-D': 5 } },
+  am: { label: '등원', time: '08:20', base: '햇살어린이집', dwell: 3, def: ['D', 'C', 'B', 'A'],
+    legs: { 'A-S': 9, 'B-S': 9, 'C-S': 7, 'D-S': 4, 'A-B': 5, 'A-C': 8, 'A-D': 10, 'B-C': 4, 'B-D': 7, 'C-D': 4 } }
+};
+var CHANGES = [
+  { id: 'absent', type: '결석', kid: '지호', text: '오늘 결석 · 은행나무길 정류장은 경로에서 빠져요', meta: '보호자 요청 · 07:42', trips: ['am', 'pm'], tone: 'gray', diffTag: '빠짐', diffText: '은행나무길 · 지호 결석' },
+  { id: 'place', type: '하차 지점 변경', kid: '서아', text: '별빛초 후문 → 하늘공원 입구 · 오늘 하원만', meta: '인계: 할머니 · 보호자 요청 11:05', trips: ['pm'], tone: 'yellow', diffTag: '추가', diffText: '하늘공원 입구 · 서아' },
+  { id: 'handler', type: '인계자 변경', kid: '도윤', text: '엄마 → 아빠 · 오늘 하원만', meta: '푸른마을 3단지 정문 · 보호자 요청 12:20', trips: ['pm'], tone: 'yellow', diffTag: '인계자', diffText: '도윤 · 엄마 → 아빠' }
+];
+var RULES = ['승인된 정류장만 사용', '아이가 인도 쪽으로 내리는 진입 방향', '도로 횡단이 적은 순서', '보호자와 약속한 시간', '결석한 아이의 정류장은 제외'];
+var CHECKS = ['맨 뒷좌석까지 걸어가 확인했어요', '좌석 아래와 사이를 확인했어요', '두고 내린 물건을 확인했어요'];
+var DUR = ['2:10', '1:48', '2:02', '1:55', '2:20', '2:05'];
+var PLAYLISTS = [
+  { id: 'week', name: '이번 주 노래', sub: '운행마다 처음에 한 번 · 일주일 반복', star: true, tracks: ['[곡명] 이번 주 노래'] },
+  { id: 'safety', name: '교통안전', sub: '', tracks: ['[곡명] 신호등 건너기', '[곡명] 안전벨트 딸깍', '[곡명] 차 안에서는 앉아요', '[곡명] 횡단보도 손 들기', '[곡명] 내릴 때는 기다려요'] },
+  { id: 'number', name: '숫자·한글 놀이', sub: '등원 기본', tracks: ['[곡명] 하나 둘 셋', '[곡명] 가나다 기차', '[곡명] 숫자 계단', '[곡명] 글자 찾기', '[곡명] 열까지 세기', '[곡명] 모양 놀이'] },
+  { id: 'english', name: '영어 동요', sub: '', tracks: ['[곡명] 인사 노래', '[곡명] 색깔 노래', '[곡명] 동물 노래', '[곡명] 숫자 노래', '[곡명] 헤어질 때 노래'] },
+  { id: 'season', name: '계절 노래', sub: '', tracks: ['[곡명] 봄', '[곡명] 여름', '[곡명] 가을', '[곡명] 겨울'] },
+  { id: 'calm', name: '잔잔한 노래', sub: '하원 기본', tracks: ['[곡명] 노을', '[곡명] 집으로 가는 길', '[곡명] 구름', '[곡명] 별 하나', '[곡명] 내일 또 만나'] }
+];
+function withCopula(word) {
+  var c = word.charCodeAt(word.length - 1);
+  if (c < 0xAC00 || c > 0xD7A3) return word + '이에요';
+  return ((c - 0xAC00) % 28) ? word + '이에요' : word + '예요';
+}
+function toMin(t) { var p = t.split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10); }
+function fmt(m) { var h = Math.floor(m / 60); var mm = m % 60; return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm; }
+function leg(R, a, b) { return R.legs[[a, b].sort().join('-')]; }
+function plan(trip, order) {
+  var R = ROUTES[trip];
+  var t = toMin(R.time);
+  var prev = 'S';
+  var out = [];
+  order.forEach(function (k) {
+    var l = leg(R, prev, k);
+    t += l;
+    out.push({ key: k, eta: t, leg: l, prev: prev });
+    t += R.dwell;
+    prev = k;
+  });
+  var back = leg(R, prev, 'S');
+  t += back;
+  return { stops: out, end: t, endLeg: back, total: t - toMin(R.time) };
+}
+function warnFor(trip, st) {
+  if (trip !== 'pm') return '';
+  if (st.key === 'D' && st.eta < 960) return '서아 할머니와의 약속(16:00 이후)보다 ' + (960 - st.eta) + '분 일찍 도착해요';
+  if (st.key === 'A' && st.prev !== 'S') return '단지 반대쪽 차로로 들어가 길을 건너 내릴 수 있어요';
+  return '';
+}
+function endWarn(trip, p) {
+  if (trip === 'am' && p.end > 540) return '09:00보다 ' + (p.end - 540) + '분 늦어요';
+  return '';
+}
+function sameOrder(a, b) { return a.join('') === b.join(''); }
+class Component extends DCLogic {
+  constructor(...args) {
+    super(...args);
+    this.state = this.fresh('pm');
+  }
+  fresh(trip) {
+    return {
+      screen: 'today', trip: trip, acks: {}, board: {}, stopIdx: 0, kid: {}, side: false, stopped: false, exKid: null, keepDone: {},
+      checks: [false, false, false], inst: false, userPaused: false, toast: '', returning: false, advancing: false,
+      order: { pm: ROUTES.pm.def.slice(), am: ROUTES.am.def.slice() }, draft: null, moved: '', reason: '', notify: true, showRules: false,
+      prev: 'today', playlist: 'calm', preview: -1, auto: { start: true, duck: '30%', resume: true, week: false }
+    };
+  }
+  componentWillUnmount() {
+    clearTimeout(this._t);
+    clearTimeout(this._toastT);
+  }
+  say(msg) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: msg });
+    this._toastT = setTimeout(() => this.setState({ toast: '' }), 3500);
+  }
+  restartWith(trip) {
+    clearTimeout(this._t);
+    var keep = { playlist: this.state.playlist, auto: this.state.auto };
+    this.setState(Object.assign(this.fresh(trip), keep));
+  }
+  curStop() {
+    var s = this.state;
+    var key = s.order[s.trip][s.stopIdx];
+    return STOPS[s.trip][key];
+  }
+  finishedStop(kid) {
+    return this.curStop().kids.every(function (id) { var v = kid[id]; return v === 'done' || v === 'keep' || v === 'skip'; });
+  }
+  queueAdvance() {
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.advance(), 1500);
+  }
+  advance() {
+    var s = this.state;
+    var n = s.order[s.trip].length;
+    var paused = s.auto.resume ? s.userPaused : true;
+    if (s.stopIdx < n - 1) this.setState({ stopIdx: s.stopIdx + 1, screen: 'moving', side: false, stopped: false, advancing: false, userPaused: paused });
+    else this.setState({ returning: true, screen: 'moving', side: false, stopped: false, advancing: false, userPaused: paused });
+  }
+  kidAct(id) {
+    var s = this.state;
+    if (!s.side || s.advancing) return;
+    var cur = s.kid[id] || 'wait';
+    var next = cur === 'wait' ? 'handed' : (cur === 'handed' ? 'done' : cur);
+    var kid = Object.assign({}, s.kid);
+    kid[id] = next;
+    var fin = this.finishedStop(kid);
+    this.setState({ kid: kid, advancing: fin });
+    if (fin) this.queueAdvance();
+  }
+  exResolve(kind) {
+    var s = this.state;
+    var pm = s.trip === 'pm';
+    if (kind === 'call') { this.setState({ screen: 'stop' }); this.say('체험: 등록된 번호로 순정 전화 앱이 열려요. 통화한 뒤 다시 골라요.'); return; }
+    if (kind === 'wait') { this.setState({ screen: 'stop' }); this.say('3분 대기를 시작했어요. 다른 아이 기록은 계속할 수 있어요.'); return; }
+    var kid = Object.assign({}, s.kid);
+    kid[s.exKid] = pm ? 'keep' : 'skip';
+    var fin = this.finishedStop(kid);
+    this.setState({ kid: kid, screen: 'stop', advancing: fin, exKid: null });
+    if (fin) this.queueAdvance();
+  }
+  moveDraft(i, dir) {
+    var d = this.state.draft.slice();
+    var j = i + dir;
+    if (j < 0 || j >= d.length) return;
+    var tmp = d[i];
+    d[i] = d[j];
+    d[j] = tmp;
+    this.setState({ draft: d, moved: tmp });
+  }
+  commitDraft() {
+    var s = this.state;
+    var order = Object.assign({}, s.order);
+    order[s.trip] = s.draft.slice();
+    var custom = !sameOrder(order[s.trip], ROUTES[s.trip].def);
+    this.setState({ order: order, draft: null, moved: '', screen: 'route' });
+    this.say(custom ? '순서를 바꿨어요' + (s.reason ? ' · 이유: ' + s.reason : '') + '. 내비에는 다음 정류장부터 이 순서로 넘겨요.' : '제안 순서로 정했어요.');
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var pm = s.trip === 'pm';
+    var R = ROUTES[s.trip];
+    var scr = s.screen;
+    var order = s.order[s.trip];
+    var n = order.length;
+    var P = plan(s.trip, order);
+    var ordered = P.stops.map(function (x) { return Object.assign({ key: x.key, eta: x.eta, leg: x.leg, prev: x.prev }, STOPS[s.trip][x.key]); });
+    var stop = ordered[Math.min(s.stopIdx, n - 1)];
+    var st = function (id) { return s.kid[id] || 'wait'; };
+    var names = function (ids) { return ids.map(function (id) { return KIDS[id].name; }).join(', '); };
+    var isCustom = !sameOrder(order, R.def);
+
+    var boardedN = pm ? KID_IDS.filter(function (id) { return s.board[id]; }).length : KID_IDS.filter(function (id) { return st(id) === 'done'; }).length;
+    var dropN = pm ? KID_IDS.filter(function (id) { return st(id) === 'done'; }).length : 0;
+    var keepIds = pm ? KID_IDS.filter(function (id) { return st(id) === 'keep'; }) : [];
+    var keepDoneN = keepIds.filter(function (id) { return s.keepDone[id]; }).length;
+    var unresolved = keepIds.filter(function (id) { return !s.keepDone[id]; });
+    var skippedN = pm ? 0 : KID_IDS.filter(function (id) { return st(id) === 'skip'; }).length;
+    var onboard = pm ? boardedN - dropN - keepDoneN : (s.inst ? 0 : boardedN);
+
+    var title = R.label + ' · 2호차 · ' + R.time + ' 출발';
+    if (scr === 'today') title = '오늘의 통학';
+    if (scr === 'music') title = '동요 고르기';
+    var chips = [];
+    var statusText = '';
+    var tone = '';
+    if (scr === 'today') chips = ['2호차'];
+    else if (scr === 'route') chips = ['탑승 예정 7명', '정류장 ' + n + '곳'];
+    else if (scr === 'reorder') { chips = ['운행 전']; statusText = '순서 바꾸는 중'; tone = 'y'; }
+    else if (scr === 'music') chips = [R.label + (s.prev === 'stop' || s.prev === 'arrive' ? ' · 정차 중' : (s.prev === 'end' || s.prev === 'done' ? ' · 운행 후' : ' · 운행 전'))];
+    else if (scr === 'board') chips = ['탑승 ' + boardedN + '/7명'];
+    else if (scr === 'moving' || scr === 'approach') chips = s.returning ? ['차 안 ' + onboard + '명', pm ? '복귀 중' : '기관으로'] : ['차 안 ' + onboard + '명', '정류장 ' + (s.stopIdx + 1) + '/' + n];
+    else if (scr === 'stop' || scr === 'exception') chips = ['차 안 ' + onboard + '명', '정류장 ' + (s.stopIdx + 1) + '/' + n];
+    else if (scr === 'arrive') chips = ['차 안 ' + onboard + '명'];
+    else chips = ['기록상 차 안 ' + unresolved.length + '명'];
+    if (scr === 'approach') { statusText = '곧 도착'; tone = 'y'; }
+    if (scr === 'stop' || scr === 'arrive' || scr === 'end') { statusText = '정차 중'; tone = 'b'; }
+    if (scr === 'exception') { statusText = '예외 처리 중'; tone = 'c'; }
+
+    var trips = ['am', 'pm'].map(function (id) {
+      var r = ROUTES[id];
+      var sel = s.trip === id;
+      var cn = CHANGES.filter(function (c) { return c.trips.indexOf(id) >= 0; }).length;
+      return {
+        label: r.label + ' · ' + r.time, meta: '7명 · 정류장 4곳 · 변경 ' + cn + '건',
+        tag: sel ? '선택됨' : '체험 가능', tagFg: sel ? '#7A5000' : '#646A73',
+        bg: sel ? '#FFFFFF' : 'transparent', bd: sel ? '#A86F00' : '#DDE0E5', pressed: sel ? 'true' : 'false',
+        pick: function () { self.setState({ trip: id }); }
+      };
+    });
+
+    var tripChanges = CHANGES.filter(function (c) { return c.trips.indexOf(s.trip) >= 0; });
+    var changes = tripChanges.map(function (c) {
+      var done = !!s.acks[c.id];
+      return {
+        type: c.type, kid: c.kid, text: c.text, meta: c.meta, done: done, todo: !done,
+        bd: done ? 'transparent' : (c.tone === 'yellow' ? '#E3C25E' : '#CDD1D7'),
+        tagBg: c.tone === 'yellow' ? '#FFF3CC' : '#EBEDF0', tagFg: c.tone === 'yellow' ? '#7A5000' : '#3A3F47',
+        ack: function () { var a = Object.assign({}, self.state.acks); a[c.id] = true; self.setState({ acks: a }); }
+      };
+    });
+    var ackN = changes.filter(function (c) { return c.done; }).length;
+    var allAck = ackN === changes.length;
+    var diffs = tripChanges.map(function (c) { return { tag: c.diffTag, text: c.diffText, bg: c.tone === 'yellow' ? '#FFF3CC' : '#EBEDF0', fg: c.tone === 'yellow' ? '#7A5000' : '#3A3F47' }; });
+
+    var routeRows = ordered.map(function (x, i) {
+      var w = warnFor(s.trip, x);
+      return { num: i + 1, name: x.name, eta: fmt(x.eta), tag: x.tag, who: (pm ? '하차 · ' : '승차 · ') + names(x.kids), warn: w, hasWarn: !!w };
+    });
+
+    var D = plan(s.trip, s.draft || order);
+    var B = plan(s.trip, R.def);
+    var baseEta = {};
+    B.stops.forEach(function (x) { baseEta[x.key] = x.eta; });
+    var warnCount = 0;
+    var draftRows = D.stops.map(function (x, i) {
+      var info = STOPS[s.trip][x.key];
+      var w = warnFor(s.trip, x);
+      if (w) warnCount += 1;
+      var mv = x.key === s.moved;
+      return {
+        num: i + 1, name: info.name, who: names(info.kids), eta: fmt(x.eta), old: fmt(baseEta[x.key]), changed: x.eta !== baseEta[x.key],
+        warn: w, hasWarn: !!w,
+        canUp: i > 0, cantUp: i === 0, canDown: i < n - 1, cantDown: i === n - 1,
+        up: function () { self.moveDraft(i, -1); }, down: function () { self.moveDraft(i, 1); },
+        numBg: mv ? '#FFC93C' : 'transparent', numBd: mv ? '#FFC93C' : '#A86F00', numFg: mv ? '#1F1600' : '#8A5A00',
+        bd: mv ? '#A86F00' : '#DDE0E5', bw: mv ? '2px' : '1px'
+      };
+    });
+    var ew = endWarn(s.trip, D);
+    if (ew) warnCount += 1;
+    var diffMin = D.end - B.end;
+    var reasons = ['보호자 요청', '도로 상황', '기타'].map(function (r) {
+      var on = s.reason === r;
+      return {
+        t: r, pressed: on ? 'true' : 'false', bg: on ? '#FFF3CC' : '#FFFFFF', bd: on ? '#A86F00' : '#CDD1D7', bw: on ? '2px' : '1px', fg: on ? '#7A5000' : '#16191D',
+        pick: function () { self.setState({ reason: self.state.reason === r ? '' : r }); }
+      };
+    });
+
+    var boardKids = KID_IDS.map(function (id) {
+      var on = !!s.board[id];
+      return {
+        name: KIDS[id].name, init: KIDS[id].init, pressed: on ? 'true' : 'false',
+        st: on ? '탑승 · 벨트 확인' : '탑승 전', stFg: on ? '#1D5FAF' : '#646A73',
+        bg: on ? '#E6F0FC' : '#FFFFFF', bd: on ? '#2A72C9' : '#DDE0E5',
+        avBg: on ? '#2A72C9' : '#DDE0E5', avFg: on ? '#FFFFFF' : '#16191D',
+        tap: function () { var b = Object.assign({}, self.state.board); b[id] = !b[id]; self.setState({ board: b }); }
+      };
+    });
+
+    var rows = [{ num: '출', name: R.base + ' 출발', meta: R.time + (pm ? ' · 기관 승차' : ' 출발') }];
+    ordered.forEach(function (x, i) { rows.push({ num: String(i + 1), name: x.name, meta: fmt(x.eta) + ' · ' + (pm ? '하차 ' : '승차 ') + x.kids.length + '명' }); });
+    rows.push({ num: pm ? '복' : '도', name: R.base + (pm ? ' 복귀' : ' 도착'), meta: fmt(P.end) + (pm ? ' · 종료 점검' : ' · 기관 인계') });
+    var cIdx = -1;
+    if (scr === 'board') cIdx = 0;
+    else if (scr === 'moving' || scr === 'approach' || scr === 'stop' || scr === 'exception') cIdx = s.returning ? n + 1 : s.stopIdx + 1;
+    else if (scr === 'arrive' || scr === 'end') cIdx = n + 1;
+    else if (scr === 'done') cIdx = n + 2;
+    var tl = rows.map(function (r, i) {
+      var d = i < cIdx;
+      var c = i === cIdx;
+      return {
+        num: r.num, name: r.name, meta: r.meta, isDone: d, notDone: !d,
+        bg: c ? '#FFFFFF' : 'transparent', bd: c ? '#A86F00' : 'transparent',
+        mBg: d ? '#2A72C9' : 'transparent', mBd: d ? '#2A72C9' : (c ? '#A86F00' : '#A9AEB6'), mFg: c ? '#8A5A00' : '#4F555E',
+        fg: d ? '#4F555E' : '#16191D', sub: c ? '#7A5000' : '#646A73'
+      };
+    });
+
+    var target = s.returning ? { name: R.base, eta: P.end, leg: P.endLeg, tag: '기관 앞 승하차 구역', kids: [] } : stop;
+    var mvKids = target.kids.map(function (id) {
+      var k = KIDS[id];
+      var note = pm ? k.note : '';
+      return { name: k.name, init: k.init, line: pm ? '인계: ' + k.pm : '보호자: ' + k.am, note: note, hasNote: !!note };
+    });
+    var mvKidsLabel = s.returning ? '차 안 ' + onboard + '명 (기록 기준)' : (pm ? '내릴 친구 ' : '탈 친구 ') + target.kids.length + '명';
+
+    var tts;
+    if (s.returning) tts = pm ? '곧 햇살어린이집에 도착해요. 친구들은 자리에서 기다려요.' : '곧 햇살어린이집에 도착해요. 내릴 준비를 해요.';
+    else tts = '곧 ' + withCopula(stop.name) + '. ' + names(stop.kids) + (pm ? ' 친구 내릴 준비해요.' : ' 친구를 맞이할 준비해요.');
+    var steps;
+    if (s.returning) steps = pm ? ['차량이 완전히 멈췄는지 확인', '남은 아이가 있으면 기관 선생님께 인계', '운행 종료 점검으로 넘어가요'] : ['차량이 완전히 멈췄는지 확인', '기관 선생님과 만나요', '아이들을 기관에 인계해요'];
+    else steps = pm ? ['차량이 완전히 멈췄는지 확인', '문 쪽 오토바이·자전거를 직접 확인', '보호자를 확인하고 인계 → 하차 기록'] : ['차량이 완전히 멈췄는지 확인', '문 쪽 오토바이·자전거를 직접 확인', '보호자에게 인계받고 → 승차·벨트 기록'];
+
+    var focusDone = false;
+    var sKids = stop.kids.map(function (id) {
+      var k = KIDS[id];
+      var v = st(id);
+      var isWait = v === 'wait';
+      var isHanded = v === 'handed';
+      var showAct = isWait || isHanded;
+      var focus = showAct && !focusDone;
+      if (focus) focusDone = true;
+      var line;
+      if (pm) line = isWait ? '인계 예정: ' + k.pm : isHanded ? k.pm + '께 인계 확인함 · 하차 기록 남음' : v === 'done' ? k.pm + '께 인계 · 하차 기록함' : '차 안에서 동승 유지 중';
+      else line = isWait ? '보호자: ' + k.am : isHanded ? '인계받음 · 승차·벨트 확인 남음' : v === 'done' ? '승차·벨트 확인함' : '오늘 미탑승으로 기록';
+      var note = pm ? k.note : '';
+      var open = showAct && s.side && !s.advancing;
+      return {
+        name: k.name, init: k.init, line: line, note: note, hasNote: !!note,
+        bd: focus ? '#A86F00' : 'transparent',
+        showEx: isWait && !s.advancing,
+        actPrimary: open && focus, actSecondary: open && !focus, actLocked: showAct && !open,
+        actLabel: isWait ? (pm ? '인계 확인' : '인계받기') : (pm ? '하차 기록' : '승차·벨트 확인'),
+        isDone: v === 'done', doneLabel: pm ? '하차 기록 완료' : '승차 완료',
+        isOut: v === 'keep' || v === 'skip', outLabel: pm ? '동승 유지' : '오늘 미탑승',
+        act: function () { self.kidAct(id); },
+        ex: function () { self.setState({ exKid: id, screen: 'exception' }); }
+      };
+    });
+    var isLast = s.stopIdx >= n - 1;
+    var stopHint = !s.side ? '문 쪽을 직접 확인하면 인계 버튼이 열려요.' : (pm ? '모두 하차를 기록하면 ' : '모두 승차하면 ') + (isLast ? '기관 안내로 넘어가요.' : '다음 정류장 안내로 넘어가요.');
+
+    var exK = s.exKid ? KIDS[s.exKid] : null;
+    var exHandler = exK ? (pm ? exK.pm : exK.am) : '';
+    var exOpts = exK ? [
+      { t: exHandler + '에게 전화', d: '등록된 번호로 연결해요', isPhone: true, isClock: false, isBus: false, go: function () { self.exResolve('call'); } },
+      { t: '3분 더 기다리기', d: '다른 아이 기록은 계속할 수 있어요', isPhone: false, isClock: true, isBus: false, go: function () { self.exResolve('wait'); } },
+      pm ? { t: '동승 유지 · 기관에서 인계', d: '다음 정류장으로 가고, 남은 아이는 종료 점검에서 정리해요', isPhone: false, isClock: false, isBus: true, go: function () { self.exResolve('keep'); } }
+         : { t: '오늘은 타지 않음으로 기록', d: '보호자와 통화한 뒤 골라요', isPhone: false, isClock: false, isBus: true, go: function () { self.exResolve('keep'); } }
+    ] : [];
+
+    var tiles = pm ? [
+      { l: '승차', v: boardedN, fg: '#16191D' },
+      { l: '하차·인계', v: dropN + keepDoneN, fg: '#16191D' },
+      { l: '미완료 인계', v: unresolved.length, fg: unresolved.length ? '#A83E10' : '#1D5FAF' },
+      { l: '결석', v: 1, fg: '#16191D' }
+    ] : [
+      { l: '승차', v: boardedN, fg: '#16191D' },
+      { l: '기관 인계', v: s.inst ? boardedN : 0, fg: '#16191D' },
+      { l: '미완료 인계', v: s.inst ? 0 : boardedN, fg: s.inst ? '#1D5FAF' : '#A83E10' },
+      { l: '결석·미탑승', v: 1 + skippedN, fg: '#16191D' }
+    ];
+    var unres = unresolved.map(function (id) { return { name: KIDS[id].name, go: function () { var kd = Object.assign({}, self.state.keepDone); kd[id] = true; self.setState({ keepDone: kd }); } }; });
+    var checks = CHECKS.map(function (t, i) {
+      var on = !!s.checks[i];
+      return {
+        t: t, on: on, pressed: on ? 'true' : 'false', bg: on ? '#E6F0FC' : '#FFFFFF', bd: on ? '#2A72C9' : '#CDD1D7', mk: on ? '#2A72C9' : 'transparent',
+        tap: function () { var c = self.state.checks.slice(); c[i] = !c[i]; self.setState({ checks: c }); }
+      };
+    });
+    var leftChecks = s.checks.filter(function (x) { return !x; }).length;
+    var endOpen = leftChecks === 0 && unresolved.length === 0;
+
+    var PL = PLAYLISTS.filter(function (p) { return p.id === s.playlist; })[0] || PLAYLISTS[5];
+    var playlists = PLAYLISTS.map(function (p) {
+      var on = p.id === s.playlist;
+      return {
+        name: p.name, sub: p.star ? p.sub : p.tracks.length + '곡' + (p.sub ? ' · ' + p.sub : '') + (on ? ' · 선택됨' : ''),
+        star: !!p.star, note: !p.star, pressed: on ? 'true' : 'false',
+        bg: on ? '#FFFFFF' : (p.star ? '#FFF3CC' : 'transparent'), bd: on ? '#A86F00' : 'transparent',
+        icBg: p.star ? '#FFC93C' : (on ? '#E6F0FC' : '#DDE0E5'), icStroke: on ? '#1D5FAF' : '#4F555E', subFg: p.star ? '#7A5000' : '#4F555E',
+        pick: function () { self.setState({ playlist: p.id, preview: -1 }); }
+      };
+    });
+    var tracks = PL.tracks.map(function (t, i) {
+      var on = s.preview === i;
+      return { n: i + 1, t: t, dur: DUR[i % DUR.length], on: on, off: !on, bg: on ? '#E6F0FC' : '#FFFFFF', bd: on ? '#2A72C9' : 'transparent',
+        tap: function () { self.setState({ preview: self.state.preview === i ? -1 : i }); } };
+    });
+    var setAuto = function (key, val) { var a = Object.assign({}, self.state.auto); a[key] = val; self.setState({ auto: a }); };
+    var autoRows = [['start', '운행을 시작하면 재생'], ['resume', '출발하면 이어서 재생'], ['week', '이번 주 노래를 먼저']].map(function (r) {
+      var on = !!s.auto[r[0]];
+      return { t: r[1], aria: on ? 'true' : 'false', bg: on ? '#2A72C9' : '#CDD1D7', just: on ? 'flex-end' : 'flex-start', tap: function () { setAuto(r[0], !self.state.auto[r[0]]); } };
+    });
+    var duckOpts = ['끄기', '30%', '50%'].map(function (o) {
+      var on = s.auto.duck === o;
+      return { t: o, pressed: on ? 'true' : 'false', bg: on ? '#FFF3CC' : '#F3F4F6', bd: on ? '#A86F00' : '#DDE0E5', bw: on ? '2px' : '1px', fg: on ? '#7A5000' : '#16191D', pick: function () { setAuto('duck', o); } };
+    });
+
+    var mState = 'off';
+    if (scr === 'moving') mState = s.userPaused ? 'user' : 'play';
+    else if (scr === 'approach') mState = 'duck';
+    else if (scr === 'stop' || scr === 'exception' || scr === 'arrive') mState = 'hold';
+    else if (scr === 'end' || scr === 'done') mState = 'stopped';
+    else if (scr === 'music' && s.preview >= 0) mState = 'preview';
+    var M = {
+      play: ['상황별 동요 · 이동 중 재생', '정류장이 가까워지면 줄여요', '#1D5FAF'],
+      user: ['상황별 동요 · 선생님이 멈춤', '다시 누르면 이어서 재생해요', '#4F555E'],
+      duck: ['상황별 동요 · ' + (s.auto.duck === '끄기' ? '안내 음성 먼저' : '음량 ' + s.auto.duck + '로 줄임'), '정차하면 일시정지해요', '#7A5000'],
+      hold: ['상황별 동요 · 정차 중 일시정지', s.auto.resume ? '출발하면 이어서 재생해요' : '출발 후 직접 재생해요', '#4F555E'],
+      off: ['상황별 동요 · 대기', s.auto.start ? '운행이 시작되면 재생해요' : '운행 중 직접 재생해요', '#646A73'],
+      stopped: ['상황별 동요 · 정지', '종료 점검에 집중해요', '#646A73'],
+      preview: ['미리 듣기 · ' + PL.name, '', '#1D5FAF']
+    }[mState];
+    var firstTrack = s.auto.week ? PLAYLISTS[0].tracks[0] : PL.tracks[0];
+    var mLine = mState === 'preview' ? PL.tracks[s.preview] : firstTrack + ' · ' + PL.name;
+
+    var replayText;
+    if (scr === 'moving') replayText = s.returning ? (pm ? '햇살어린이집으로 돌아가요.' : '햇살어린이집으로 가요.') : '다음은 ' + withCopula(stop.name) + '. ' + names(stop.kids) + (pm ? ' 친구가 내려요.' : ' 친구가 타요.');
+    else if (scr === 'approach') replayText = tts;
+    else if (scr === 'stop') replayText = names(stop.kids) + (pm ? ' 친구, 보호자를 확인하고 내려요.' : ' 친구, 차에 타면 안전벨트를 매요.');
+    else replayText = '';
+
+    var otherTrip = pm ? 'am' : 'pm';
+    var canPick = ['today', 'route', 'board', 'stop', 'arrive', 'end', 'done'].indexOf(scr) >= 0;
+    var mCanToggle = scr === 'moving' || (scr === 'music' && s.preview >= 0);
+    return {
+      title: title, chips: chips.map(function (t) { return { t: t }; }), statusText: statusText,
+      stYellow: tone === 'y', stBlue: tone === 'b', stCoral: tone === 'c',
+      isToday: scr === 'today', isRoute: scr === 'route', isReorder: scr === 'reorder', isMusic: scr === 'music', isBoard: scr === 'board', isMoving: scr === 'moving', isApproach: scr === 'approach',
+      isStop: scr === 'stop', isException: scr === 'exception', isArrive: scr === 'arrive', isEnd: scr === 'end', isDone: scr === 'done',
+      showTimeline: ['today', 'route', 'reorder', 'music'].indexOf(scr) < 0,
+      routeDiffs: scr === 'route' && !s.showRules, routeRules: scr === 'route' && s.showRules,
+      trips: trips, rules: RULES.map(function (t) { return { t: t }; }), diffs: diffs,
+      notifyAria: s.notify ? 'true' : 'false', notifyBg: s.notify ? '#2A72C9' : '#CDD1D7', notifyJust: s.notify ? 'flex-end' : 'flex-start',
+      toggleNotify: function () { self.setState({ notify: !self.state.notify }); },
+      toggleRules: function () { self.setState({ showRules: !self.state.showRules }); },
+      tlTitle: R.label + ' 경로 · 정류장 ' + n + '곳', tl: tl,
+      changes: changes, chTotal: changes.length, ackN: ackN, allAck: allAck, notAllAck: !allAck,
+      toRoute: function () { if (allAck) self.setState({ screen: 'route', showRules: false }); },
+      routeTitle: isCustom ? '방문 순서' : '제안 방문 순서', isCustom: isCustom,
+      routeSub: '승인 정류장 ' + n + '곳 · ' + R.time + ' 출발 → ' + fmt(P.end) + (pm ? ' 복귀' : ' 도착') + ' 예정',
+      routeRows: routeRows, routeCta: pm ? '이 순서로 · 기관 승차 시작' : '이 순서로 · 운행 시작',
+      openReorder: function () { self.setState({ screen: 'reorder', draft: self.state.order[self.state.trip].slice(), moved: '' }); },
+      startRoute: function () { self.setState(pm ? { screen: 'board' } : { screen: 'moving', stopIdx: 0, returning: false, userPaused: !self.state.auto.start }); if (self.state.notify) self.say('체험: 보호자에게 정류장별 도착 예정 시각을 보냈다고 표시해요.'); },
+      startTime: R.time, endLabel: pm ? '복귀 예정' : '기관 도착 예정', endRowLabel: pm ? '복귀 · 햇살어린이집' : '도착 · 햇살어린이집',
+      draftRows: draftRows, draftEnd: fmt(D.end), baseEnd: fmt(B.end),
+      diffText: diffMin > 0 ? '+' + diffMin + '분' : (diffMin < 0 ? diffMin + '분' : '변화 없음'),
+      diffBg: diffMin > 0 ? '#FDECE4' : (diffMin < 0 ? '#E6F0FC' : '#EBEDF0'), diffFg: diffMin > 0 ? '#A83E10' : (diffMin < 0 ? '#1D5FAF' : '#3A3F47'),
+      totalText: '총 소요 ' + B.total + '분 → ' + D.total + '분',
+      warnCount: warnCount, hasWarns: warnCount > 0, noWarns: warnCount === 0,
+      hasEndWarn: !!ew, endWarnText: ew, reasons: reasons,
+      cancelDraft: function () { self.setState({ screen: 'route', draft: null, moved: '' }); },
+      resetDraft: function () { self.setState({ draft: ROUTES[self.state.trip].def.slice(), moved: '' }); },
+      commitDraft: function () { self.commitDraft(); },
+      playlists: playlists, plName: PL.name, tracks: tracks, autoRows: autoRows, duckOpts: duckOpts,
+      openMusic: function () { self.setState({ prev: self.state.screen, screen: 'music', preview: -1 }); },
+      closeMusic: function () { self.setState({ screen: self.state.prev, preview: -1 }); },
+      confirmMusic: function () { self.setState({ screen: self.state.prev, preview: -1 }); self.say(PL.name + ' 목록으로 정했어요.'); },
+      boardKids: boardKids, boardedN: boardedN, boardAll: boardedN === 7, boardNotAll: boardedN < 7, boardLeft: 7 - boardedN,
+      depart: function () { self.setState({ screen: 'moving', stopIdx: 0, returning: false, userPaused: !self.state.auto.start }); },
+      mvLabel: s.returning ? (pm ? '복귀' : '도착지') : '다음 정류장 · ' + (s.stopIdx + 1) + '/' + n,
+      mvName: target.name, mvMin: target.leg + '분', mvDist: (target.leg * 0.3).toFixed(1) + 'km', mvEta: fmt(target.eta), mvTag: target.tag,
+      mvKids: mvKids, mvKidsLabel: mvKidsLabel,
+      demoApproach: s.returning ? '기관 300m 전으로' : '정류장 300m 전으로',
+      simApproach: function () { self.setState({ screen: 'approach', stopped: false }); },
+      tts: tts, ttsHead: '안내 음성 재생 중 · ' + (s.auto.duck === '끄기' ? '음악은 그대로예요' : '음악은 ' + s.auto.duck + '로 줄였어요'),
+      steps: steps.map(function (t, i) { return { n: i + 1, t: t }; }),
+      stopped: s.stopped, notStopped: !s.stopped,
+      simStop: function () { self.setState({ stopped: true }); },
+      approachCta: s.returning ? (pm ? '정차했어요 · 종료 점검' : '정차했어요 · 기관 인계') : (pm ? '정차했어요 · 인계 시작' : '정차했어요 · 승차 시작'),
+      startStop: function () {
+        if (!self.state.stopped) return;
+        if (self.state.returning) self.setState({ screen: pm ? 'end' : 'arrive' });
+        else self.setState({ screen: 'stop', side: false });
+      },
+      stopLabel: '정류장 ' + (s.stopIdx + 1) + '/' + n + ' · 정차 중',
+      stopTitle: stop.name + (pm ? ' · 인계' : ' · 승차'),
+      side: s.side, sidePressed: s.side ? 'true' : 'false',
+      sideBg: s.side ? '#E6F0FC' : '#FFFFFF', sideBd: s.side ? '#2A72C9' : '#A86F00', sideMk: s.side ? '#2A72C9' : 'transparent',
+      toggleSide: function () { if (!self.state.advancing) self.setState({ side: !self.state.side }); },
+      sKids: sKids, exBtn: pm ? '보호자가 안 보여요' : '아이가 안 나왔어요',
+      advancing: s.advancing, notAdvancing: !s.advancing, stopHint: stopHint,
+      nextText: isLast ? (pm ? '복귀 안내로 넘어가요' : '기관 안내로 넘어가요') : '다음 정류장 안내로 넘어가요',
+      exHead: exK ? exK.name + (pm ? ' · 인계 불가' : ' · 승차 불가') : '',
+      exTitle: pm ? '보호자가 보이지 않아요' : '아이가 나오지 않았어요',
+      exInfo: exK ? (pm ? '인계 예정: ' + exHandler + (exK.note ? ' (' + exK.note + ')' : '') : '보호자: ' + exHandler) + ' · 연락처 등록됨' : '',
+      exOpts: exOpts, exCancel: function () { self.setState({ screen: 'stop', exKid: null }); },
+      onboard: onboard, onboardKids: KID_IDS.filter(function (id) { return st(id) === 'done'; }).map(function (id) { return { name: KIDS[id].name }; }),
+      instHand: function () { self.setState({ inst: true, screen: 'end' }); },
+      tiles: tiles, unres: unres, checks: checks, endOpen: endOpen, endLocked: !endOpen,
+      endLockedLabel: unresolved.length ? '남은 아이를 먼저 기관 선생님께 인계해요' : '직접 확인 ' + leftChecks + '개 남았어요',
+      finish: function () { if (endOpen) self.setState({ screen: 'done' }); },
+      doneTitle: R.label + ' 운행을 마쳤어요',
+      doneSummary: pm ? '승차 ' + boardedN + '명 · 하차·인계 ' + (dropN + keepDoneN) + '명 · 결석 1명 · 기록을 보관했어요' : '승차 ' + boardedN + '명 · 기관 인계 ' + boardedN + '명 · 미탑승 ' + skippedN + '명 · 결석 1명',
+      otherLabel: ROUTES[otherTrip].label,
+      restart: function () { self.restartWith(s.trip); },
+      restartOther: function () { self.restartWith(otherTrip); },
+      mLabel: M[0], mSub: M[1], mFg: M[2], mLine: mLine, canPick: canPick,
+      mCanToggle: mCanToggle, mNoToggle: !mCanToggle,
+      mShowPause: mState === 'play' || mState === 'duck' || mState === 'preview', mShowPlay: !(mState === 'play' || mState === 'duck' || mState === 'preview'),
+      mToggleLabel: mState === 'play' || mState === 'preview' ? '음악 일시정지' : '음악 재생',
+      toggleMusic: function () { if (self.state.screen === 'music') self.setState({ preview: -1 }); else self.setState({ userPaused: !self.state.userPaused }); },
+      replay: function () { self.say(replayText ? '다시 듣기 · “' + replayText + '”' : '지금은 다시 들을 안내가 없어요.'); },
+      hasToast: !!s.toast, toast: s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

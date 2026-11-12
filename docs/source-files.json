@@ -1,0 +1,678 @@
+[
+  {
+    "path": "app/build.gradle.kts",
+    "sha256": "d2c0bba7d97d5124302b54841c7cbcb3147c940b342e73f9d1ff93fbefafc509"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/InstitutionDeviceTest.kt",
+    "sha256": "38eb8adad0555b325e3b6c26eecd9957dacfcaaaae3abfae20fe8cca237ef831"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/IsolatedTripRule.kt",
+    "sha256": "f79b215362d1f332dbeea1e64a1f96f4f6b982987f0b9c381d9c5526512edbaa"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/ProcessRestoreDeviceTest.kt",
+    "sha256": "d0296f716dad7b2d70531ed6a8f2af73d2fbb8cad637f7a472b885ce7f31d6f2"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/ShuttleFlowDeviceTest.kt",
+    "sha256": "18f7dd06b5bf0633c365115875bcc1c2248625c7550a3ba3fe71d0e41c85d38b"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/TrackingReadinessDiagnosticTest.kt",
+    "sha256": "fe96d6314abb498a370d2b99e00ccc6a846b613b2f23615635e5fc614f4ffcb5"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/TrackingTransportDeviceTest.kt",
+    "sha256": "866adcc1724c509a8ab56a6a31f11a1a6ab25ed81822a858281a3f35f63ed7ce"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/VehicleTrackingControlsDeviceTest.kt",
+    "sha256": "9efbe6c6e3b658b692853d06f1ad886f039d54d4437470e9e45340edfc3ec657"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/audio/AudioDeviceTest.kt",
+    "sha256": "7252b2aa25a432d48b6ca001335ccb73ac0c624e052b21ac0a46abb17931881c"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/audio/PleosTtsRuntimeDeviceTest.kt",
+    "sha256": "c38e0303855944125fee472958a2a4864b1a410e33bf9f6c51c745dfeed40f90"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/audio/SpeechDeviceTest.kt",
+    "sha256": "a774875a735f3b807cc997d457d6e6c50d7b32bad5933255b0247d6ca954b0b4"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/audio/SpeechQualityComparisonDeviceTest.kt",
+    "sha256": "2141b9c5e6b026f9e326697745ffaa66d6f7253bbbd3583f9a11e1207ffa4643"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/sdk/SdkRuntimeDeviceTest.kt",
+    "sha256": "9f0e894fae663b29cbd40ee10a2c34502c7dce8bbaeb3bd52e5f4cb7428149a2"
+  },
+  {
+    "path": "app/src/androidTest/java/com/hanhyo/pleosshuttle/sdk/WaypointEtaDeviceTest.kt",
+    "sha256": "f6fa0fae59d553a1138a33af05ab8806531fc0ec6abe88b1ab2c75b450be6cab"
+  },
+  {
+    "path": "app/src/debug/AndroidManifest.xml",
+    "sha256": "f61c53687d11bbfa67faea9cafc0704ccae0e1f5e31c9260cb54c515366b9340"
+  },
+  {
+    "path": "app/src/main/AndroidManifest.xml",
+    "sha256": "efbf155514f48a299fb164ae3dfeb536461024d47a39e08396e278370ccda82c"
+  },
+  {
+    "path": "app/src/main/assets/licenses/IBM-Plex-Sans-KR-OFL.txt",
+    "sha256": "3ff4395aeb203050b3d4e775861cf0b93b598e0a6d2b16f0eb41df3350b15695"
+  },
+  {
+    "path": "app/src/main/assets/schema.json",
+    "sha256": "65b3cd7391833f80e0f256b507c6fd9154b2ff1889317091f2160d7efa494de6"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/AutomaticTracking.kt",
+    "sha256": "30ae333a53f2bd214db820be9e68c68054a0ec1911f1ad2d6cb2518361fcd39e"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/AutomaticTripGuidance.kt",
+    "sha256": "54e6eccd31216a2c4301317c11d73918bd2237909fd14d78ea2b6f8c0576ae0e"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/DriveStateObserver.kt",
+    "sha256": "53290b194f22c3f6433665b1277ae57a03e9893f9f72b1de5bd45c9ca1be3ec9"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/FlowGuide.kt",
+    "sha256": "6b161f13ebb50d911df6a6edc6f81aa539c12360cba744bfb7f7db0e43a4de1c"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/InstitutionConnection.kt",
+    "sha256": "71269c64eddb5a05f5815e7cac52f609fecbf4f83efcbb488b858e8488a3b9f7"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/MainActivity.kt",
+    "sha256": "2e36eab3d7302e0edd3b5daab914321dce9ba151264b86e7bcf815b5b7aea391"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/MovingTrackingDemo.kt",
+    "sha256": "53c435e9d3223ea4f74edc99f8a0faa68b162e23dd130d8ba07b5a1e965627c1"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/NavigationTracking.kt",
+    "sha256": "95da71790ef9a1bc335c8c011bb62f08ca4bcfbfbf6be52d5900d59519a321f2"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ShuttleViewModel.kt",
+    "sha256": "e07c24e7afd9fb7ee026b68671658fadfbf2e634b17b9f810481402247974328"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/TrackingLocation.kt",
+    "sha256": "a69d558abf1934d35daed18b894117a680e4c46de23e5270b12af814fd41630f"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/TripNavigationPolicy.kt",
+    "sha256": "9da5ede14493f0977f2c82f06234d51aaa278b4f0fb2a152868d7c1690dd6f23"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/TripStore.kt",
+    "sha256": "b5a48acfc03cc181fe61086a93708c0b6fc83236789accd3686f282cd7fe8ed7"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/TripTrackingService.kt",
+    "sha256": "848931ab45f3ed55cca7b33f9102df3a405f86be5a032ff4939874aa97a09eeb"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/VehicleTrackingControls.kt",
+    "sha256": "e57b6b2870feaf0676cc87183f20c4cc02d6a08412075b82a46133f6fa45f00a"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/audio/AudioFocusPolicy.kt",
+    "sha256": "45eaa358f8f45bf3559e2617cdec9e8fd0a0b52cf22bfd93c7970d42c0117450"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/audio/LocalAudioAdapter.kt",
+    "sha256": "8ec2c2004e6585aa7a38e37cb11c6d8e96430252d77928247b809637cc7c31b2"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/audio/SpeechRequestGate.kt",
+    "sha256": "9fb270eb812a0fc3df41a05f7610d6e0923503d8a9e1b0749251edbf8beeb079"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/AppDimens.kt",
+    "sha256": "7302a751f2f423e202bcb8dbe31106565fb0efcec40de8e2d94456df9d180361"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/AppTheme.kt",
+    "sha256": "b7b8b6fe5b02c48b1035030d32fccb70065a8908c8aabd6de3d26846fd89a52d"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/color/AppColors.kt",
+    "sha256": "45256f82ead968bf295d8385a18867acd11c2742950c76475c9d64f70e3f8a5e"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/color/ColorPalette.kt",
+    "sha256": "5149ac65ad43b78a6dc90d2008c1580613978443ee0167c20e10972a7d56bb58"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/color/ColorScheme.kt",
+    "sha256": "a0972f9ac74c4f4e53c28a24a608e798d55cb83d5780a5d52baa5884fa1503f1"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/color/SemanticColors.kt",
+    "sha256": "5daeef3845ed5006727efcebdaa9c4200d22f942e7de1e0750fc3cbeb4a5e106"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/typography/AppTypography.kt",
+    "sha256": "dc8367855a9b1a2959a02e24771ce72f7c2bb2bddbe5622f8d47c8a6cae36f4f"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/designsystem/theme/typography/Fonts.kt",
+    "sha256": "59dee369a127153db8d86249e77993152f73469d467df6c77d7d758b9798e16d"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/domain/RoutePlanner.kt",
+    "sha256": "a65b157f4bb6063d916ca87f2e11752cb640b7d02151a6b0ea5fd77a76a07b5a"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/domain/RouteTimeline.kt",
+    "sha256": "447bd4019e772c6b9e04496c5ef527db2967a8ff8f1c31fc19601f6402f1e301"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/domain/ShuttleEngine.kt",
+    "sha256": "8e030234e6d671529d48d4f0db4249c7cded19cb0517ca98a573cf7a385a93b7"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/domain/ShuttleModels.kt",
+    "sha256": "d9a18629dfea9391e0c2a9f16f92cd2ff133ae9ed66a28e2849eace594de03a0"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/sdk/AaosConnectionFence.kt",
+    "sha256": "4c08ebd9ca8c5744e0d2ccc8c54d5c7457dd709dbb68f750520c46537a4a829c"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/sdk/ExactSupportedAreas.kt",
+    "sha256": "332ee49cdafeb09c6bfbe036b9a35f1137f9ea6056f364d44fed893d5347b6ed"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/sdk/RealNaviAdapter.kt",
+    "sha256": "6ccc9ee201915568a12ac51fbc4c89aba7070b23331530a529b4bd6bbb1101d9"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/sdk/RealVehicleAdapter.kt",
+    "sha256": "76ecb940f5189096506153b341994772d4ce88e7df0c631cb72f76d0a20747b7"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/sdk/SdkModels.kt",
+    "sha256": "43ae42a934685977f499ad27c490184dcf8c84cfa4171addc231dde8c7365aee"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/sdk/UnlockSafetyPolicy.kt",
+    "sha256": "87ae70ad9bb67c2601ecc775ff01dbccc24e1659350c568fa3a376b86af2579c"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/InstitutionPanel.kt",
+    "sha256": "0df62982a9a4b3dafe6bf6bf08f5a2662b4370712bc5f8a69ae9dafba2c01295"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/RosterScreen.kt",
+    "sha256": "0059889dbaba664859db2d98fc4f9a42ff8b358c77977d2b0207b18684a92491"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/RoutePlanning.kt",
+    "sha256": "6826b8a86edf1574c37b84d228365ee0d7da5e7ceeaf04564142a56de74cbdb0"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/RouteScreens.kt",
+    "sha256": "3bf8a7356c04ba7a7b80a7adcc1086257e57864c46d3175b797ab3b65fa1819a"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/ShuttleApp.kt",
+    "sha256": "1edb20215a36dd5284e2a75fc96b87a83809847e49958c4db908845054826f93"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/TeacherFlowScreen.kt",
+    "sha256": "c9d08a5c6210b9492f037349d775c9ef1926117596734dd22b1d9efc38f09f1a"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/TestToolsScreen.kt",
+    "sha256": "747f37273dee814f51240da1ca232acd9c11fcaeb7baa2dc8c6de5d88dd28aa7"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/TripControlsScreen.kt",
+    "sha256": "c518f575c529561ec0cbd71ccaa35565fa52f43448985aa712c7f506f78c9d78"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/TripDisplay.kt",
+    "sha256": "ae6a30a991591903a02630ac52b75c437e1cfc04ddabb8fd3e245d664eb760fc"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/TripWidgets.kt",
+    "sha256": "8b2900c2e3695d9c9ea213a23499e4ddbe615a711087849a4016e4fe57ef1b7d"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/VehicleDiagnosticsScreen.kt",
+    "sha256": "8a2efa8cc5a0e25fed0ab363dff46777eb079b85087417bd269ee57d4e42429b"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/VehicleTrackingPanel.kt",
+    "sha256": "725ce136417fe2983a52a776b07226367932e96a8ab6dc91c1d0a15c7b21a5f9"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/AppHeader.kt",
+    "sha256": "fb2c937e27b382b5c964089a4701dd23eaa8804af437ba17f9e04a073797bb07"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/Buttons.kt",
+    "sha256": "dd821ca6517ff9502b530d4e7c7a10933230e0caf2b582ac71f7b64f1ec6e025"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/Chips.kt",
+    "sha256": "1140e8a1809ad0441a83f50148a81e73d625ad4213aac156e7e239cdbba4d4f1"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/Fields.kt",
+    "sha256": "4250ab82847bb86ee678e200b5052a1f4279b1f6752e133f1f54040e7deb249d"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/GuideFocus.kt",
+    "sha256": "61922f2363f91b0c103927ab3170c401c937f55a70e365ee1b42b90804bba92c"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/MusicBar.kt",
+    "sha256": "165c4cd6682b86ff9ecfa44c2db07b008770d3f4bc181e804273ebe6d7b390fe"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/Panels.kt",
+    "sha256": "344cd06dc7596b8f165ba77f78b765b95d6858e3f9cfdb9f58ae69d7254e0167"
+  },
+  {
+    "path": "app/src/main/java/com/hanhyo/pleosshuttle/ui/component/StopTimeline.kt",
+    "sha256": "907d63128891b5e833a0556c7da411e6b5c8a3c750a2af807314338d32674aff"
+  },
+  {
+    "path": "app/src/main/res/drawable/ic_shuttle.xml",
+    "sha256": "a07296ad9e6d93d9ddd676416b4d79b58f0827280f50c58b0d7fd777b1dd463e"
+  },
+  {
+    "path": "app/src/main/res/font/ibm_plex_sans_kr_bold.ttf",
+    "sha256": "2aa49909a6dae0591efa1cc892bf99a2556b3b56fbcb639439240010518548ae"
+  },
+  {
+    "path": "app/src/main/res/font/ibm_plex_sans_kr_medium.ttf",
+    "sha256": "b3f1a81ce1738e414e04d6f6d946581319e5d15ceecc8e42f91913a6f39a6712"
+  },
+  {
+    "path": "app/src/main/res/font/ibm_plex_sans_kr_regular.ttf",
+    "sha256": "193af4c0c4f979251edd13708ea4c3eb4d0d07f9352b3d2a58b43b042767183b"
+  },
+  {
+    "path": "app/src/main/res/font/ibm_plex_sans_kr_semibold.ttf",
+    "sha256": "c1640995dae522401987918ac5caf90c2d7ecc90552216b653c97754fa941eb3"
+  },
+  {
+    "path": "app/src/main/res/raw/test_melody.wav",
+    "sha256": "d1fa7da883928e44079b0514db91b9142a03ccb0c63c3e6e9d5f8bd6890d2702"
+  },
+  {
+    "path": "app/src/main/res/values/strings.xml",
+    "sha256": "872bb3af4f012b2d8c46d1cf0f3a29938515720827be6600b28dcb96afbdbd52"
+  },
+  {
+    "path": "app/src/main/res/xml/backup_rules.xml",
+    "sha256": "ac534ef100d6fc95ef8c396e1a01220709dfb8a6e114ba5cffe02f48e2f061c1"
+  },
+  {
+    "path": "app/src/main/res/xml/data_extraction_rules.xml",
+    "sha256": "a256f0350bac2211a9bcb74fd8f7a47d668a1960e3889bb5588892a2448531d3"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/AutomaticTrackingTest.kt",
+    "sha256": "726da6aa8194b120e184ad1e6ff11d35d8ec68d453b670956f43977e2daeb471"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/AutomaticTripGuidanceTest.kt",
+    "sha256": "f1c8cac691868a142df2438ba83d226861129119240fe02e0d601378513062e8"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/FlowGuideTest.kt",
+    "sha256": "9467305dcbf9ce79ee402faf658739d7fc54dad07fbb09ea40df90a7007640f5"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/MovingTrackingDemoTest.kt",
+    "sha256": "17e7da9037eebcd76a44348b46d03434286092c507081f0a8b2dcf14c3535279"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/NavigationTrackingTest.kt",
+    "sha256": "783fce589e1e52e53540077f221b9368006c00f49f706eaa8a30f02b7b2cb096"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/TrackingLocationTest.kt",
+    "sha256": "26516f5c4775ffeaaccefd86f20d28d805acf22552aef0db78a0c59cd44a985f"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/TripNavigationPolicyTest.kt",
+    "sha256": "2eb15e323da4ee83edde286fe637897d66486e5fd9e9b55a401cefe4cf161e2b"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/VehicleTrackingControlsTest.kt",
+    "sha256": "c1926f30962c5bda0866b02cdda9bf9cd18209b78e11fb4ad8c42d5c07911ea1"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/audio/AudioFocusPolicyTest.kt",
+    "sha256": "6f5ff581f66141a78a2c9c4403a949f956fa68f837c796b9a35bc1f87f45f7d4"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/audio/SpeechRequestGateTest.kt",
+    "sha256": "1a4e796216d4c95f704df7b59416630cf3baf0eed7ca43a1a25366bd51b0ea9b"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/domain/OperationalSafetyTest.kt",
+    "sha256": "9f4a247ddcf252394ce83e266daf8dbac79401fb0edc24fd2cb124340ee8710f"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/domain/RoutePlannerTest.kt",
+    "sha256": "461d2988c08c0df0aad78155673e7534b94a63ff1f25d87911c2e5a32a201204"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/domain/RouteTimelineTest.kt",
+    "sha256": "a339a8e1aad212a0a859b8e00a70673a06e11776488f99f193247d8b2c244ee9"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/domain/ShuttleEngineTest.kt",
+    "sha256": "5dc080f32373586020fa1eceaf34da9d74b8535937e1690c471e1b15df6bd37b"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/sdk/AaosConnectionFenceTest.kt",
+    "sha256": "c15b950dedad260c7ba84013c6b061bedc3b7d4a66bc37a8bde8503dbfc3a681"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/sdk/ExactSupportedAreasTest.kt",
+    "sha256": "b7861641575f8f2e932eb9c4cdf018c862f02e9316eb4dcca6cb0e10ee490eae"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/sdk/UnlockSafetyPolicyTest.kt",
+    "sha256": "1ffc4227c09f9d4755b250cb0917d364fba69abfd6fe0b841a27ab8eec279b08"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/ui/RoutePlanningTest.kt",
+    "sha256": "1eb56dc2dfce43fa444a688b1c5cee1393ae12c3625d4f12542f868eb3333fbf"
+  },
+  {
+    "path": "app/src/test/java/com/hanhyo/pleosshuttle/ui/TripDisplayTest.kt",
+    "sha256": "c88f49bb39e617bc18fed5a9a5af9e94544c2b74001609f09205c5c204d6daae"
+  },
+  {
+    "path": "build.gradle.kts",
+    "sha256": "e28c8b2cf20983ef3ba67d3b044287c559b49fe8232b61c610791afcf636c9e7"
+  },
+  {
+    "path": "common/kotlin/com/hanhyo/shuttle/net/Api.kt",
+    "sha256": "85c7af5c6864a6ab88f393d7fea590ca07151f10ac89c348cadc33c58f71622f"
+  },
+  {
+    "path": "docs/API_FINDINGS.md",
+    "sha256": "ff037c7cb460e5e9545c397d1cebef7de6a34e20949c7766e5e676ebd18ce5d4"
+  },
+  {
+    "path": "docs/AUDIO.md",
+    "sha256": "9573e0aa94892918214ba33456a512c294d2edabda57ad12f1f36c558e4815e0"
+  },
+  {
+    "path": "docs/DEMO_STEP_BY_STEP.md",
+    "sha256": "01daa384fa7a60356419a85464dff83c52532c5829abec795cbb50abc15927c9"
+  },
+  {
+    "path": "docs/INSTITUTION_DEMO.md",
+    "sha256": "cda795b7e36ed31a132a40ea027d79092b9efe0f6a1b3732a9d028dd73a7c68b"
+  },
+  {
+    "path": "docs/LIVE_TRACKING.md",
+    "sha256": "5075e9e23dcea2f58710f39b29d8afdebd91bdee87d4257ecfc49d0af9e7f206"
+  },
+  {
+    "path": "docs/NOTION_FEATURE_COMPLEMENTS_2026-11-04.md",
+    "sha256": "b9b06e14dbba62472dd6901c66e9e0f2f66ae8b6975c38423045d08cdded84ca"
+  },
+  {
+    "path": "docs/VERIFICATION.md",
+    "sha256": "232ef6869f12323ba61ee84dcede79cf1208c172d5f94021f9598ce970a2d490"
+  },
+  {
+    "path": "docs/WALKTHROUGH.md",
+    "sha256": "f9cc2b47c1b5c8ec3aebb1dc967e24a1b9e76122c0797450d05af8be52a6dd6e"
+  },
+  {
+    "path": "docs/design/FLOW.md",
+    "sha256": "e8c4c93fd6791f52ed1ae2bab72329ac481b2961818cbd63d86d92ba1dbce754"
+  },
+  {
+    "path": "docs/design/IMPLEMENTATION_PLAN.md",
+    "sha256": "95ccb6039fec72115ac75c5b987e5502329d2103994a5430bf85f7b2560a8717"
+  },
+  {
+    "path": "docs/design/PROMPTS.md",
+    "sha256": "73a6a93b46ca266d7c9ebc624e26f4cac76b65cf4b26ee7dff7a03e04293b412"
+  },
+  {
+    "path": "docs/design/README.md",
+    "sha256": "68b5a1efa4a7585d33f6eb7e71abd98541db0830c445e42529bcfd21e167af20"
+  },
+  {
+    "path": "docs/design/SCREENS.md",
+    "sha256": "14e07403281cb4521345a22d36811dd1360bb1fabdf73bedef59d2425f3e296f"
+  },
+  {
+    "path": "docs/design/TOKENS.md",
+    "sha256": "4484a4ffd15277d172b22809df8baa104c5b1d1147a1609306dce9be09451372"
+  },
+  {
+    "path": "docs/design/canvas/L01-Today.dc.html",
+    "sha256": "9e26f1682f93438136c3e53141a9a3bf5413e919d13d540e3e91d66ae67b0b2f"
+  },
+  {
+    "path": "docs/design/canvas/L02-Route.dc.html",
+    "sha256": "dd843dd7b4968dd4060d4755b0c5a41792697dc3851950c035f19dd0002c8cd7"
+  },
+  {
+    "path": "docs/design/canvas/L03-Moving.dc.html",
+    "sha256": "5c256f007268e8c366ac0dee0aef4a7acd49d2106fe39a7731fd4abee7b32df9"
+  },
+  {
+    "path": "docs/design/canvas/L04-Approach.dc.html",
+    "sha256": "468c9814299985683c288dfa95b56f1d91686aafdb1f8e13dcedd31bde58fb00"
+  },
+  {
+    "path": "docs/design/canvas/L05-Handover.dc.html",
+    "sha256": "e3f919bd3d7e857acbdecb0ea07b15c5672adea01f85854e9857b8faca38ac68"
+  },
+  {
+    "path": "docs/design/canvas/L06-Exception.dc.html",
+    "sha256": "6829c13f0d6a1dc3f5d3ce431c56c36a19733f0427c65636f6a3374f48dddac0"
+  },
+  {
+    "path": "docs/design/canvas/L07-EndCheck.dc.html",
+    "sha256": "96dd733dea9da6daaa51d66266882899454bc15db2fbfced76f983f53c033020"
+  },
+  {
+    "path": "docs/design/canvas/L08-MorningPickup.dc.html",
+    "sha256": "960614148bafdbd5cf4411ba7927576fd21a6c1201dcdd20c1fcfef7e52e3791"
+  },
+  {
+    "path": "docs/design/canvas/L09-Reorder.dc.html",
+    "sha256": "7c9c06d88c833876ff9597293e576ace0ad92e11652caf056b8f639307d2c38d"
+  },
+  {
+    "path": "docs/design/canvas/L10-Music.dc.html",
+    "sha256": "671216d945078e9abcfaa9a7647f780e1a1aebe8cb3ae0ee625cc21fe2a20c40"
+  },
+  {
+    "path": "docs/design/canvas/L11-ChildDetail.dc.html",
+    "sha256": "b4aaaf78dac04064a44a5531e5062a91543f47deacf9f3583dd6d96d7248234a"
+  },
+  {
+    "path": "docs/design/canvas/L12-TripLog.dc.html",
+    "sha256": "da1645cf8d3d5f64396b9c46da94f87957fd96b12f3a5d56605e17013e6c48bf"
+  },
+  {
+    "path": "docs/design/canvas/L13-Boarding.dc.html",
+    "sha256": "d1311615903099ceb57a262ac2dd70cdc2ecdf6ec849fac18f2748eb8773074b"
+  },
+  {
+    "path": "docs/design/canvas/Layout.dc.html",
+    "sha256": "d8095419d39fbb2f53e19affd31d85e55fd700b61b0d8b9530bccbb69cd6a466"
+  },
+  {
+    "path": "docs/design/canvas/Main.dc.html",
+    "sha256": "95eae6ce6514a7d1ef609758cf925986d26ddf40fab33b783a85bb9dbbec6e75"
+  },
+  {
+    "path": "docs/design/canvas/P01-Today.dc.html",
+    "sha256": "c9e616e9dffbe0dbf48b26e53dab10e300e29b20c634e6394ceabd89402e899e"
+  },
+  {
+    "path": "docs/design/canvas/P02-Moving.dc.html",
+    "sha256": "48e1753a45704ed8be60f414ded552900794d191d0b533f116bab090e97d8c3c"
+  },
+  {
+    "path": "docs/design/canvas/P03-Handover.dc.html",
+    "sha256": "2a3aec18aa632f819f121c03e67c418a311d0922f8df2b1e1c1c66dbc42ce3e9"
+  },
+  {
+    "path": "docs/design/canvas/P04-EndCheck.dc.html",
+    "sha256": "6672bfad4d272e99fe4bd262275adc54554b8caebd42727600fffaf0e511a75d"
+  },
+  {
+    "path": "docs/design/canvas/P05-Music.dc.html",
+    "sha256": "58f087053793367da9a40b909ff22b30292b25b7c0fca4618d6c74cfa32c37a7"
+  },
+  {
+    "path": "docs/design/canvas/Prototype.dc.html",
+    "sha256": "a0b5ee31dd7f3e6f758ee6842b15a97e201cdbb7f90428fb749124e1ac340635"
+  },
+  {
+    "path": "docs/design/canvas/canvas.json",
+    "sha256": "4ce498c1cc4ffeaa853d5b028ab175aaebcf4085fc878d335d3967bb08a9700a"
+  },
+  {
+    "path": "docs/design/code-drafts/README.md",
+    "sha256": "e7c42dd17da73fffce5356fcba26101e9a1abdbf2eb9a8ca1d80347bfbfed71b"
+  },
+  {
+    "path": "docs/design/tokens.json",
+    "sha256": "d04ab8a755e5afa4631c6c0fe8a70922fdc9931b0b228c361c3848a7358ac073"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/01-parent.png",
+    "sha256": "c0c7b760445163456a48c7661705c0c223805ee67959982c9c7dd296a49d0660"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/01-parent.svg",
+    "sha256": "6f589d298f158821b0302ad3a847ba7ddc07f7fb0ed05241e52e73feed1627d9"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/02-vehicle.png",
+    "sha256": "c886b7ff9e33876ed24b68b5bc4a891680e21b23cf5c255a5ab4ba9cdef96c4d"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/02-vehicle.svg",
+    "sha256": "1a51f2fe782a8e39f3b1bade38e681c07a6a42c6d61bcddb439743ec3b1b100d"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/03-sync.png",
+    "sha256": "84687d7bf522eb338a8872a3e17674104bbe2fa2ede82026401eeb801d1019d7"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/03-sync.svg",
+    "sha256": "4f36080ed1e715872c680b444a0adfbb4b71c929fa14c583c8dcf8d664486111"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/README.md",
+    "sha256": "ddbd8280562e7ea2121a14cbf05a6fb6cb8efe3b9a3503fc697c61a6de5c7555"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/index.html",
+    "sha256": "16c78949e69a7b50c1515ea62380e44133d6bcf5834340682b32249c60592c3c"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/01-parent.png",
+    "sha256": "a4123c0800fcee85eff15ad95c7d9f8813cf506b1ffbbb9fa510aa73aa451c43"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/01-parent.svg",
+    "sha256": "5d7b7c909d3e372a07c4b4d8bf5f2d65c316a75aade253b5601258a49472e760"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/02-vehicle.png",
+    "sha256": "1ae1f501c24164b5f3453ab38bd96ed3a256c1eb94c35cb4303add710e629376"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/02-vehicle.svg",
+    "sha256": "d3c847c17d674887bcf34e454925cd6f117cd0758408457b9e928eb7158526b3"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/03-sync.png",
+    "sha256": "636bee85825cc10b934fb871adebe368c1b6a479e688addf408a9769e53f428e"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/03-sync.svg",
+    "sha256": "516f99bc211772cbdd87c6e5dd6d2d70c2fc4f877cee2557f2653f1a7b21c9bd"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/README.md",
+    "sha256": "02c70df63b943a8c5a96308e9807f7ffc22ffc54d583dc9841866541321c48b4"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/index.html",
+    "sha256": "c88a67c4d3eb95c749139099f7ad7bd477f65542098a016f5a21e7399a6df22c"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/reference-detailed/verification.json",
+    "sha256": "0769196e3a0f5e9628fa0d9cc18ab2977c15d161afab114513ec6a26f00e3ba7"
+  },
+  {
+    "path": "docs/ui-flow-2026-11-04/verification.json",
+    "sha256": "3979475f00a5a423939134f2c0c200f148e24e83eef9cc292e6d7690ed0a0233"
+  },
+  {
+    "path": "gradle.properties",
+    "sha256": "0c495a571fdc2d2ee3e9e1cba39b093a8723f0b73f8ce5256fcc23defb24efb4"
+  },
+  {
+    "path": "gradle/libs.versions.toml",
+    "sha256": "8fca496ce0dbd7bb522c1ca24c9b0f0ed162ad1047e2afbac8fbc92031d6b2ed"
+  },
+  {
+    "path": "gradle/wrapper/gradle-wrapper.jar",
+    "sha256": "e996d452d2645e70c01c11143ca2d3742734a28da2bf61f25c82bdc288c9e637"
+  },
+  {
+    "path": "gradle/wrapper/gradle-wrapper.properties",
+    "sha256": "dafb226d06402c4b7d9c1a9b6833c26eaa117c08d2b4a16636a2d54ea8abc33f"
+  },
+  {
+    "path": "gradlew",
+    "sha256": "c15a47b60a4eeede9ffee33433fd990d8b6236607372b9bb1f6dc51b07b78c39"
+  },
+  {
+    "path": "gradlew.bat",
+    "sha256": "af835f98787e9269af5a046edcb821a592fed372139df7b947b471a63cfc236b"
+  },
+  {
+    "path": "scripts/export-evidence.py",
+    "sha256": "29ed6acb03348564464dd6efff41753673562218467da7a8f35b250a566b8179"
+  },
+  {
+    "path": "scripts/generate_test_tune.py",
+    "sha256": "48b7829492ec0bd3697b9c25d9f52632b4feae87af629525b60e6bc64807b6b2"
+  },
+  {
+    "path": "scripts/install-on-pleos.sh",
+    "sha256": "671afedb44a92ab44152bb8cebc64d455eb1db194015b00ab262bc8a6a89ee1f"
+  },
+  {
+    "path": "scripts/verify-sdk-on-pleos.py",
+    "sha256": "a8ffea1711ea0d1419b9e94e97c87202c74b557548ea24e30885c035bfb86ee0"
+  }
+]

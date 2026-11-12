@@ -1,0 +1,22 @@
+{
+  "edition": "team-summary",
+  "date": "2026-11-04",
+  "svg_parse": "pass",
+  "application_changes": false,
+  "files": {
+    "01-parent.png": "c0c7b760445163456a48c7661705c0c223805ee67959982c9c7dd296a49d0660",
+    "01-parent.svg": "6f589d298f158821b0302ad3a847ba7ddc07f7fb0ed05241e52e73feed1627d9",
+    "02-vehicle.png": "c886b7ff9e33876ed24b68b5bc4a891680e21b23cf5c255a5ab4ba9cdef96c4d",
+    "02-vehicle.svg": "1a51f2fe782a8e39f3b1bade38e681c07a6a42c6d61bcddb439743ec3b1b100d",
+    "03-sync.png": "84687d7bf522eb338a8872a3e17674104bbe2fa2ede82026401eeb801d1019d7",
+    "03-sync.svg": "4f36080ed1e715872c680b444a0adfbb4b71c929fa14c583c8dcf8d664486111",
+    "index.html": "16c78949e69a7b50c1515ea62380e44133d6bcf5834340682b32249c60592c3c",
+    "README.md": "ddbd8280562e7ea2121a14cbf05a6fb6cb8efe3b9a3503fc697c61a6de5c7555"
+  },
+  "checks": {
+    "unique_ids": true,
+    "local_links": true,
+    "javascript_syntax": true,
+    "visual_review": "three images inspected"
+  }
+}

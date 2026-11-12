@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="960" viewBox="0 0 1800 960" role="img" aria-labelledby="title-03-sync"><title id="title-03-sync">통학메이트 · 두 앱의 연결</title><rect width="100%" height="100%" fill="#F5F7FA"/>
+<text x="60.0" y="40.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="40" font-weight="700" fill="#182D3E">통학메이트 · 두 앱의 연결</text>
+<text x="60.0" y="103.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="400" fill="#536777">차량에서 기록하면, 학부모의 화면과 알림에 반영됩니다.</text>
+<text x="120.0" y="190.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">차량 앱에서 하는 일</text>
+<text x="1090.0" y="190.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">학부모가 보는 것</text>
+<rect x="60" y="255" width="660" height="97" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="92.0" y="285.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">운행 시작</text>
+<polyline points="720,303 1020,303" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1020,303 1009.4690092573155,308.75310646325045 1009.4690092573155,297.24689353674955" fill="#087E70"/>
+<rect x="1020" y="255" width="720" height="97" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="1052.0" y="285.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">이동 중 화면 + 출발 알림</text>
+<rect x="60" y="386" width="660" height="97" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="92.0" y="416.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">Pleos 위치·예상 시간 갱신</text>
+<polyline points="720,434 1020,434" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1020,434 1009.4690092573155,439.75310646325045 1009.4690092573155,428.24689353674955" fill="#087E70"/>
+<rect x="1020" y="386" width="720" height="97" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="1052.0" y="416.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">정류장 진행 + 내 아이 예상 시간</text>
+<rect x="60" y="517" width="660" height="97" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="92.0" y="547.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">도착·정차 확인</text>
+<polyline points="720,565 1020,565" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1020,565 1009.4690092573155,570.7531064632504 1009.4690092573155,559.2468935367496" fill="#087E70"/>
+<rect x="1020" y="517" width="720" height="97" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="1052.0" y="547.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">도착 화면 + 도착 알림</text>
+<rect x="60" y="648" width="660" height="97" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="92.0" y="678.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">인계 확인 → 하차 기록</text>
+<polyline points="720,696 1020,696" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1020,696 1009.4690092573155,701.7531064632504 1009.4690092573155,690.2468935367496" fill="#087E70"/>
+<rect x="1020" y="648" width="720" height="97" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="1052.0" y="678.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="27" font-weight="700" fill="#182D3E">하차 완료 화면 + 하차 알림</text>
+<rect x="60" y="808" width="1680" height="75" rx="14" fill="#FFF5C6" stroke="#FFF5C6"/>
+<text x="90.0" y="832.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">도착 전 안내</text>
+<text x="390.0" y="832.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="400" fill="#182D3E">내 아이의 유효한 예상 시간이 2분 이내이면 접근 알림</text>
+<text x="60.0" y="918.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">통학메이트 · 현재 구현을 요약한 화면 흐름 · 2026.11.04</text>
+<text x="1710.0" y="918.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">3 / 3</text>
+</svg>

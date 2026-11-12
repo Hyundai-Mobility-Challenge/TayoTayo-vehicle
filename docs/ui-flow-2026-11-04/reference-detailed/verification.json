@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-04",
+  "kind": "documentation-only",
+  "network_dependencies": false,
+  "source_inspection": true,
+  "application_tests_rerun": false,
+  "sheets": [
+    {
+      "name": "01-parent",
+      "png_size": [
+        1800,
+        1430
+      ],
+      "svg_xml": true
+    },
+    {
+      "name": "02-vehicle",
+      "png_size": [
+        1800,
+        1580
+      ],
+      "svg_xml": true
+    },
+    {
+      "name": "03-sync",
+      "png_size": [
+        1800,
+        1260
+      ],
+      "svg_xml": true
+    }
+  ],
+  "files": {
+    "01-parent.png": "a4123c0800fcee85eff15ad95c7d9f8813cf506b1ffbbb9fa510aa73aa451c43",
+    "01-parent.svg": "5d7b7c909d3e372a07c4b4d8bf5f2d65c316a75aade253b5601258a49472e760",
+    "02-vehicle.png": "1ae1f501c24164b5f3453ab38bd96ed3a256c1eb94c35cb4303add710e629376",
+    "02-vehicle.svg": "d3c847c17d674887bcf34e454925cd6f117cd0758408457b9e928eb7158526b3",
+    "03-sync.png": "636bee85825cc10b934fb871adebe368c1b6a479e688addf408a9769e53f428e",
+    "03-sync.svg": "516f99bc211772cbdd87c6e5dd6d2d70c2fc4f877cee2557f2653f1a7b21c9bd",
+    "index.html": "c88a67c4d3eb95c749139099f7ad7bd477f65542098a016f5a21e7399a6df22c",
+    "README.md": "02c70df63b943a8c5a96308e9807f7ffc22ffc54d583dc9841866541321c48b4"
+  },
+  "document_checks": {
+    "unique_html_ids": true,
+    "local_links_exist": true,
+    "svg_xml_parse": true,
+    "png_visual_review": "3 sheets reviewed; no text clipping observed",
+    "javascript_controls": "3 tabs / keyboard / zoom / print handler passed in isolated DOM stub",
+    "browser_render_test": false
+  }
+}

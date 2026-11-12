@@ -1,0 +1,396 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>통학메이트 화면 이동도</title><style>*{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#182d3e;font:16px/1.6 "Malgun Gothic",system-ui,sans-serif}header,main,footer{max-width:1840px;margin:auto;padding:24px 28px}header{padding-bottom:12px}h1{font-size:30px;margin:0 0 8px}p{margin:4px 0 12px;color:#536777}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:20px 0 10px}button,a.control,select{font:inherit;border:1px solid #c9d5df;border-radius:9px;padding:10px 16px;background:white;color:#182d3e;cursor:pointer;text-decoration:none}button[aria-selected=true]{background:#182d3e;color:white;border-color:#182d3e}button:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #2165b4;outline-offset:3px}.spacer{flex:1}.canvas{overflow-x:auto;border-radius:12px;background:#f5f7fa}.canvas svg{display:block;width:100%;height:auto;min-width:600px}.full .canvas svg{width:1800px;max-width:none}.panel[hidden]{display:none}.panel h2{font-size:23px}.caption{background:#eaf0f5;padding:14px 18px;border-radius:10px}.downloads{display:flex;gap:14px;flex-wrap:wrap;margin:16px 0}details{background:#fff;border:1px solid #d6dfe7;border-radius:12px;padding:16px 20px;margin:16px 0}summary{cursor:pointer;font-weight:700}.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:20px;padding-top:20px}.notes h3{font-size:17px;margin:0 0 6px}.notes p{font-size:15px}.badge{display:inline-block;background:#fff3b6;color:#604a00;padding:4px 9px;border-radius:6px;font-size:13px}.sources{font-size:14px;overflow-wrap:anywhere}a{color:#2165b4}footer{font-size:14px} @media(max-width:640px){header,main,footer{padding:16px}.spacer{display:none}h1{font-size:24px}.canvas svg{min-width:900px}}@media print{@page{size:A3 landscape;margin:8mm}header,footer,.toolbar,.downloads,details,.caption{display:none}main{padding:0;max-width:none}.panel[hidden],.panel{display:block!important;break-after:page}.panel:last-child{break-after:auto}.canvas{overflow:visible}.canvas svg,.full .canvas svg{width:100%;height:270mm;min-width:0;object-fit:contain}.panel h2{display:none}}</style></head><body><header><span class="badge">현재 구현 기준 · 2026-11-04</span><h1>통학메이트 화면 이동도</h1><p>실제 버튼과 화면 구조를 코드에서 확인해 그린 축약 와이어프레임입니다. 앱 화면 캡처나 새로 구현된 UI가 아닙니다.</p><div class="toolbar"><div role="tablist" aria-label="화면 이동도 구분"><button id="tab-parent" role="tab" aria-controls="panel-parent" aria-selected="true" type="button">학부모 화면 이동</button><button id="tab-vehicle" role="tab" aria-controls="panel-vehicle" aria-selected="false" type="button">차량 화면 이동</button><button id="tab-sync" role="tab" aria-controls="panel-sync" aria-selected="false" type="button">두 앱 연동</button></div><span class="spacer"></span><label>보기 <select id="zoom"><option value="fit">화면에 맞춤</option><option value="full">원본 크기</option></select></label><button id="print" type="button">3장 인쇄 / PDF 저장</button></div><p class="caption">학부모: 홈 카드의 상태 변화 · 차량: 하원 본문 교체와 상세 패널 이동 · 두 앱 연동: 조작부터 알림까지. 작은 화면에서는 원본 크기로 좌우 이동하거나 PNG를 열어 확대하세요.</p></header><main><section class="panel" id="panel-parent" role="tabpanel" aria-labelledby="tab-parent"><h2>학부모 화면 이동</h2><div class="canvas"><svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1430" viewBox="0 0 1800 1430" role="img" aria-labelledby="title-01-parent desc-01-parent"><title id="title-01-parent">01  학부모 앱 · 화면 이동과 홈 카드 상태</title><desc id="desc-01-parent">핵심: 별도 아이 상세 페이지 없이, 「오늘의 하원」 홈 안에서 아이별 카드가 갱신됩니다.. 화면 번호와 조작 화살표를 따라 읽는 축약 와이어프레임입니다.</desc><rect width="100%" height="100%" fill="#F5F7FA"/>
+<text x="50.0" y="36.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="38" font-weight="700" fill="#182D3E">01  학부모 앱 · 화면 이동과 홈 카드 상태</text>
+<text x="50.0" y="94.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#536777">핵심: 별도 아이 상세 페이지 없이, 「오늘의 하원」 홈 안에서 아이별 카드가 갱신됩니다.</text>
+<text x="50.0" y="132.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">파랑 실선: 화면/영역 이동    초록 점선: 같은 화면 상태 갱신    보라: 앱 밖으로 이동    주황: 미검증·예외</text>
+<rect x="50" y="200" width="420" height="285" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="50" y="200" width="420" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="68.0" y="212.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P01  로그인 / 가입</text>
+<rect x="70" y="265" width="380" height="38" rx="7" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="82.0" y="273.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">서버 주소 · 개발용</text>
+<rect x="70" y="312" width="380" height="38" rx="7" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="82.0" y="320.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">초대받은 이메일</text>
+<rect x="70" y="359" width="380" height="38" rx="7" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="82.0" y="367.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">비밀번호 · 10자 이상</text>
+<rect x="70" y="410" width="380" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="233.0" y="418.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">로그인</text>
+<text x="70.0" y="462.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">처음이라면 보호자 가입 → 이름 입력 추가</text>
+<rect x="690" y="200" width="420" height="285" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="690" y="200" width="420" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="708.0" y="212.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P02  홈 · 어린이 미연결</text>
+<text x="710.0" y="265.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="700" fill="#182D3E">어린이를 연결해 주세요</text>
+<text x="710.0" y="312.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="400" fill="#536777">기관에서 받은 코드를 입력해요.</text>
+<rect x="710" y="353" width="380" height="38" rx="7" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="722.0" y="361.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">기관에서 받은 초대 코드</text>
+<rect x="710" y="405" width="380" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="852.0" y="413.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">어린이 연결</text>
+<text x="710.0" y="458.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#9B5C0B">오류는 같은 화면 메시지 → 코드 재입력</text>
+<rect x="1330" y="200" width="420" height="285" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="1330" y="200" width="420" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="1348.0" y="212.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P03  홈 · 오늘의 하원</text>
+<text x="1350.0" y="265.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="25" font-weight="700" fill="#182D3E">민수의 하원</text>
+<text x="1350.0" y="307.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">기관 · 배정 차량</text>
+<rect x="1350" y="341" width="380" height="58" rx="14" fill="#EAF4F1" stroke="#D6DFE7"/>
+<text x="1362.0" y="354.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">아이별 하원 카드  ↓ 아래 상태 참고</text>
+<text x="1350.0" y="417.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">+ 어린이 추가 연결  /  최근 하원 기록</text>
+<text x="1350.0" y="451.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">알림·설정  /  새로고침</text>
+<polyline points="470,342 690,342" fill="none" stroke="#2165B4" stroke-width="3"/>
+<polygon points="690,342 679.4690092573155,347.75310646325045 679.4690092573155,336.24689353674955" fill="#2165B4"/>
+<text x="532.0" y="277.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#2165B4">로그인 성공</text>
+<text x="520.0" y="303.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#2165B4">아이 미연결 시</text>
+<polyline points="1110,342 1330,342" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1330,342 1319.4690092573155,347.75310646325045 1319.4690092573155,336.24689353674955" fill="#087E70"/>
+<text x="1151.0" y="277.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#087E70">어린이 연결 성공</text>
+<text x="1169.0" y="303.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#087E70">홈 내용 갱신</text>
+<text x="50.0" y="505.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">이미 아이가 연결된 계정은 로그인 후 P03으로 진입 · 가입은 P01의 폼 전환 · 추가 연결/최근 기록은 홈에서 펼치기</text>
+<text x="50.0" y="557.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="700" fill="#182D3E">P03 안에서 바뀌는 네 가지 모습 — 서로 다른 페이지가 아닙니다</text>
+<rect x="50" y="607" width="380" height="323" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="50" y="607" width="380" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="68.0" y="619.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P03-a  운행 대기</text>
+<rect x="70" y="672" width="340" height="75" rx="14" fill="#FFF7CC" stroke="#FFF7CC"/>
+<text x="82.0" y="685.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">출발 소식을 기다리고 있어요</text>
+<text x="82.0" y="717.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" font-weight="400" fill="#536777">우리 아이 하차 지점</text>
+<text x="70.0" y="778.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="700" fill="#182D3E">시청 앞 픽업 장소</text>
+<text x="70.0" y="820.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">진행·공유는 운행 중 제공</text>
+<text x="70.0" y="898.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">차량에서 출발하면 자동 갱신</text>
+<rect x="490" y="607" width="380" height="323" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="490" y="607" width="380" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="508.0" y="619.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P03-b  이동 중</text>
+<rect x="510" y="672" width="340" height="75" rx="14" fill="#FFF7CC" stroke="#FFF7CC"/>
+<text x="522.0" y="685.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">약 5분</text>
+<text x="522.0" y="717.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" font-weight="400" fill="#536777">Pleos 최신 예상 시간</text>
+<polyline points="528,775 528,863" fill="none" stroke="#D8BD40" stroke-width="5"/>
+<rect x="520" y="773" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="553.0" y="769.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">출발지</text>
+<rect x="520" y="813" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="553.0" y="809.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">정류장 1 · 익명</text>
+<rect x="520" y="853" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="553.0" y="849.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">내 아이 하차 지점</text>
+<rect x="511" y="802" width="35" height="24" rx="7" fill="#182D3E" stroke="#182D3E"/>
+<text x="517.5" y="805.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">BUS</text>
+<rect x="510" y="887" width="340" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="620.0" y="895.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">픽업 상황 공유</text>
+<rect x="930" y="607" width="380" height="323" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="930" y="607" width="380" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="948.0" y="619.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P03-c  도착 · 인계 대기</text>
+<rect x="950" y="672" width="340" height="75" rx="14" fill="#FFF7CC" stroke="#FFF7CC"/>
+<text x="962.0" y="685.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">픽업 장소에 도착했어요</text>
+<text x="962.0" y="717.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" font-weight="400" fill="#536777">선생님의 인계 확인을 기다려요</text>
+<polyline points="968,775 968,863" fill="none" stroke="#D8BD40" stroke-width="5"/>
+<rect x="960" y="773" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="993.0" y="769.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">출발지</text>
+<rect x="960" y="813" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="993.0" y="809.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">정류장 1 · 익명</text>
+<rect x="960" y="853" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="993.0" y="849.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">내 아이 하차 지점</text>
+<rect x="951" y="848" width="35" height="24" rx="7" fill="#182D3E" stroke="#182D3E"/>
+<text x="957.5" y="851.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">BUS</text>
+<rect x="950" y="887" width="340" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="1060.0" y="895.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">픽업 상황 공유</text>
+<rect x="1370" y="607" width="380" height="323" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="1370" y="607" width="380" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="1388.0" y="619.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P03-d  하차 완료</text>
+<rect x="1390" y="672" width="340" height="75" rx="14" fill="#EAF1FF" stroke="#EAF1FF"/>
+<text x="1402.0" y="685.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">오늘도 하원을 마쳤어요</text>
+<text x="1402.0" y="717.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" font-weight="400" fill="#536777">선생님이 하차를 기록했어요</text>
+<polyline points="1408,775 1408,863" fill="none" stroke="#D8BD40" stroke-width="5"/>
+<rect x="1400" y="773" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="1433.0" y="769.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">출발지</text>
+<rect x="1400" y="813" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="1433.0" y="809.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">정류장 1 · 익명</text>
+<rect x="1400" y="853" width="16" height="16" rx="8" fill="#F1CF37" stroke="#F1CF37"/>
+<text x="1433.0" y="849.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">내 아이 하차 지점</text>
+<rect x="1391" y="848" width="35" height="24" rx="7" fill="#182D3E" stroke="#182D3E"/>
+<text x="1397.5" y="851.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="11" font-weight="700" fill="#FFFFFF">BUS</text>
+<text x="1390.0" y="898.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">위치 공유 종료 · 완료 기록 유지</text>
+<polyline points="430,767 490,767" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="490,767 479.4690092573155,772.7531064632504 479.4690092573155,761.2468935367496" fill="#087E70"/>
+<text x="423.0" y="579.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">차량 출발</text>
+<polyline points="870,767 930,767" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="930,767 919.4690092573155,772.7531064632504 919.4690092573155,761.2468935367496" fill="#087E70"/>
+<text x="863.0" y="579.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">도착 확인</text>
+<polyline points="1310,767 1370,767" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1370,767 1359.4690092573155,772.7531064632504 1359.4690092573155,761.2468935367496" fill="#087E70"/>
+<text x="1303.0" y="579.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">하차 기록</text>
+<text x="50.0" y="950.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">연결 지연: 같은 카드가 「갱신 대기」로 변경 · ETA/진행 중지 → 유효한 정보가 오면 복구 · 시간 0만으로 완료되지 않음</text>
+<rect x="50" y="1010" width="510" height="232" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="50" y="1010" width="510" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="68.0" y="1022.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P04  알림·설정 · 팝업</text>
+<text x="70.0" y="1075.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#2165B4">홈의 「알림·설정」을 누르면 열림</text>
+<text x="70.0" y="1115.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">푸시 등록 상태 / 알림 권한 허용</text>
+<text x="70.0" y="1141.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">연결 새로고침 / 로그아웃 · 알림 연결 해제</text>
+<rect x="70" y="1190" width="470" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="263.0" y="1198.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">닫기 → 홈</text>
+<rect x="645" y="1010" width="510" height="232" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="645" y="1010" width="510" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="663.0" y="1022.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P05  휴대폰 공유창 · 앱 밖</text>
+<text x="665.0" y="1075.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#7952A5">P03 「픽업 상황 공유」 → Android 공유창</text>
+<text x="665.0" y="1117.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">사용자가 메신저·받는 사람을 선택</text>
+<text x="665.0" y="1143.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">앱이 메시지를 자동 발송하지 않음</text>
+<text x="665.0" y="1193.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#2165B4">홈: 「공유 링크 모두 종료」로 철회</text>
+<rect x="1240" y="1010" width="510" height="232" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="1240" y="1010" width="510" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="1258.0" y="1022.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">P06  수신자 웹 · 앱 설치 불필요</text>
+<text x="1260.0" y="1075.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#7952A5">받은 링크 열기 → 내 아이 픽업 진행</text>
+<text x="1260.0" y="1117.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">익명 정류장 · ETA · 지도 보기 옵션</text>
+<text x="1260.0" y="1143.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">다른 아이의 이름·주소·좌표는 숨김</text>
+<text x="1260.0" y="1193.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#9B5C0B">만료/철회/하차 → 조회 종료 화면</text>
+<polyline points="1155,1130 1240,1130" fill="none" stroke="#7952A5" stroke-width="3"/>
+<polygon points="1240,1130 1229.4690092573155,1135.7531064632503 1229.4690092573155,1124.2468935367497" fill="#7952A5"/>
+<text x="1179.0" y="1097.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#7952A5">전달</text>
+<rect x="50" y="1270" width="820" height="84" rx="12" fill="#EAF0F5" stroke="#EAF0F5"/>
+<text x="66.0" y="1282.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#182D3E">화면 구조에서 확인한 점</text>
+<text x="66.0" y="1312.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">아이 카드는 홈에 모두 표시 · 최근 기록은 펼치기(최대 6개) · 설정은 팝업</text>
+<rect x="930" y="1270" width="820" height="84" rx="12" fill="#FFF4E7" stroke="#FFF4E7"/>
+<text x="946.0" y="1282.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#9B5C0B">공유와 알림의 경계</text>
+<text x="946.0" y="1312.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">링크 열람 ≠ 인계 권한 · 알림 탭은 앱 홈 진입, 특정 아이로 자동 이동하지 않음</text>
+<polyline points="50,1378 1750,1378" fill="none" stroke="#D6DFE7" stroke-width="2"/>
+<text x="50.0" y="1395.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">통학메이트 · 현재 코드 기준 · 2026-11-04 · 가상 민수 / 예상 시간은 표시 예시 · 실제 화면 캡처 아님</text>
+<text x="1720.0" y="1395.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">1 / 3</text>
+</svg></div><div class="downloads"><a href="01-parent.svg" target="_blank">확대 가능한 원본 SVG</a><a href="01-parent.png" target="_blank">이미지 PNG</a></div><details><summary>학부모 화면 구조 · 상세 근거</summary><div class="notes"><article><h3>P01 로그인/가입</h3><p>별도 화면 이동 없이 join 상태에 따라 이름 입력과 버튼이 바뀝니다. 비로그인 폼에 개발용 서버 주소가 표시됩니다.</p></article><article><h3>P02 → P03</h3><p>초대 수락 성공 후 같은 홈에 어린이 카드가 생깁니다. 별도의 어린이 상세 Activity/페이지는 없습니다.</p></article><article><h3>P03 카드</h3><p>여러 아이가 있으면 카드가 세로로 나열됩니다. 대기·이동·도착·완료는 같은 TrackingCard의 상태입니다. 예시 ETA 5분은 측정값이 아닙니다.</p></article><article><h3>추가 연결 / 최근 기록</h3><p>홈에서 입력 영역과 최근 기록 영역을 펼칩니다. 최근 기록은 현재 코드상 최대 6개입니다.</p></article><article><h3>설정 / 알림 진입</h3><p>알림·설정은 AlertDialog입니다. 푸시 탭은 MainActivity를 열며 특정 아이 카드로 자동 이동하는 처리는 없습니다.</p></article><article><h3>공유</h3><p>Android 공유창은 OS 화면, 링크 수신 화면은 웹입니다. 링크는 읽기 범위만 주며 인계 권한이 아닙니다. 공유 웹에는 선택적으로 지도 보기가 남아 있습니다.</p></article></div></details></section><section class="panel" id="panel-vehicle" role="tabpanel" aria-labelledby="tab-vehicle" hidden><h2>차량 화면 이동</h2><div class="canvas"><svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1580" viewBox="0 0 1800 1580" role="img" aria-labelledby="title-02-vehicle desc-02-vehicle"><title id="title-02-vehicle">02  차량 앱 · 실제 조작 경로</title><desc id="desc-02-vehicle">핵심: 「하원」 본문이 단계별로 바뀝니다. 「명단·상세」는 별도 패널이며 Pleos 내비는 외부 앱입니다.. 화면 번호와 조작 화살표를 따라 읽는 축약 와이어프레임입니다.</desc><rect width="100%" height="100%" fill="#F5F7FA"/>
+<text x="50.0" y="36.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="38" font-weight="700" fill="#182D3E">02  차량 앱 · 실제 조작 경로</text>
+<text x="50.0" y="94.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#536777">핵심: 「하원」 본문이 단계별로 바뀝니다. 「명단·상세」는 별도 패널이며 Pleos 내비는 외부 앱입니다.</text>
+<text x="50.0" y="132.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">파랑 실선: 화면/영역 이동    초록 점선: 같은 화면 상태 갱신    보라: 앱 밖으로 이동    주황: 미검증·예외</text>
+<rect x="50" y="205" width="365" height="255" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="50" y="205" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="68.0" y="217.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V00  하원 · 공통 진입</text>
+<text x="70.0" y="270.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">상단: 하원 한 바퀴</text>
+<text x="70.0" y="310.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="400" fill="#182D3E">왼쪽: 정류장 진행</text>
+<text x="70.0" y="337.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="400" fill="#182D3E">본문: 지금 해야 할 동작</text>
+<rect x="70" y="375" width="325" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="167.0" y="383.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">기관 · 배정 명단</text>
+<rect x="70" y="423" width="325" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="188.0" y="431.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">명단 · 상세</text>
+<rect x="495" y="205" width="365" height="255" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="495" y="205" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="513.0" y="217.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V01  기관 · 차량 연결</text>
+<rect x="515" y="270" width="325" height="38" rx="7" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="527.0" y="278.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">서버 주소 / 차량 연결 코드</text>
+<rect x="515" y="319" width="325" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="638.5" y="327.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">차량 연결</text>
+<rect x="515" y="372" width="325" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="578.5" y="380.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">배정 명단으로 운행 준비</text>
+<text x="515.0" y="426.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">연결 완료 후 반복 입력 불필요</text>
+<rect x="940" y="205" width="365" height="255" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="940" y="205" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="958.0" y="217.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V02  하원 · 탑승 준비</text>
+<text x="960.0" y="270.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="700" fill="#182D3E">민수 · 차에 탔나요?</text>
+<rect x="960" y="319" width="325" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="1083.5" y="327.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">탑승 기록</text>
+<text x="960.0" y="373.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">다음 아이로 같은 본문 갱신</text>
+<rect x="960" y="413" width="325" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="1059.0" y="421.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">탑승 마침 · N명</text>
+<rect x="1385" y="205" width="365" height="255" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="1385" y="205" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="1403.0" y="217.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V03  하원 · 순서 확인</text>
+<text x="1405.0" y="270.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="700" fill="#182D3E">하원 준비가 끝났어요</text>
+<text x="1405.0" y="310.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">탑승 인원 / 방문 순서</text>
+<rect x="1405" y="356" width="325" height="40" rx="9" fill="#EEF2F5" stroke="#EEF2F5"/>
+<text x="1519.5" y="364.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#182D3E">순서 바꾸기</text>
+<rect x="1405" y="408" width="325" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="1481.0" y="416.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">이 순서로 · 운행 시작</text>
+<polyline points="415,330 495,330" fill="none" stroke="#2165B4" stroke-width="3"/>
+<polygon points="495,330 484.4690092573155,335.75310646325045 484.4690092573155,324.24689353674955" fill="#2165B4"/>
+<text x="418.0" y="180.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">기관 버튼</text>
+<polyline points="860,330 940,330" fill="none" stroke="#2165B4" stroke-width="3"/>
+<polygon points="940,330 929.4690092573155,335.75310646325045 929.4690092573155,324.24689353674955" fill="#2165B4"/>
+<text x="863.0" y="180.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">명단 준비</text>
+<polyline points="1305,330 1385,330" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1385,330 1374.4690092573155,335.75310646325045 1374.4690092573155,324.24689353674955" fill="#087E70"/>
+<text x="1308.0" y="180.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">탑승 마침</text>
+<text x="50.0" y="486.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">최초 권한 안내 → Android 권한 허용 · 일반 기록/출발은 최신 P·속도 0·연결·UX 조건 확인 · 주차브레이크는 문 시험 조건</text>
+<polyline points="1568,460 1568,526 232,526 232,575" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="232,575 226.24689353674955,564.4690092573155 237.75310646325045,564.4690092573155" fill="#087E70"/>
+<text x="725.5" y="533.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#087E70">운행 시작 → 자동 전송·경로 요청·출발 알림</text>
+<rect x="50" y="585" width="365" height="295" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="50" y="585" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="68.0" y="597.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V04  하원 · 주행 / 도착 확인</text>
+<text x="70.0" y="650.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="700" fill="#182D3E">도착하면 확인해 주세요</text>
+<text x="70.0" y="693.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">다음 지점 / 내릴 어린이</text>
+<text x="70.0" y="731.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#9B5C0B">주행 중 도착 버튼 비활성</text>
+<rect x="70" y="774" width="325" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="173.0" y="782.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">도착·정차 확인</text>
+<text x="70.0" y="827.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">정차 후 사람이 눌러야 진행</text>
+<rect x="495" y="585" width="365" height="295" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="495" y="585" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="513.0" y="597.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V05  Pleos 순정 내비 · 앱 밖</text>
+<rect x="515" y="650" width="325" height="110" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="600.5" y="675.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" font-weight="700" fill="#182D3E">순정 내비 화면</text>
+<text x="572.0" y="714.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">실제 도로 지도는 이 앱에서</text>
+<text x="515.0" y="784.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">D 전환 → 내비 전면 요청</text>
+<text x="515.0" y="809.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#182D3E">백그라운드 위치·ETA 전송 유지</text>
+<text x="515.0" y="849.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#7952A5">정차 후 차량 앱을 다시 열기</text>
+<rect x="940" y="585" width="365" height="295" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="940" y="585" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="958.0" y="597.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V06  하원 · 대면 인계</text>
+<text x="960.0" y="650.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#182D3E">민수</text>
+<text x="960.0" y="699.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="400" fill="#182D3E">보호자에게 직접 인계했나요?</text>
+<rect x="960" y="753" width="325" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="1083.5" y="761.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">인계 확인</text>
+<text x="960.0" y="813.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">보호자 폰은 도착 · 인계 대기</text>
+<text x="960.0" y="849.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">남은 순서 바꾸기 · 조건부</text>
+<rect x="1385" y="585" width="365" height="295" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="1385" y="585" width="365" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="1403.0" y="597.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V07  하원 · 하차 기록</text>
+<text x="1405.0" y="650.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="29" font-weight="700" fill="#182D3E">민수</text>
+<text x="1405.0" y="699.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="400" fill="#182D3E">인계 확인 완료 · 내렸나요?</text>
+<rect x="1405" y="753" width="325" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="1528.5" y="761.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">하차 기록</text>
+<text x="1405.0" y="813.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">해당 지점 마지막 아이 처리 시</text>
+<text x="1405.0" y="838.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#087E70">다음 목적지로 자동 진행</text>
+<polyline points="415,690 495,690" fill="none" stroke="#7952A5" stroke-width="3"/>
+<polygon points="495,690 484.4690092573155,695.7531064632504 484.4690092573155,684.2468935367496" fill="#7952A5"/>
+<text x="427.5" y="557.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#7952A5">D 전환</text>
+<polyline points="495,827 415,827" fill="none" stroke="#7952A5" stroke-width="3"/>
+<polygon points="415,827 425.5309907426845,821.2468935367496 425.5309907426845,832.7531064632504" fill="#7952A5"/>
+<text x="425.0" y="850.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#7952A5">앱 복귀</text>
+<polyline points="232,880 232,926 1122,926 1122,880" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1122,880 1127.7531064632503,890.5309907426845 1116.2468935367497,890.5309907426845" fill="#087E70"/>
+<text x="549.5" y="941.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#087E70">V04에서 「도착·정차 확인」 → V06</text>
+<polyline points="1305,720 1385,720" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1385,720 1374.4690092573155,725.7531064632504 1374.4690092573155,714.2468935367496" fill="#087E70"/>
+<text x="1306.0" y="557.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#087E70">인계 확인</text>
+<text x="50.0" y="995.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">반복: V07 → 같은 지점의 다음 아이(V06), 지점 완료 → 다음 목적지(V04) · 실제 차량 출발을 승인하는 동작은 아님</text>
+<rect x="50" y="1050" width="510" height="235" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="50" y="1050" width="510" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="68.0" y="1062.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V08  하원 · 출발지 복귀</text>
+<text x="70.0" y="1115.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">하차 지점 방문을 마치면 복귀 안내</text>
+<text x="70.0" y="1159.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">출발지에 돌아와 정차 확인</text>
+<rect x="70" y="1211" width="470" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="245.5" y="1219.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">복귀·정차 확인</text>
+<text x="70.0" y="1259.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#9B5C0B">미하차 기록이 남으면 먼저 확인·정정</text>
+<rect x="645" y="1050" width="510" height="235" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="645" y="1050" width="510" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="663.0" y="1062.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V09  하원 · 실내 확인</text>
+<text x="665.0" y="1115.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">차량 실내를 확인해 주세요</text>
+<text x="665.0" y="1159.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">사람이 남은 아이가 없는지 직접 확인</text>
+<rect x="665" y="1211" width="470" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="792.5" y="1219.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">실내 확인 완료 · 운행 종료</text>
+<text x="665.0" y="1259.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">센서만으로 어린이 부재를 판정하지 않음</text>
+<rect x="1240" y="1050" width="510" height="235" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<rect x="1240" y="1050" width="510" height="48" rx="14" fill="#EAF0F5" stroke="#D6DFE7"/>
+<text x="1258.0" y="1062.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">V10  하원 완료 → 운행 기록</text>
+<text x="1260.0" y="1115.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">오늘의 하원을 마쳤어요</text>
+<text x="1260.0" y="1159.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#182D3E">하차·실내 확인 저장 / 전송 종료</text>
+<rect x="1260" y="1211" width="470" height="40" rx="9" fill="#182D3E" stroke="#182D3E"/>
+<text x="1435.0" y="1219.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">완료 기록 보기</text>
+<text x="1260.0" y="1259.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#2165B4">상세 패널의 「운행 기록」으로 이동</text>
+<polyline points="560,1168 645,1168" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="645,1168 634.4690092573155,1173.7531064632503 634.4690092573155,1162.2468935367497" fill="#087E70"/>
+<polyline points="1155,1168 1240,1168" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1240,1168 1229.4690092573155,1173.7531064632503 1229.4690092573155,1162.2468935367497" fill="#087E70"/>
+<rect x="50" y="1320" width="820" height="84" rx="12" fill="#EAF0F5" stroke="#EAF0F5"/>
+<text x="66.0" y="1332.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#182D3E">상세로 갈 때의 실제 경로</text>
+<text x="66.0" y="1362.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">명단·상세 → 명단 / 운행 기록 / 기관 연결 / 테스트 도구 · 「하원으로」로 복귀</text>
+<rect x="930" y="1320" width="820" height="84" rx="12" fill="#FFF4E7" stroke="#FFF4E7"/>
+<text x="946.0" y="1332.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#9B5C0B">보호자 미도착 예외 경로</text>
+<text x="946.0" y="1362.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">명단·상세 → 명단·방문 순서 조작 → 사유 → 운전자 확인 · 운행 화면 복귀</text>
+<rect x="50" y="1424" width="820" height="84" rx="12" fill="#EAF0F5" stroke="#EAF0F5"/>
+<text x="66.0" y="1436.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#182D3E">순서 수정은 본문 교체</text>
+<text x="66.0" y="1466.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">V03 순서 바꾸기 → 위/아래 → 이 순서로 정하기 또는 취소 → 기존 하원 본문</text>
+<rect x="930" y="1424" width="820" height="84" rx="12" fill="#FFF4E7" stroke="#FFF4E7"/>
+<text x="946.0" y="1436.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#9B5C0B">근접 알림 복귀는 현장 미검증</text>
+<text x="946.0" y="1466.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">근접+정차 조건 → 알림 → 탭으로 하원 복귀. 자동 인계·하차 확정은 없음</text>
+<polyline points="50,1528 1750,1528" fill="none" stroke="#D6DFE7" stroke-width="2"/>
+<text x="50.0" y="1545.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">통학메이트 · 현재 코드 기준 · 2026-11-04 · 가상 민수 / 예상 시간은 표시 예시 · 실제 화면 캡처 아님</text>
+<text x="1720.0" y="1545.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">2 / 3</text>
+</svg></div><div class="downloads"><a href="02-vehicle.svg" target="_blank">확대 가능한 원본 SVG</a><a href="02-vehicle.png" target="_blank">이미지 PNG</a></div><details><summary>차량 화면 구조 · 상세 근거</summary><div class="notes"><article><h3>기본 하원 화면</h3><p>panel=flow 안에서 TeacherFlow가 단계에 따라 본문을 바꿉니다. 가로 화면은 좌측 정류장 목록, 작은 화면은 상단 간단 목록입니다.</p></article><article><h3>기관 진입</h3><p>하원 하단의 기관 · 배정 명단 버튼 또는 명단 · 상세 → 기관 연결 탭으로 접근합니다. 명단 준비가 성공하면 panel=flow로 돌아옵니다.</p></article><article><h3>탑승 / 경로</h3><p>탑승 기록을 반복하거나 탑승 마침을 누르면 순서 확인 본문으로 바뀝니다. 현재는 최소 한 명 탑승으로 진행할 수 있습니다. 전원 출결 확정 기능은 별도입니다.</p></article><article><h3>출발 / D</h3><p>이 순서로 · 운행 시작이 출발 액션입니다. D 관측은 순정 내비 전면 요청이며 앱이 기어를 바꾸지 않습니다. 하원 하단 Pleos 내비 지도 버튼도 있습니다.</p></article><article><h3>하차 다음 단계</h3><p>메인 하원의 하차 기록은 recordAlightingAndContinue를 호출합니다. 같은 지점 마지막 아이가 처리되면 다음 목적지로 자동 진행합니다. 별도 상세 조작 흐름은 버튼과 행동이 다를 수 있습니다.</p></article><article><h3>예외 / 복귀 / 종료</h3><p>보호자 미도착 예외는 현재 상세 조작 화면에 있습니다. 모든 하차 지점 방문 후 출발지 복귀·정차 확인 → 미하차 기록 확인 → 실내 확인·종료를 거칩니다.</p></article><article><h3>정차와 근접 알림</h3><p>일반 기록은 최신 속도 0/P/연결/UX 조건입니다. 근접 알림은 별도 조건과 현장 검증이 필요하며, 자동 도착·인계·하차를 의미하지 않습니다.</p></article></div></details></section><section class="panel" id="panel-sync" role="tabpanel" aria-labelledby="tab-sync" hidden><h2>두 앱 연동</h2><div class="canvas"><svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1260" viewBox="0 0 1800 1260" role="img" aria-labelledby="title-03-sync desc-03-sync"><title id="title-03-sync">03  두 앱 연동 · 누가 누르면 무엇이 바뀌나요?</title><desc id="desc-03-sync">왼쪽은 차량의 조작, 가운데는 전달되는 정보, 오른쪽은 보호자가 실제로 보는 화면입니다.. 화면 번호와 조작 화살표를 따라 읽는 축약 와이어프레임입니다.</desc><rect width="100%" height="100%" fill="#F5F7FA"/>
+<text x="50.0" y="36.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="38" font-weight="700" fill="#182D3E">03  두 앱 연동 · 누가 누르면 무엇이 바뀌나요?</text>
+<text x="50.0" y="94.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" font-weight="400" fill="#536777">왼쪽은 차량의 조작, 가운데는 전달되는 정보, 오른쪽은 보호자가 실제로 보는 화면입니다.</text>
+<text x="50.0" y="132.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">파랑 실선: 화면/영역 이동    초록 점선: 같은 화면 상태 갱신    보라: 앱 밖으로 이동    주황: 미검증·예외</text>
+<text x="70.0" y="199.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="700" fill="#182D3E">차량 앱 · 동승 선생님</text>
+<text x="730.0" y="199.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="700" fill="#182D3E">서버 · 연결 처리</text>
+<text x="1310.0" y="199.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" font-weight="700" fill="#182D3E">학부모 앱 · 홈 카드</text>
+<rect x="50" y="255" width="540" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="70.0" y="270.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#2165B4">1  운행 준비</text>
+<text x="70.0" y="307.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">배정 명단으로 운행 준비</text>
+<rect x="700" y="255" width="400" height="119" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="720.0" y="278.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">기관·차량·어린이 연결</text>
+<text x="720.0" y="334.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#087E70">자동 전달 · 접근 범위 검사</text>
+<rect x="1230" y="255" width="520" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="1250.0" y="275.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">카드는 운행 대기</text>
+<text x="1250.0" y="317.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">초대 연결은 최초 한 번</text>
+<polyline points="590,313 700,313" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="700,313 689.4690092573155,318.75310646325045 689.4690092573155,307.24689353674955" fill="#087E70"/>
+<polyline points="1100,313 1230,313" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1230,313 1219.4690092573155,318.75310646325045 1219.4690092573155,307.24689353674955" fill="#087E70"/>
+<text x="70.0" y="377.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">준비만으로 출발 알림은 보내지 않음</text>
+<rect x="50" y="396" width="540" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="70.0" y="411.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#2165B4">2  출발</text>
+<text x="70.0" y="448.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">이 순서로 · 운행 시작</text>
+<rect x="700" y="396" width="400" height="119" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="720.0" y="419.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">운행 시작 / Pleos 위치·ETA</text>
+<text x="720.0" y="475.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#087E70">자동 전달 · 접근 범위 검사</text>
+<rect x="1230" y="396" width="520" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="1250.0" y="416.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">이동 중 + 출발 알림</text>
+<text x="1250.0" y="458.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">내 아이 ETA가 유효하면 안내</text>
+<polyline points="590,454 700,454" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="700,454 689.4690092573155,459.75310646325045 689.4690092573155,448.24689353674955" fill="#087E70"/>
+<polyline points="1100,454 1230,454" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1230,454 1219.4690092573155,459.75310646325045 1219.4690092573155,448.24689353674955" fill="#087E70"/>
+<text x="70.0" y="518.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">자동 전송 시작 · 별도 위치 스위치 불필요</text>
+<rect x="50" y="537" width="540" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="70.0" y="552.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#2165B4">3  이동 / D 전환</text>
+<text x="70.0" y="589.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">순정 내비 표시 · 관측 유지</text>
+<rect x="700" y="537" width="400" height="119" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="720.0" y="560.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">약 5초 갱신 / 아이별 범위 확인</text>
+<text x="720.0" y="616.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#087E70">자동 전달 · 접근 범위 검사</text>
+<rect x="1230" y="537" width="520" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="1250.0" y="557.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">정류장 진행 + 약 N분</text>
+<text x="1250.0" y="599.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">유효 ETA 0~2분 → 접근 알림</text>
+<polyline points="590,595 700,595" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="700,595 689.4690092573155,600.7531064632504 689.4690092573155,589.2468935367496" fill="#087E70"/>
+<polyline points="1100,595 1230,595" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1230,595 1219.4690092573155,600.7531064632504 1219.4690092573155,589.2468935367496" fill="#087E70"/>
+<text x="70.0" y="659.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">내비 범위 밖 / 오래된 값 / 불일치 → ETA 숨김</text>
+<rect x="50" y="678" width="540" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="70.0" y="693.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#2165B4">4  정류장 도착</text>
+<text x="70.0" y="730.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">도착·정차 확인</text>
+<rect x="700" y="678" width="400" height="119" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="720.0" y="701.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">해당 지점 도착 상태</text>
+<text x="720.0" y="757.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#087E70">자동 전달 · 접근 범위 검사</text>
+<rect x="1230" y="678" width="520" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="1250.0" y="698.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">도착 · 인계 대기 + 알림</text>
+<text x="1250.0" y="740.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">버스가 내 아이 지점에 표시</text>
+<polyline points="590,736 700,736" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="700,736 689.4690092573155,741.7531064632504 689.4690092573155,730.2468935367496" fill="#087E70"/>
+<polyline points="1100,736 1230,736" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1230,736 1219.4690092573155,741.7531064632504 1219.4690092573155,730.2468935367496" fill="#087E70"/>
+<text x="70.0" y="800.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">이전 정류장 도착을 내 아이 도착으로 표시하지 않음</text>
+<rect x="50" y="819" width="540" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="70.0" y="834.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#2165B4">5  대면 인계 / 하차</text>
+<text x="70.0" y="871.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">인계 확인 → 하차 기록</text>
+<rect x="700" y="819" width="400" height="119" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="720.0" y="842.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">하차 이벤트 / 링크 접근 종료</text>
+<text x="720.0" y="898.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#087E70">자동 전달 · 접근 범위 검사</text>
+<rect x="1230" y="819" width="520" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="1250.0" y="839.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">하차 완료 + 하차 알림</text>
+<text x="1250.0" y="881.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">하차 기록 시각 표시</text>
+<polyline points="590,877 700,877" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="700,877 689.4690092573155,882.7531064632504 689.4690092573155,871.2468935367496" fill="#087E70"/>
+<polyline points="1100,877 1230,877" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1230,877 1219.4690092573155,882.7531064632504 1219.4690092573155,871.2468935367496" fill="#087E70"/>
+<text x="70.0" y="941.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">인계만 눌러서는 하차 완료가 되지 않음</text>
+<rect x="50" y="960" width="540" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="70.0" y="975.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="700" fill="#2165B4">6  전체 운행 종료</text>
+<text x="70.0" y="1012.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">복귀 확인 → 실내 확인·종료</text>
+<rect x="700" y="960" width="400" height="119" rx="14" fill="#EAF4F1" stroke="#EAF4F1"/>
+<text x="720.0" y="983.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" font-weight="700" fill="#182D3E">위치 전송 종료 / 공유 차단</text>
+<text x="720.0" y="1039.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#087E70">자동 전달 · 접근 범위 검사</text>
+<rect x="1230" y="960" width="520" height="119" rx="14" fill="#FFFFFF" stroke="#D6DFE7"/>
+<text x="1250.0" y="980.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" font-weight="700" fill="#182D3E">기록된 아이의 완료 상태 유지</text>
+<text x="1250.0" y="1022.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" font-weight="400" fill="#536777">미하차를 완료로 꾸미지 않음</text>
+<polyline points="590,1018 700,1018" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="700,1018 689.4690092573155,1023.7531064632504 689.4690092573155,1012.2468935367496" fill="#087E70"/>
+<polyline points="1100,1018 1230,1018" fill="none" stroke="#087E70" stroke-width="3" stroke-dasharray="8 6"/>
+<polygon points="1230,1018 1219.4690092573155,1023.7531064632504 1219.4690092573155,1012.2468935367496" fill="#087E70"/>
+<text x="70.0" y="1082.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">운행 종료와 아이별 하차 완료는 별도 상태</text>
+<rect x="50" y="1125" width="820" height="84" rx="12" fill="#EAF0F5" stroke="#EAF0F5"/>
+<text x="66.0" y="1137.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#182D3E">검증한 연결</text>
+<text x="66.0" y="1167.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">실제 SDK ETA·D 내비 전환·배경 전송, 가상 운행 FCM의 삼성폰 OS 수신 기록 확인</text>
+<rect x="930" y="1125" width="820" height="84" rx="12" fill="#FFF4E7" stroke="#FFF4E7"/>
+<text x="946.0" y="1137.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="19" font-weight="700" fill="#9B5C0B">미검증 / 미구현 구분</text>
+<text x="946.0" y="1167.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" font-weight="400" fill="#536777">미검증: 실도로·근접 팝업·외부 LTE / 미구현 제안: 특정 아이 알림 딥링크</text>
+<polyline points="50,1208 1750,1208" fill="none" stroke="#D6DFE7" stroke-width="2"/>
+<text x="50.0" y="1225.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">통학메이트 · 현재 코드 기준 · 2026-11-04 · 가상 민수 / 예상 시간은 표시 예시 · 실제 화면 캡처 아님</text>
+<text x="1720.0" y="1225.0" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" font-weight="400" fill="#536777">3 / 3</text>
+</svg></div><div class="downloads"><a href="03-sync.svg" target="_blank">확대 가능한 원본 SVG</a><a href="03-sync.png" target="_blank">이미지 PNG</a></div><details><summary>검증 범위와 개선 제안 · 상세 근거 및 미적용 개선 제안</summary><div class="notes"><article><h3>확인한 결과</h3><p>11/3 차량 JVM 152개·서버 84개·차량 UI 4개·삼성폰 UI 9개 통과 기록. 11/4 기본 SDK 연결 수정 후 JVM 152개와 격리 전송 1개 통과. 이번에는 코드를 읽어 도식을 작성했으며 앱 테스트를 재실행하지 않았습니다.</p></article><article><h3>현재까지의 한계</h3><p>실도로 주행, 차량 근접 때 OEM 팝업과 탭 복귀, 외부망 공개 운영은 미검증입니다. OS의 FCM 수신은 사용자의 읽음/인계 확인과 다릅니다.</p></article><article><h3>제안 A · 보호자 홈</h3><p>여러 아이가 늘어나면 카드 목록과 아이 상세 화면을 분리할지 검토합니다. 지금은 존재하지 않는 상세 화면이므로 현재 이동도에 넣지 않았습니다.</p></article><article><h3>제안 B · 알림 진입</h3><p>알림을 누르면 해당 아이 카드로 바로 이동하고 강조하도록 개선할 수 있습니다. 현재는 홈 진입까지입니다.</p></article><article><h3>제안 C · 차량 예외 처리</h3><p>보호자 미도착/동승 유지 버튼을 메인 인계 화면에서 바로 열도록 하면 상세 패널 왕복을 줄일 수 있습니다. 아직 적용하지 않았습니다.</p></article><article><h3>제안 D · 일상/시험 분리</h3><p>연결 완료 후의 기관 코드 입력, 모의 운행, 문 시험, 중복된 상세 조작 동선을 운영 화면에서 더 분리할 수 있습니다. 기존 기능 삭제 없이 설계 검토가 필요합니다.</p></article><article><h3>제안 E · 시간의 의미</h3><p>차량 순서 검토의 예시 계산 시간과 보호자에게 전달되는 실제 Pleos ETA를 더 명확히 구분하면 시연 설명이 쉬워집니다.</p></article></div></details></section></main><footer><p>파일은 이 폴더만으로 열립니다. 외부 서버·지도·폰·에뮬레이터에 접속하지 않습니다. 앱 코드와 기기 상태는 변경하지 않았습니다.</p><p><a href="README.md">화면 목록·근거 문서</a> · <a href="verification.json">생성·파일 검증 기록</a></p></footer><script>const tabs=Array.from(document.querySelectorAll('[role="tab"]'));function selectTab(t){tabs.forEach(b=>{const active=b===t;b.setAttribute('aria-selected',String(active));document.getElementById(b.getAttribute('aria-controls')).hidden=!active;});}tabs.forEach((t,i)=>{t.addEventListener('click',()=>selectTab(t));t.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();const n=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];selectTab(n);n.focus();}});});document.getElementById('zoom').addEventListener('change',e=>{document.querySelector('main').classList.toggle('full',e.target.value==='full');});document.getElementById('print').addEventListener('click',()=>window.print());</script></body></html>
