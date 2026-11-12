@@ -44,7 +44,8 @@ internal fun nextFlowGuide(
             }
         }
         TripPhase.ALIGHTING -> {
-            val child = trip.currentStopChildren.firstOrNull { it.status == Attendance.ONBOARD }
+            // V-21: 동승 유지 아이는 인계·하차 대상이 아니다(처리됨). 모두 처리되면 [다음 지점으로] 단계에서 동승 유지 취소를 함께 보여 준다.
+            val child = trip.currentStopChildren.firstOrNull { it.awaitingAlighting }
             when {
                 surroundingsWarning -> FlowGuide("운전자", "주변 위험 확인", "경고 유지", "surroundings-status")
                 child != null && child.id !in trip.handoverChildIds -> FlowGuide("선생님", "보호자 인계 확인", "직접 인계", "handover-${child.id}")
@@ -56,6 +57,8 @@ internal fun nextFlowGuide(
         TripPhase.END_REVIEW -> {
             val child = trip.onboardChildren.firstOrNull()
             when {
+                // V-22: 동승 유지로 돌아온 아이는 기관 담당자에게 직접 인계하고 하차 기록한다.
+                child != null && child.staysOnboard -> FlowGuide("선생님", "동승 유지 어린이 기관 인계", "기관 직접 인계", "return-org-${child.id}")
                 child != null && child.id !in trip.handoverChildIds -> FlowGuide("선생님", "미하차 기록 확인", "인계 확인", "end-handover-${child.id}")
                 child != null -> FlowGuide("선생님", "기록 정정", "사유 기록", "correct-${child.id}")
                 else -> FlowGuide("선생님", "실내 확인 후 종료", "직접 확인과 종료 저장", "confirm-finish")
@@ -69,7 +72,7 @@ internal fun nextFlowGuide(
 /** Excludes clock ticks, observation timestamps and diagnostic revisions to avoid scroll jumps. */
 internal fun flowProgressKey(trip: TripState, boardingReviewed: Boolean): List<Any?> = listOf(
     trip.tripId, trip.phase, trip.integrationMode, trip.currentStopIndex,
-    trip.children.map { it.id to it.status }, trip.routeIsExample, trip.routeProposal, trip.routeVersion,
+    trip.children.map { Triple(it.id, it.status, it.stayOnboardReason) }, trip.routeIsExample, trip.routeProposal, trip.routeVersion,
     trip.manualSurroundingsCheckAtMillis, trip.unlockConfirmation?.id,
     trip.unlockAttempt?.status, trip.unlockAttempt?.completedAtMillis, trip.unlockAttempt?.invalidated,
     trip.manualDoorAtMillis, trip.handoverChildIds, trip.directCabinCheckAtMillis,

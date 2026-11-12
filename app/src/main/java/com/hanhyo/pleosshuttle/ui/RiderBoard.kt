@@ -25,6 +25,7 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.ChildRecord
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
+import com.hanhyo.pleosshuttle.domain.StayOnboardReasons
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
 import com.hanhyo.pleosshuttle.domain.notBoardingBadge
@@ -99,6 +100,20 @@ internal fun riderStatusLabel(status: Attendance): String = when (status) {
     Attendance.CONFIRMED_NOT_BOARDED -> status.label
 }
 
+/** 아이 기준 상태 문구. V-21 동승 유지 아이는 탑승 중 "동승 유지", 복귀 후 기관 인계 하차는 "기관 인계 완료". */
+internal fun riderStatusLabel(child: ChildRecord): String = when {
+    child.staysOnboard && child.status == Attendance.ONBOARD -> "동승 유지"
+    child.staysOnboard && child.status == Attendance.ALIGHTED -> "기관 인계 완료"
+    else -> riderStatusLabel(child.status)
+}
+
+internal fun riderTone(child: ChildRecord): ChipTone =
+    if (child.staysOnboard && child.status == Attendance.ONBOARD) ChipTone.ACCENT else riderTone(child.status)
+
+/** V-21 동승 유지 사유 배지. 동승 유지 중인 아이만. */
+internal fun stayOnboardBadge(child: ChildRecord): String? =
+    if (child.staysOnboard && child.status == Attendance.ONBOARD) "동승 유지 사유 · ${StayOnboardReasons.label(child.stayOnboardReason)}" else null
+
 /** 상태 색(V-03: 탑승 전 / 탑승 / 하차 / 오늘 미탑승). 색만으로 구분하지 않도록 칩에는 항상 글자를 함께 쓴다. */
 internal fun riderTone(status: Attendance): ChipTone = when (status) {
     Attendance.NOT_BOARDED -> ChipTone.NEUTRAL
@@ -137,9 +152,9 @@ internal fun riderBoard(
                 id = child.id,
                 name = displayName(child),
                 status = child.status,
-                statusLabel = riderStatusLabel(child.status),
-                tone = riderTone(child.status),
-                badge = if (moving) null else notBoardingBadge(child),
+                statusLabel = riderStatusLabel(child),
+                tone = riderTone(child),
+                badge = if (moving) null else stayOnboardBadge(child) ?: notBoardingBadge(child),
                 stopName = if (moving) null else trip.stops.find { it.id == child.stopId }?.shortName,
                 highlight = when {
                     trip.phase == TripPhase.END_REVIEW && child.status == Attendance.ONBOARD -> RiderHighlight.REMAINING
@@ -160,13 +175,18 @@ internal fun riderBoard(
         if (trip.phase != TripPhase.PREPARING || count(Attendance.ALIGHTED) > 0) add("하차 완료 ${count(Attendance.ALIGHTED)}")
         if (count(Attendance.NOT_BOARDED) > 0) add("탑승 전 ${count(Attendance.NOT_BOARDED)}")
         if (count(Attendance.CONFIRMED_NOT_BOARDED) > 0) add("미탑승 확인 ${count(Attendance.CONFIRMED_NOT_BOARDED)}")
+        if (trip.stayOnboardChildren.isNotEmpty()) add("동승 유지 ${trip.stayOnboardChildren.size}")
         if (beltShown && trip.onboardChildren.isNotEmpty()) add("벨트 미확인 ${trip.beltUncheckedCount}")
     }.joinToString(" · ")
     val remaining = rows.count { it.highlight == RiderHighlight.REMAINING }
     val beltWarnings = rows.count { it.belt?.warn == true }
     val note = when {
         moving -> "운행 중에는 조회만 할 수 있어요"
-        trip.phase == TripPhase.END_REVIEW -> if (remaining > 0) "차 안에 남은 기록 ${remaining}명 · 직접 확인해 주세요" else "차 안에 남은 기록 없음 · 실내는 직접 확인해 주세요"
+        trip.phase == TripPhase.END_REVIEW -> when {
+            trip.stayOnboardChildren.isNotEmpty() -> "차 안에 남은 기록 ${remaining}명(동승 유지 ${trip.stayOnboardChildren.size}명 · 기관에 인계) · 직접 확인해 주세요"
+            remaining > 0 -> "차 안에 남은 기록 ${remaining}명 · 직접 확인해 주세요"
+            else -> "차 안에 남은 기록 없음 · 실내는 직접 확인해 주세요"
+        }
         trip.phase == TripPhase.PREPARING && !stationary -> "정차 후 기록할 수 있어요"
         beltWarnings > 0 -> "벨트 미확인 ${beltWarnings}명 · 출발 전에 직접 확인해 주세요"
         else -> null

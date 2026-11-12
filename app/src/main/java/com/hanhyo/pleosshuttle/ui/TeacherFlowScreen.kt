@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -16,6 +20,7 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
+import com.hanhyo.pleosshuttle.domain.StayOnboardReasons
 import com.hanhyo.pleosshuttle.domain.notBoardingBadge
 import com.hanhyo.pleosshuttle.sdk.SdkOutcome
 import com.hanhyo.pleosshuttle.ui.component.Action
@@ -26,13 +31,15 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
 /** Teacher actions are explicit; destination and guidance advance after the last child record. */
 @Composable internal fun TeacherFlow(vm: ShuttleViewModel, guide: FlowGuide, onBoardingReviewed: () -> Unit, onOpenReorder: () -> Unit) {
     val tag = guide.targetTag
-    val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "not-boarded-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}") }
+    val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "not-boarded-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}", "return-org-${it.id}") }
     val stationary = vm.engine.stationaryBlockers(vm.now).isEmpty()
     val uxLocked = vm.trip.integrationMode == IntegrationMode.SDK && vm.sdkVehicle.uxRestricted.value == true
     val type = AppTheme.typography
     val question = type.titleBold.copy(fontWeight = FontWeight.Medium)
     val hint = type.body2Regular
     val warning = AppTheme.colors.primaryContent
+    // V-21: [보호자 미도착 · 동승 유지]를 누르면 같은 카드에서 고정 사유를 고른다(단계가 바뀌면 닫힘).
+    var choosingStay by remember(tag) { mutableStateOf(false) }
     // 정차 중 인계 화면에서도 남은 지점이 둘 이상이면 순서를 바꿀 수 있다(바뀌는 것은 다음 정류장부터).
     val remainingReorder = @Composable {
         if (vm.trip.routeOrder.size - (vm.trip.currentStopIndex + 1) >= 2) {
@@ -94,14 +101,36 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                 if (confirmed > 0) Text("미탑승 확인 ${confirmed}명 · 취소는 명단에서", style = hint, color = AppTheme.colors.textSecondary)
             }
             (tag?.startsWith("handover-") == true || tag?.startsWith("end-handover-") == true) && child != null -> {
-                Text("보호자에게 직접 인계했나요?", style = question)
-                Action("인계 확인", tag, prominent = true) { vm.perform { confirmHandover(child.id, it) } }
-                if (tag?.startsWith("handover-") == true) remainingReorder()
+                val atStop = tag?.startsWith("handover-") == true
+                if (atStop && choosingStay) {
+                    // V-21: 사유는 고정 선택지만(자유 입력 없음 → 보호자·대리인 개인정보를 남기지 않음, 7절).
+                    Text("동승 유지 사유를 골라 주세요", style = question)
+                    Text("아이는 내리지 않고 계속 타고 가요. 복귀 후 기관에 인계해요.", style = hint, color = AppTheme.colors.textSecondary)
+                    StayOnboardReasons.ALL.forEach { code ->
+                        Action(StayOnboardReasons.label(code), "stay-reason-$code-${child.id}", enabled = stationary) {
+                            vm.perform { markStayOnboard(child.id, code, it) }
+                        }
+                    }
+                    Action("돌아가기", "stay-cancel-${child.id}", secondary = true) { choosingStay = false }
+                } else {
+                    Text("보호자에게 직접 인계했나요?", style = question)
+                    Action("인계 확인", tag, prominent = true) { vm.perform { confirmHandover(child.id, it) } }
+                    if (atStop) {
+                        Action("보호자 미도착 · 동승 유지", "stay-onboard-${child.id}", secondary = true, enabled = stationary) { choosingStay = true }
+                        remainingReorder()
+                    }
+                }
             }
             tag?.startsWith("alight-") == true && child != null -> {
                 Text("인계 확인 완료 · 차에서 내렸나요?", style = question)
                 Action("하차 기록", tag, prominent = true) { vm.perform { recordAlightingAndContinue(child.id, it) } }
                 remainingReorder()
+            }
+            tag?.startsWith("return-org-") == true && child != null -> {
+                // V-22: 동승 유지(V-21)로 돌아온 아이. 선생님이 기관 담당자에게 직접 인계한 뒤 하차 기록한다.
+                StatusChip("동승 유지 · ${StayOnboardReasons.label(child.stayOnboardReason)}", tone = ChipTone.ACCENT)
+                Text("기관 담당자에게 직접 인계했나요?", style = question)
+                Action("기관 인계 확인 · 하차 기록", tag, prominent = true) { vm.perform { returnStayOnboardToOrg(child.id, it) } }
             }
             tag?.startsWith("correct-") == true && child != null -> {
                 Text("실제 상태와 다른 기록을 정정해 주세요.", style = question)
@@ -113,7 +142,9 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                 RouteCheckBody(vm, onOpenReorder)
             }
             tag in setOf("arrive-stop", "arrive-origin") -> {
-                Text(if (vm.trip.currentStop == null) "복귀 후 차량 실내를 확인해요." else "내릴 어린이: " + vm.trip.currentStopChildren.filter { it.status == Attendance.ONBOARD }.joinToString { it.name.removePrefix("가상 ") }.ifBlank { "없음" }, style = question)
+                Text(if (vm.trip.currentStop == null) "복귀 후 차량 실내를 확인해요." else "내릴 어린이: " + vm.trip.currentStopChildren.filter { it.awaitingAlighting }.joinToString { it.name.removePrefix("가상 ") }.ifBlank { "없음" }, style = question)
+                if (vm.trip.currentStop == null && vm.trip.stayOnboardChildren.isNotEmpty())
+                    Text("동승 유지 ${vm.trip.stayOnboardChildren.size}명 · 복귀 후 기관에 인계해요", style = hint, color = AppTheme.colors.textSecondary)
                 Text(if (vm.trip.integrationMode == IntegrationMode.SIMULATION) "도착을 가정하고 정차를 확인해 주세요." else "운전자에게 도착과 정차를 확인해 주세요.", style = hint, color = AppTheme.colors.textSecondary)
                 if (!stationary || uxLocked) Text(if (uxLocked) "차량 조작 제한 중" else vm.engine.stationaryBlockers(vm.now).first(), color = warning, style = type.body2SemiBold)
                 if (vm.trip.integrationMode == IntegrationMode.SDK && vm.navi.outcome in setOf(SdkOutcome.ERROR, SdkOutcome.TIMEOUT, SdkOutcome.PERMISSION_REQUIRED)) Text("길 안내 연결 실패 · 상세에서 확인해 주세요.", color = warning, style = type.body2SemiBold)
@@ -121,7 +152,14 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                     vm.perform { if (tag == "arrive-origin") beginEndReview(it) else chooseAlighting(it) }
                 }
             }
-            tag == "complete-stop" -> Action("다음 지점으로", tag, prominent = true) { vm.perform { completeCurrentStop(it) } }
+            tag == "complete-stop" -> {
+                // V-21: 이 정류장에서 동승 유지로 남긴 아이. 정류장을 떠나기 전(하차 단계)에는 취소하고 인계로 돌아갈 수 있다.
+                vm.trip.currentStopChildren.filter { it.status == Attendance.ONBOARD && it.staysOnboard }.forEach { stay ->
+                    Text("${stay.name.removePrefix("가상 ")} · 동승 유지(${StayOnboardReasons.label(stay.stayOnboardReason)})", style = hint, color = AppTheme.colors.textSecondary)
+                    Action("동승 유지 취소 · 인계로", "stay-undo-${stay.id}", secondary = true, enabled = stationary) { vm.perform { undoStayOnboard(stay.id, it) } }
+                }
+                Action("다음 지점으로", tag, prominent = true) { vm.perform { completeCurrentStop(it) } }
+            }
             tag == "confirm-finish" -> {
                 Text("남아 있는 어린이가 없는지 직접 살펴보세요.", style = question)
                 Action("실내 확인 완료 · 운행 종료", tag, prominent = true) { vm.perform { inspectAndFinish(it) } }

@@ -198,8 +198,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (child.status != Attendance.CONFIRMED_NOT_BOARDED) return reject("미탑승 확인 기록이 없습니다.")
         return changeAttendance(child, Attendance.NOT_BOARDED, "미탑승 확인 취소", now)
     }
-    private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long): Boolean {
-        val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason)
+    private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long, stayOnboard: Boolean? = null): Boolean {
+        val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason, stayOnboard = stayOnboard)
         val before = state
         update(state.copy(
             // 새로 탑승(정정 포함)한 아이의 벨트는 항상 "미확인"에서 시작한다(V-05). 하차 등 다른 변경은 벨트 값을 건드리지 않는다.
@@ -356,15 +356,66 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (childId !in state.handoverChildIds) return reject("선생님이 보호자 대면 인계를 먼저 확인해야 합니다.")
         return changeAttendance(child, Attendance.ALIGHTED, "선생님 보호자 대면 인계 후 직접 하차 기록", now)
     }
-    /** Attendance is a human record, independent of optional door-control experiments. */
+    /**
+     * Attendance is a human record, independent of optional door-control experiments.
+     * 마지막 하차 기록이면 지점을 자동 완료한다. 단, 이 지점에 동승 유지(V-21) 아이가 있으면 자동 완료하지 않고
+     * [다음 지점으로] 단계에 머문다(같은 정류장에서 동승 유지를 취소할 기회를 남김).
+     */
     fun recordAlightingAndContinue(childId: String, now: Long): Boolean {
         if (!alight(childId, now)) return false
-        if (state.currentStopChildren.none { it.status == Attendance.ONBOARD }) completeCurrentStop(now)
+        val here = state.currentStopChildren
+        if (here.none { it.awaitingAlighting } && here.none { it.status == Attendance.ONBOARD && it.staysOnboard }) completeCurrentStop(now)
         return true // The attendance write remains valid even if a lab request delays transition.
+    }
+    /**
+     * V-21 보호자 미도착 · 동승 유지(하원). 메인 인계 단계(인계 확인 전)에서만, 정차 확인(V-11) 중에만.
+     * 아이는 탑승(ONBOARD) 그대로 두고 사유 코드(고정 선택지)만 표시한다. 이 지점은 이 아이의 하차 없이 완료할 수 있다.
+     * 원장에 출결 기록(stayOnboard=true)을 남겨 서버에 GUARDIAN_NO_SHOW로 보낸다(D35 기관 쪽 자동 기록). 모의 모드는 기기 기록만.
+     */
+    fun markStayOnboard(childId: String, reasonCode: String, now: Long): Boolean {
+        if (state.phase != TripPhase.ALIGHTING) return reject("동승 유지는 정류장 도착·정차 확인 뒤 인계 단계에서 기록합니다.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        if (reasonCode !in StayOnboardReasons.ALL) return reject("동승 유지 사유를 선택해 주세요.")
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.stopId != state.currentStop?.id) return reject("현재 하차 지점의 어린이가 아닙니다.")
+        if (child.status != Attendance.ONBOARD) return reject("탑승 기록이 있는 어린이만 동승 유지할 수 있습니다.")
+        if (child.staysOnboard) return reject("이미 동승 유지로 기록했습니다.")
+        if (childId in state.handoverChildIds) return reject("보호자 인계 확인을 이미 기록했습니다. 하차 기록을 하거나 정정하세요.")
+        val label = StayOnboardReasons.label(reasonCode)
+        val event = LedgerEntry(id("stay", now), child.id, Attendance.ONBOARD, Attendance.ONBOARD, now, "보호자 미도착 · 동승 유지($label)", stayOnboard = true)
+        return update(state.copy(
+            children = state.children.map { if (it.id == child.id) it.copy(stayOnboardReason = reasonCode) else it },
+            ledger = state.ledger + event,
+        ), "${child.name}: 동승 유지($label) 저장 · 복귀 후 기관에 인계해 주세요.")
+    }
+    /** V-21 동승 유지 취소. 같은 정류장(하차 단계)·정차 중에만. 아이는 다시 인계 확인 단계로 돌아간다. */
+    fun undoStayOnboard(childId: String, now: Long): Boolean {
+        if (state.phase != TripPhase.ALIGHTING) return reject("동승 유지 취소는 그 정류장에 정차 중일 때만 할 수 있습니다.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.stopId != state.currentStop?.id) return reject("현재 하차 지점의 어린이가 아닙니다.")
+        if (child.status != Attendance.ONBOARD || !child.staysOnboard) return reject("동승 유지 기록이 없습니다.")
+        val event = LedgerEntry(id("stay", now), child.id, Attendance.ONBOARD, Attendance.ONBOARD, now, "동승 유지 취소", stayOnboard = false)
+        return update(state.copy(
+            children = state.children.map { if (it.id == child.id) it.copy(stayOnboardReason = null) else it },
+            ledger = state.ledger + event,
+        ), "${child.name}: 동승 유지를 취소했습니다. 보호자 인계를 확인해 주세요.")
+    }
+    /**
+     * V-22: 동승 유지로 복귀한 아이를 선생님이 기관 담당자에게 직접 인계하고 하차 기록한다. 종료 확인(복귀·정차) 단계에서만.
+     * 서버에는 CHILD_RETURNED_TO_ORG(기관 복귀)로 보낸다(보호자 하차 알림 CHILD_DROPPED_OFF가 아님).
+     */
+    fun returnStayOnboardToOrg(childId: String, now: Long): Boolean {
+        if (state.phase != TripPhase.END_REVIEW) return reject("기관 인계는 복귀 후 종료 확인 단계에서 기록합니다.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.status != Attendance.ONBOARD || !child.staysOnboard) return reject("동승 유지 중인 어린이만 기관 인계로 기록합니다.")
+        return changeAttendance(child, Attendance.ALIGHTED, "동승 유지 · 선생님 기관 직접 인계 후 하차 기록", now, stayOnboard = true)
     }
     fun completeCurrentStop(now: Long): Boolean {
         if (state.phase != TripPhase.ALIGHTING || state.currentStop == null) return reject("현재 하차 지점이 없습니다.")
-        if (state.currentStopChildren.any { it.status == Attendance.ONBOARD }) return reject("현재 지점의 인계·하차 기록이 남아 있습니다.")
+        // V-21: 동승 유지 아이는 처리된 것으로 본다(내리지 않고 계속 타고 감).
+        if (state.currentStopChildren.any { it.awaitingAlighting }) return reject("현재 지점의 인계·하차 기록이 남아 있습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (surroundings.kind == SurroundingKind.WARNING) return reject("주변 위험 경고를 먼저 확인하세요.")
         if (state.unlockAttempt?.let { it.completedAtMillis == null } == true) return reject("별도 문 시험의 응답을 기다리고 있습니다.")
@@ -387,7 +438,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
 
     fun resumeWarnings(now: Long): List<String> = buildList {
-        if (state.currentStopChildren.any { it.status == Attendance.ONBOARD }) add("현재 지점에 미하차 기록이 남아 있음")
+        if (state.currentStopChildren.any { it.awaitingAlighting }) add("현재 지점에 미하차 기록이 남아 있음")
         addAll(doorStationaryBlockers(now))
         if (surroundings.kind != SurroundingKind.DIRECT_CHECK_REQUIRED || surroundings.observedAtMillis == null || now - surroundings.observedAtMillis!! > MANUAL_CHECK_TTL) add("주변 정보 미확인 또는 오래됨")
         if (state.unlockAttempt?.status != ResultStatus.TARGET_OBSERVED) add("문 해제 목표 상태 관측 미확인")

@@ -58,7 +58,7 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
     Section("03  운행", "운전자 · 다음 지점 안내") {
         Text((vm.trip.currentStop ?: vm.trip.origin).name, style = AppTheme.typography.titleBold)
         Text("좌표 ${(vm.trip.currentStop ?: vm.trip.origin).latitude}, ${(vm.trip.currentStop ?: vm.trip.origin).longitude}", style = AppTheme.typography.body3Regular)
-        Text(if (vm.trip.currentStop == null) "하차 지점을 모두 방문했습니다. 출발지로 복귀한 뒤 직접 실내 확인을 진행하세요." else "내릴 어린이: ${vm.trip.currentStopChildren.filter { it.status == Attendance.ONBOARD }.joinToString { it.name }.ifBlank { "미하차 기록 없음" }}")
+        Text(if (vm.trip.currentStop == null) "하차 지점을 모두 방문했습니다. 출발지로 복귀한 뒤 직접 실내 확인을 진행하세요." else "내릴 어린이: ${vm.trip.currentStopChildren.filter { it.awaitingAlighting }.joinToString { it.name }.ifBlank { "미하차 기록 없음" }}")
         NavigationStatus(vm)
         Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Action("다음 지점 안내", "navigate-next") { vm.navigateNext() }

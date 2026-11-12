@@ -106,7 +106,17 @@ data class ChildRecord(
      * 운행 중 화면 상태용이며 서버로 보내지 않는다(D27 좌석·벨트 기록 보관 제외).
      */
     val beltConfirmed: Boolean = false,
+    /**
+     * V-21 보호자 미도착 · 동승 유지 사유 코드([StayOnboardReasons]). null = 동승 유지 아님.
+     * 값이 있으면 이 운행 동안 내리지 않고 계속 타고 가는 아이다(정류장 하차 대상·하차 안내에서 빠지고, 복귀 후 기관 인계).
+     * 이전 저장 파일을 복원하면 JVM 기본값 null = 동승 유지 아님(UID 고정, 필드 추가는 직렬화 호환).
+     */
+    val stayOnboardReason: String? = null,
 ) : Serializable {
+    /** V-21: 보호자 미도착으로 동승 유지 중(또는 동승 유지 뒤 기관 인계로 하차한) 아이. */
+    val staysOnboard: Boolean get() = stayOnboardReason != null
+    /** 정류장에서 인계·하차 기록을 기다리는 아이: 탑승 중이고 동승 유지가 아님. 정류장 완료·하차 안내 기준. */
+    val awaitingAlighting: Boolean get() = status == Attendance.ONBOARD && !staysOnboard
     /** 오늘 탑승 예정 여부. 기본값 탑승(D20). */
     val expectedToBoard: Boolean get() = !notExpectedToBoard
     /** 탑승 기록도 미탑승 확인도 없는 상태. 탑승 단계에서 선생님이 결정해야 하는 아이. */
@@ -134,6 +144,22 @@ fun notBoardingReasonLabel(code: String?): String? = when (code?.trim()?.upperca
     "SELF_PICKUP" -> "직접 픽업"
     "NOT_RIDING" -> "미탑승"
     else -> "기타"
+}
+
+/**
+ * V-21 동승 유지 사유(고정 선택지). 자유 입력을 받지 않아 보호자·대리인 개인정보가 기록에 들어가지 않는다(7절).
+ * 코드는 기기 원장에만 남기며, 서버 GUARDIAN_NO_SHOW 이벤트는 사유 필드를 저장하지 않는다(TripController.updateChildFromEvent).
+ */
+object StayOnboardReasons {
+    const val GUARDIAN_ABSENT = "GUARDIAN_ABSENT"
+    const val NO_CONTACT = "NO_CONTACT"
+    const val OTHER = "OTHER"
+    val ALL = listOf(GUARDIAN_ABSENT, NO_CONTACT, OTHER)
+    fun label(code: String?): String = when (code) {
+        GUARDIAN_ABSENT -> "보호자 미도착"
+        NO_CONTACT -> "연락 안 됨"
+        else -> "기타"
+    }
 }
 
 /** V-02 "오늘 미탑승 예정" 배지 문구. 탑승 예정인 아이는 null(배지 없음). 명단에서 빼지 않고 표시만 한다. */
@@ -168,6 +194,13 @@ data class LedgerEntry(
      * 서버 출결 이벤트로 보내지 않는다(서버에는 체크리스트 driverConfirmed로만 전달). 이전 저장 파일은 JVM 기본값 null.
      */
     val driverCheck: Boolean? = null,
+    /**
+     * V-21 동승 유지 기록 표시. null = 아님(이전 저장 파일도 null).
+     * - before·after 둘 다 ONBOARD: true = 보호자 미도착 · 동승 유지 기록, false = 같은 정류장에서 동승 유지 취소.
+     * - after = ALIGHTED이고 true: 동승 유지 아이를 복귀 후 기관에 인계하고 하차 기록(V-22).
+     * 출결 기록이므로 서버로 보낸다(InstitutionTrips.ledgerEventType).
+     */
+    val stayOnboard: Boolean? = null,
 ) : Serializable {
     /** V-05 벨트 기록이면 true. 서버 전송(InstitutionConnection)에서 제외한다. */
     val isBeltRecord: Boolean get() = belt != null
@@ -312,6 +345,8 @@ data class TripState(
 ) : Serializable {
     val currentStop: Stop? get() = routeOrder.getOrNull(currentStopIndex)?.let { id -> stops.find { it.id == id } }
     val onboardChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.ONBOARD }
+    /** V-21: 지금 동승 유지로 타고 있는 아이(복귀 후 기관 인계 대상). */
+    val stayOnboardChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.ONBOARD && it.staysOnboard }
     val currentStopChildren: List<ChildRecord> get() = children.filter { it.stopId == currentStop?.id }
     val remainingStopCount: Int get() = (routeOrder.size - currentStopIndex).coerceAtLeast(0)
     /** 오늘 탈 아이(탑승 예정, D20 기본값 탑승) 수. 저장 필드가 아니라 명단에서 계산한다. */

@@ -132,7 +132,7 @@ class InstitutionConnection(context: Context) {
         val sentEvents = sentEventIds(trip.tripId).toMutableSet()
         val stopByChild = trip.children.associate { it.id to it.stopId }
         val ledgerRows = InstitutionTrips.serverLedger(trip.ledger).map { entry ->
-            val eventType = InstitutionTrips.ledgerEventType(entry.before, entry.after)
+            val eventType = InstitutionTrips.ledgerEventType(entry)
             Triple(entry.id, eventType, JSONObject().put("tripChildId", entry.childId).put("tripStopId", stopByChild[entry.childId]))
         }
         val handovers = trip.handoverChildIds.map { id -> Triple("handover-$id", "CHILD_HANDED_OVER", JSONObject().put("tripChildId", id).put("tripStopId", stopByChild[id])) }
@@ -203,6 +203,21 @@ internal object InstitutionTrips {
     /** V-08: 출발 시점에 기사 확인 체크가 있으면 true(서버가 driver_checked_at 기록), 없으면 false("기사 확인 없음"). */
     fun driverConfirmed(trip: TripState): Boolean = trip.driverCheckedAtMillis != null
 
+    /**
+     * V-21 동승 유지 기록을 포함한 원장 항목 → 서버 이벤트 유형. 서버 TripController.updateChildFromEvent 기준:
+     * - 동승 유지(stayOnboard=true, ONBOARD→ONBOARD): GUARDIAN_NO_SHOW → trip_children.status=GUARDIAN_NO_SHOW, no_show_at 기록(D35).
+     *   서버는 이 이벤트의 사유를 저장하지 않으므로 사유 코드는 기기 원장에만 남긴다.
+     * - 동승 유지 취소(stayOnboard=false): 서버에 BOARDED로 되돌리는 이벤트가 없어 CORRECTION으로 이력만(상태는 이후 인계·하차 이벤트가 덮어씀).
+     * - 동승 유지 아이 기관 인계 하차(stayOnboard=true, →ALIGHTED): CHILD_RETURNED_TO_ORG → status=RETURNED_TO_ORG, returned_to_org_at.
+     * 그 밖은 [ledgerEventType] (before, after) 규칙.
+     */
+    fun ledgerEventType(entry: LedgerEntry): String = when {
+        entry.stayOnboard == false -> "CORRECTION"
+        entry.stayOnboard == true && entry.after == Attendance.ALIGHTED -> "CHILD_RETURNED_TO_ORG"
+        entry.stayOnboard == true && entry.after == Attendance.ONBOARD -> "GUARDIAN_NO_SHOW"
+        else -> ledgerEventType(entry.before, entry.after)
+    }
+
     fun ledgerEventType(before: Attendance, after: Attendance): String = when (after) {
         Attendance.ONBOARD -> "CHILD_BOARDED"
         Attendance.ALIGHTED -> "CHILD_DROPPED_OFF"
@@ -222,9 +237,12 @@ internal object InstitutionTrips {
                 "BOARDED" -> Attendance.ONBOARD
                 "NOT_BOARDED" -> if (expected) Attendance.CONFIRMED_NOT_BOARDED else Attendance.NOT_BOARDED
                 "DROPPED_OFF" -> Attendance.ALIGHTED
+                // V-21: 서버에 동승 유지(보호자 미도착)로 기록된 아이는 아직 차 안에 있다. 서버는 사유를 저장하지 않아 "보호자 미도착"으로 둔다.
+                "GUARDIAN_NO_SHOW" -> Attendance.ONBOARD
                 else -> Attendance.NOT_BOARDED
             },
             notExpectedToBoard = !expected,
-            notBoardingReason = notBoardedReason?.takeIf { it.isNotBlank() })
+            notBoardingReason = notBoardedReason?.takeIf { it.isNotBlank() },
+            stayOnboardReason = if (status == "GUARDIAN_NO_SHOW") StayOnboardReasons.GUARDIAN_ABSENT else null)
     }
 }

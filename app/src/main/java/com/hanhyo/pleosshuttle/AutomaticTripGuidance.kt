@@ -19,7 +19,7 @@ internal fun tripCue(trip: TripState): TripCue? {
         TripPhase.DRIVING -> redepartureBeltPrefix(trip) + (if (trip.currentStop == null) "하차 지점 방문을 마쳤습니다. 출발지인 ${name}으로 돌아갑니다."
             else approachSpeech(name, alighting.map(::spokenChildName)))
         TripPhase.ALIGHTING -> arrivalSpeech(name, alighting.map(::spokenChildName))
-        TripPhase.END_REVIEW -> "운행을 마치기 전에 차량 실내를 직접 확인해 주세요."
+        TripPhase.END_REVIEW -> stayOnboardReturnPrefix(trip) + "운행을 마치기 전에 차량 실내를 직접 확인해 주세요."
         TripPhase.ENDED -> "하원 기록을 저장했습니다."
         TripPhase.PREPARING -> return null
     }
@@ -31,9 +31,18 @@ internal fun tripCue(trip: TripState): TripCue? {
 /** 단계 키(지점·단계 단위). 내비 요청은 하차 대상이 바뀌어도 목적지가 같으므로 이 키만 쓴다. */
 private fun stageKey(trip: TripState) = "${trip.tripId}:${trip.integrationMode}:${trip.routeVersion}:${trip.currentStopIndex}:${trip.phase}"
 
-/** V-15 하차 안내 대상: 지금 탑승 기록(ONBOARD)이고 이 지점에서 내리는 아이만, 명단 순서. 미탑승 확인·이미 하차·탑승 전(미예정 포함)은 넣지 않는다. */
+/**
+ * V-15 하차 안내 대상: 지금 탑승 기록(ONBOARD)이고 이 지점에서 내리는 아이만, 명단 순서. 미탑승 확인·이미 하차·탑승 전(미예정 포함)은 넣지 않는다.
+ * V-21 동승 유지 아이는 내리지 않으므로 넣지 않는다.
+ */
 internal fun alightingChildren(trip: TripState, stop: Stop?): List<ChildRecord> =
-    if (stop == null) emptyList() else trip.children.filter { it.stopId == stop.id && it.status == Attendance.ONBOARD }
+    if (stop == null) emptyList() else trip.children.filter { it.stopId == stop.id && it.awaitingAlighting }
+
+/** V-22 복귀 안내 앞말. 동승 유지(V-21) 아이가 있으면 "동승 유지 어린이 가 기관에 인계해 주세요. "를 붙이고, 없으면 빈 문자열. */
+internal fun stayOnboardReturnPrefix(trip: TripState): String {
+    val names = trip.stayOnboardChildren.map(::spokenChildName)
+    return if (names.isEmpty()) "" else "동승 유지 ${spokenNameList(names)} 기관에 인계해 주세요. "
+}
 
 /**
  * V-16 재출발 벨트 안내. 정류장 기록을 마치고(또는 운행 복귀로) 다시 DRIVING이 된 첫 안내(currentStopIndex > 0)의 앞에 붙인다.

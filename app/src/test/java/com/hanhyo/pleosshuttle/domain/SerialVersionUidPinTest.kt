@@ -58,5 +58,9 @@ class SerialVersionUidPinTest {
         assertEquals(null, state.driverCheckedAtMillis)
         assertTrue(state.ledger.none { it.isDriverCheckRecord })
         assertEquals(false, com.hanhyo.pleosshuttle.InstitutionTrips.driverConfirmed(state))
+        // V-21 필드도 이전 파일에 없으므로 JVM 기본값: 동승 유지 아님(null), 원장 항목은 동승 유지 기록 아님(null).
+        assertTrue(state.children.none { it.staysOnboard })
+        assertTrue(state.ledger.none { it.stayOnboard != null })
+        assertTrue(state.stayOnboardChildren.isEmpty())
     }
 }
