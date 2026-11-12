@@ -153,6 +153,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
 
     fun board(childId: String, now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("탑승 기록은 운행 준비에서 입력합니다.")
+        if (state.noTripToday) return reject(NO_TRIP_TODAY)
         if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
         val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
         if (child.status != Attendance.NOT_BOARDED) return reject("이미 탑승 또는 하차 기록이 있습니다. 정정 기능을 이용하세요.")
@@ -178,6 +179,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
     fun startDriving(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("운행 준비 단계가 아닙니다.")
+        if (state.noTripToday) return reject(NO_TRIP_TODAY)
         if (stationaryBlockers(now).isNotEmpty()) return reject("출발 전 정차 상태를 확인하세요.")
         if (state.onboardChildren.isEmpty()) return reject("선생님이 탑승 기록을 먼저 입력하세요.")
         invalidate(now, "운행 시작")
@@ -406,6 +408,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         const val MANUAL_CHECK_TTL = 30_000L
         const val REQUEST_TIMEOUT = 8_000L
         const val INSPECTION_TTL = 60_000L
+        /** D34: 탈 아이 0명이면 운행하지 않음. */
+        const val NO_TRIP_TODAY = "오늘 탈 어린이가 없어 운행하지 않습니다."
         private val REAL_SOURCES = setOf(Source.SDK, Source.EMULATOR_INPUT)
     }
 }

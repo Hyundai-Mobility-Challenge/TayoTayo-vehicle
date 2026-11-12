@@ -10,6 +10,8 @@ internal data class FlowGuide(
     val targetTag: String?,
 )
 
+internal const val NO_TRIP_TODAY_TAG = "no-trip-today"
+
 internal fun nextFlowGuide(
     trip: TripState,
     boardingReviewed: Boolean = false,
@@ -20,6 +22,8 @@ internal fun nextFlowGuide(
     // Keep the upcoming destination visible while moving; arrival confirmation remains disabled.
     if (trip.phase == TripPhase.DRIVING) return FlowGuide("선생님", "도착·정차 확인", "도착 확인은 자동 위치 판정이 아닙니다.", if(trip.currentStop == null) "arrive-origin" else "arrive-stop")
     if (uxRestricted) return FlowGuide("선생님", "정차 후 확인하세요", "차량 조작 제한 중", null)
+    // D34: 탈 아이 0명이면 탑승·출발 단계 대신 "오늘 운행 없음"만 보여준다(정차 여부와 무관).
+    if (trip.noTripToday) return FlowGuide("선생님", "오늘 운행 없음", "탈 어린이 0명", NO_TRIP_TODAY_TAG)
     if (trip.phase != TripPhase.ENDED && !stationaryReady) return FlowGuide("선생님", "정차 상태 확인", "최신 정차 정보 필요", "stationary-status")
     return when(trip.phase) {
         TripPhase.PREPARING -> {

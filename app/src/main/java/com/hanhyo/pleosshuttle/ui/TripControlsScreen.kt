@@ -26,7 +26,7 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
         StationaryStatus(vm)
         vm.trip.children.forEach { child ->
             ChildCard(child, vm) {
-                Action("탑승 기록", "board-${child.id}", enabled = child.status == Attendance.NOT_BOARDED && vm.engine.stationaryBlockers(vm.now).isEmpty()) { vm.perform { board(child.id, it) } }
+                Action("탑승 기록", "board-${child.id}", enabled = child.status == Attendance.NOT_BOARDED && !vm.trip.noTripToday && vm.engine.stationaryBlockers(vm.now).isEmpty()) { vm.perform { board(child.id, it) } }
                 Correction(child, vm)
             }
         }

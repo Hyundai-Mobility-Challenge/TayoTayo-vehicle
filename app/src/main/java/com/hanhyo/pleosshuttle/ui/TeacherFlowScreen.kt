@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import com.hanhyo.pleosshuttle.FlowGuide
+import com.hanhyo.pleosshuttle.NO_TRIP_TODAY_TAG
 import com.hanhyo.pleosshuttle.ShuttleViewModel
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
@@ -37,6 +38,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
     Column(Modifier.fillMaxWidth().testTag("flow-guide"), verticalArrangement = Arrangement.spacedBy(AppSpacing.xl)) {
         Text("동승 선생님 · ${flowTitle(vm.trip)}", style = type.body1SemiBold, color = AppTheme.colors.infoContent)
         val title = when {
+            tag == NO_TRIP_TODAY_TAG -> "오늘 ${vm.tripDirectionLabel} 운행 없음"
             child != null -> child.name.removePrefix("가상 ")
             tag == "start-trip" -> "하원 준비가 끝났어요"
             tag == "arrive-stop" -> "도착하면 확인해 주세요"
@@ -50,6 +52,15 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
         }
         Text(title, style = if (LocalCompactLayout.current) type.head3Bold else type.head2Bold, modifier = Modifier.testTag("guide-next-action"))
         when {
+            tag == NO_TRIP_TODAY_TAG -> {
+                // D34: 탈 어린이 0명 → 탑승 기록·[운행 시작] 없이 안내만 한다.
+                Text("오늘 탈 어린이가 없어요 · 운행 없음", style = question, modifier = Modifier.testTag(tag))
+                Text(if (vm.trip.children.isEmpty()) "배정된 어린이가 없어요." else "명단 ${vm.trip.children.size}명 모두 오늘 미탑승 예정이에요.", style = hint, color = AppTheme.colors.textSecondary)
+                if (vm.trip.integrationMode == IntegrationMode.SDK) {
+                    Text("명단이 바뀌었다면 기관 연결에서 명단을 다시 불러와 주세요.", style = hint, color = AppTheme.colors.textSecondary)
+                    Action("기관 연결 열기", "open-institution", secondary = true) { vm.panel = "institution" }
+                }
+            }
             tag?.startsWith("board-") == true && child != null -> {
                 Text("차에 탔나요?", style = question)
                 Action("탑승 기록", tag, prominent = true) { vm.perform { board(child.id, it) } }

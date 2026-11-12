@@ -68,6 +68,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     private val institution = InstitutionConnection(application)
     val institutionBase get() = institution.base
     var institutionDirection by mutableStateOf(institution.direction); private set
+    /** 화면 표시용 운행 방향(등원/하원). 기관 운행은 불러올 때 고른 방향, 모의 운행은 하원. */
+    val tripDirectionLabel get() = if (institutionConnected && trip.tripId == institution.boundTrip) InstitutionTrips.directionLabel(institutionDirection) else "하원"
     var institutionName by mutableStateOf(institution.name); private set
     var institutionConnected by mutableStateOf(institution.connected); private set
     var institutionStatus by mutableStateOf("기관 서버를 연결하면 보호자에게 하차 기록을 전달합니다."); private set
@@ -279,7 +281,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                 clearMovingDemo()
                 publish()
                 if (foreground) startSdk()
-                institutionStatus = "${prepared.children.size}명 명단 준비 완료 · Pleos 자동 연결 중. 탑승 기록 후 운행을 시작하세요."
+                institutionStatus = if (prepared.noTripToday) "탈 어린이 0명 · 오늘 ${InstitutionTrips.directionLabel(institution.direction)} 운행 없음"
+                    else "${prepared.children.size}명 명단 준비 완료 · Pleos 자동 연결 중. 탑승 기록 후 운행을 시작하세요."
                 panel = "flow"
             } catch (e: Exception) { institutionStatus = e.message ?: "명단 불러오기 실패" }
             finally { institutionBusy = false }
@@ -531,12 +534,14 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     }
     fun restartSimulation(stage: Int) {
         if (institutionBusy || syncing || institution.pending(trip) > 0) { actionError = "기관 기록 전송을 먼저 완료해 주세요."; return }
-        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..2) return
+        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..3) return
         val fresh = SampleTrip.create().copy(tripId = "fictional-demo-${java.util.UUID.randomUUID()}")
         val prepared = when(stage) {
             1 -> fresh.copy(phase = TripPhase.ALIGHTING, children = fresh.children.map { it.copy(status = Attendance.ONBOARD) })
             2 -> fresh.copy(phase = TripPhase.END_REVIEW, currentStopIndex = fresh.routeOrder.size,
                 children = fresh.children.map { it.copy(status = Attendance.ALIGHTED) })
+            // 테스트 도구 전용: 전원 미탑승 예정(결석) 명단 → D34 "오늘 운행 없음" 화면 확인.
+            3 -> fresh.copy(children = fresh.children.map { it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT") })
             else -> fresh
         }.let { it.copy(diagnostics = listOf(DiagnosticEntry(System.currentTimeMillis(), "체험 시작", ResultStatus.UNVERIFIED,
             "가상 단계 $stage 사전 설정. 실제 탑승·인계·하차 기록이 아닙니다."))) }

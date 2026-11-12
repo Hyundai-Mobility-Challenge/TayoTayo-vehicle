@@ -26,6 +26,11 @@ data class Observation<T>(
     fun isFresh(now: Long, maxAgeMillis: Long = 5_000): Boolean =
         value != null && observedAtMillis != null && now >= observedAtMillis &&
             now - observedAtMillis <= maxAgeMillis && status == ResultStatus.TARGET_OBSERVED
+
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = -3782103051953243101L
+    }
 }
 
 data class SeatObservation(
@@ -33,7 +38,12 @@ data class SeatObservation(
     val occupancy: Observation<Boolean> = Observation(),
     val beltFastened: Observation<Boolean> = Observation(),
     val areaLabel: String = areaId.toString(),
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 4640871374603120409L
+    }
+}
 
 data class VehicleSnapshot(
     val connected: Boolean = false,
@@ -44,13 +54,23 @@ data class VehicleSnapshot(
     val seats: List<SeatObservation> = emptyList(),
     val connectionGeneration: Long = 0,
     val parkingBrakeSupported: Boolean = false,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 7408924729198644115L
+    }
+}
 
 data class Surroundings(
     val kind: SurroundingKind = SurroundingKind.UNKNOWN,
     val source: Source = Source.SDK,
     val observedAtMillis: Long? = null,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = -3292896814217164568L
+    }
+}
 
 data class ChildRecord(
     val id: String,
@@ -77,7 +97,12 @@ data class ChildRecord(
     }
 }
 
-data class Stop(val id: String, val name: String, val latitude: Double, val longitude: Double) : Serializable
+data class Stop(val id: String, val name: String, val latitude: Double, val longitude: Double) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = -4591785948551678804L
+    }
+}
 
 data class LedgerEntry(
     val id: String,
@@ -87,7 +112,12 @@ data class LedgerEntry(
     val recordedAtMillis: Long,
     val reason: String,
     val source: Source = Source.MANUAL,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 4960029191150688459L
+    }
+}
 
 data class DiagnosticEntry(
     val atMillis: Long,
@@ -98,7 +128,12 @@ data class DiagnosticEntry(
     val requested: String? = null,
     val observed: String? = null,
     val errorCode: String? = null,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 8831578179708251824L
+    }
+}
 
 data class UnlockConfirmation(
     val id: String,
@@ -107,7 +142,12 @@ data class UnlockConfirmation(
     val safetyRevision: Long,
     val connectionGeneration: Long,
     val mode: IntegrationMode,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = -5490408417010799804L
+    }
+}
 
 data class UnlockRequest(
     val id: String,
@@ -117,7 +157,12 @@ data class UnlockRequest(
     val safetyRevision: Long,
     val connectionGeneration: Long,
     val beforeLocked: Boolean,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 7788491441232106111L
+    }
+}
 
 data class UnlockAttempt(
     val request: UnlockRequest,
@@ -126,7 +171,12 @@ data class UnlockAttempt(
     val completedAtMillis: Long? = null,
     val errorCode: String? = null,
     val invalidated: Boolean = false,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 6284569530357834259L
+    }
+}
 
 data class EndRecord(
     val recordedAtMillis: Long,
@@ -140,7 +190,12 @@ data class EndRecord(
     val occupiedAreaLabels: List<String> = occupiedAreas.map { it.toString() },
     val unknownOrStaleAreaLabels: List<String> = unknownOrStaleAreas.map { it.toString() },
     val statement: String = "선생님 직접 실내 확인과 운행 기록을 저장함. 센서 관측은 안전 보증이 아님.",
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = 8133472449072202633L
+    }
+}
 
 data class RouteProposal(
     val stopOrder: List<String>,
@@ -152,7 +207,12 @@ data class RouteProposal(
     val routeVersion: Long,
     val evaluatedOrders: Int,
     val synthetic: Boolean = true,
-) : Serializable
+) : Serializable {
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = -6836717557408514147L
+    }
+}
 
 data class TripState(
     val tripId: String,
@@ -185,6 +245,18 @@ data class TripState(
     val onboardChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.ONBOARD }
     val currentStopChildren: List<ChildRecord> get() = children.filter { it.stopId == currentStop?.id }
     val remainingStopCount: Int get() = (routeOrder.size - currentStopIndex).coerceAtLeast(0)
+    /** 오늘 탈 아이(탑승 예정, D20 기본값 탑승) 수. 저장 필드가 아니라 명단에서 계산한다. */
+    val expectedRiderCount: Int get() = children.count { it.expectedToBoard }
+    /**
+     * D34: 운행 준비 중 탈 아이가 0명(빈 명단 포함)이면 "오늘 운행 없음". 운행을 시작하지 않는다.
+     * 이미 탑승 기록이 있는 운행(복원 등)은 기록을 잃지 않도록 기존 흐름을 유지한다.
+     */
+    val noTripToday: Boolean get() = phase == TripPhase.PREPARING && expectedRiderCount == 0 && onboardChildren.isEmpty()
+
+    companion object {
+        /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
+        private const val serialVersionUID: Long = -1235094883528306877L
+    }
 }
 
 object SampleTrip {
