@@ -24,6 +24,8 @@ object AppSize {
     val headerHeight = canvasDp(72)
     val headerHeightCompact = canvasDp(64)
     val timelineWidth = canvasDp(360)
+    /** 운행 준비 중 왼쪽 패널을 [명단] 탭으로 볼 때의 폭. 행은 이름·상태 줄 + 버튼(또는 벨트) 줄 두 줄로 그린다. */
+    val rosterPaneWidth = canvasDp(420)
     val playerBarHeight = canvasDp(88)
     val playerBarHeightCompact = canvasDp(76)
     val chipHeight = canvasDp(44)

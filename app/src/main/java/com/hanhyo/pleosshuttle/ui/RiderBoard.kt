@@ -193,8 +193,12 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
     RiderAction.UNDO_NOT_BOARDED -> "rider-undo-not-boarded-$childId"
 }
 
-/** 운행 화면 본문 아래의 탑승 명단 보드. 다이얼로그 없이 행 버튼만 둔다. */
-@Composable internal fun RiderBoardSection(vm: ShuttleViewModel, modifier: Modifier = Modifier) {
+/**
+ * 운행 화면의 탑승 명단 보드. 다이얼로그 없이 행 버튼만 둔다.
+ * [stableRows]면(가로 운행 준비의 왼쪽 패널) 행을 두 줄로 그리고 아래 줄에 버튼 또는 벨트 칩을 둔다.
+ * [탑승 기록] 뒤 버튼 자리에 벨트 칩이, [미탑승 확인] 뒤엔 [취소] 버튼이 같은 높이로 들어가 아래 행이 밀리지 않는다.
+ */
+@Composable internal fun RiderBoardSection(vm: ShuttleViewModel, modifier: Modifier = Modifier, stableRows: Boolean = false) {
     val trip = vm.trip
     if (trip.children.isEmpty()) return
     val model = riderBoard(
@@ -215,12 +219,12 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
                 Text(it, style = type.body2SemiBold, modifier = Modifier.testTag("rider-board-note"),
                     color = if (model.beltWarning || model.rows.any { r -> r.highlight == RiderHighlight.REMAINING }) AppTheme.colors.dangerContent else AppTheme.colors.textSecondary)
             }
-            model.rows.forEach { row -> RiderRowView(row, vm) }
+            model.rows.forEach { row -> RiderRowView(row, vm, stableRows) }
         }
     }
 }
 
-@Composable private fun RiderRowView(row: RiderRow, vm: ShuttleViewModel) {
+@Composable private fun RiderRowView(row: RiderRow, vm: ShuttleViewModel, stableRows: Boolean = false) {
     val colors = AppTheme.colors
     val (background, border) = when (row.highlight) {
         RiderHighlight.NONE -> if (row.belt?.warn == true) colors.surface to BorderStroke(AppSize.currentOutline, colors.danger) else colors.surface to null
@@ -249,11 +253,16 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
                     row.badge?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("rider-badge-${row.id}")) }
                 }
                 StatusChip(row.statusLabel, tone = row.tone, modifier = Modifier.testTag("rider-status-${row.id}"))
-                row.belt?.let { BeltChip(it, row.id, vm) }
-                if (!compact) actions()
+                if (!stableRows) row.belt?.let { BeltChip(it, row.id, vm) }
+                if (!compact && !stableRows) actions()
             }
             // 세로 분할(좁은 창)에서는 버튼을 이름 아래 줄로 내린다.
-            if (compact && row.actions.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) { actions() }
+            if (stableRows) {
+                if (row.actions.isNotEmpty() || row.belt != null) Row(Modifier.heightIn(min = AppSize.touchMin), horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                    row.belt?.let { BeltChip(it, row.id, vm) }
+                    actions()
+                }
+            } else if (compact && row.actions.isNotEmpty()) Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) { actions() }
         }
     }
 }
