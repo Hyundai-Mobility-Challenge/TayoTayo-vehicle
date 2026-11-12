@@ -103,6 +103,11 @@ class TripTrackingService : Service() {
                 val decision=navigationPolicy.evaluate(current,fix,navigation,drive?.current ?: DriveObservation(),System.currentTimeMillis())
                 if (decision.showNavigation) navi?.showNavigation()
                 arrivalNotice(current,decision.arrivalReady)
+                // 개발용 Virtual Console 운전 중에는 앱이 모의 위치(SIMULATED)를 보내므로 Pleos 위치 보고를 쉰다.
+                if (ConsoleDriveBridge.activeTripId == current.tripId) {
+                    prefs.edit().putString("trackingServiceStatus", "Virtual Console 운전 중 · 앱이 모의 위치를 전송").apply()
+                    delay(5000); continue
+                }
                 runCatching {
                     withContext(Dispatchers.IO) {
                         connection.reportTracking(current, true, fix, navigation) {

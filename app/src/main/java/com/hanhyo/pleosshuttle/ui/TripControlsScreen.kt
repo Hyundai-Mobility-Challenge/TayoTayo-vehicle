@@ -72,6 +72,7 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
             vm.trip.currentStop == null -> "하차 지점을 모두 방문했습니다. 출발지로 복귀한 뒤 직접 실내 확인을 진행하세요."
             else -> "내릴 어린이: ${vm.trip.currentStopChildren.filter { it.awaitingAlighting }.joinToString { it.name }.ifBlank { "미하차 기록 없음" }}"
         })
+        vm.consoleDriveLine?.let { Text(it, style = AppTheme.typography.body3Regular) }
         NavigationStatus(vm)
         Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Action("다음 지점 안내", "navigate-next") { vm.navigateNext() }

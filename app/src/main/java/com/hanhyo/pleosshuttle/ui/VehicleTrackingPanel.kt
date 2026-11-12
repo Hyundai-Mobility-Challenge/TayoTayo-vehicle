@@ -74,3 +74,20 @@ import com.hanhyo.pleosshuttle.ui.component.Action
     }
     Text("보호자 앱에는 ${if (pickup) "정류장 순서" else "하차 순서"}와 우리 아이 예상 시간이 표시됩니다. Pleos 연동에서는 내비 시간을, 모의 체험에서는 시연 시간을 사용합니다.")
 }
+
+/** 개발용 Virtual Console 운전. Pleos SDK 연결(기관 서버 연결) 운행에서만 보인다. */
+@Composable internal fun ConsoleDriveControls(vm: ShuttleViewModel) {
+    if (!com.hanhyo.pleosshuttle.BuildConfig.DEBUG || vm.trip.integrationMode != IntegrationMode.SDK) return
+    val blocker = vm.consoleDriveBlocker
+    Text("Virtual Console 운전 · 가상 좌표", style = MaterialTheme.typography.titleMedium)
+    Text(if (vm.consoleDriveRunning) com.hanhyo.pleosshuttle.ConsoleDriveText.status(vm.consoleDriveFrame, vm.consoleDriveSpeedKph, vm.consoleDriveGearLabel)
+        else blocker ?: "시작하면 Virtual Console의 속도·기어(D)로 다음 지점까지 앱 안 위치가 움직입니다.",
+        modifier = Modifier.testTag("console-drive-status"))
+    if (vm.consoleDriveRunning) Text(vm.consoleDriveUploadStatus, modifier = Modifier.testTag("console-drive-upload"))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!vm.consoleDriveRunning) Button(onClick = vm::startConsoleDrive, enabled = blocker == null,
+            modifier = Modifier.testTag("console-drive-start")) { Text("Virtual Console 운전 시작") }
+        else OutlinedButton(onClick = vm::stopConsoleDrive, modifier = Modifier.testTag("console-drive-stop")) { Text("Virtual Console 운전 종료") }
+    }
+    Text("기어 D에서 속도만큼 직선으로 움직이고 P·정지면 멈춥니다. 위치는 모의 위치로만 전송합니다. 도착·정차는 직접 확인해 주세요. 주행 중 앱이 가려져도 계속 움직이며, 운행이 끝나거나 직접 종료하면 멈춥니다. 전송은 위치 공유가 켜져 있을 때만 합니다.")
+}

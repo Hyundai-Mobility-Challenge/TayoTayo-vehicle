@@ -167,6 +167,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                 }
                 if (vm.trip.currentStop == null && vm.trip.stayOnboardChildren.isNotEmpty())
                     Text("동승 유지 ${vm.trip.stayOnboardChildren.size}명 · 복귀 후 기관에 인계해요", style = hint, color = AppTheme.colors.textSecondary)
+                vm.consoleDriveLine?.let { Text(it, style = hint, color = AppTheme.colors.infoContent, modifier = Modifier.testTag("console-drive-card-line")) }
                 Text(if (vm.trip.integrationMode == IntegrationMode.SIMULATION) "도착을 가정하고 정차를 확인해 주세요." else "운전자에게 도착과 정차를 확인해 주세요.", style = hint, color = AppTheme.colors.textSecondary)
                 if (!stationary || uxLocked) Text(if (uxLocked) "차량 조작 제한 중" else vm.engine.stationaryBlockers(vm.now).first(), color = warning, style = type.body2SemiBold)
                 if (vm.trip.integrationMode == IntegrationMode.SDK && vm.navi.outcome in setOf(SdkOutcome.ERROR, SdkOutcome.TIMEOUT, SdkOutcome.PERMISSION_REQUIRED)) Text("길 안내 연결 실패 · 상세에서 확인해 주세요.", color = warning, style = type.body2SemiBold)

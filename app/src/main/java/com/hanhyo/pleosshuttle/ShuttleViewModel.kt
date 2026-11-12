@@ -116,6 +116,53 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             else TrackingNavigation("READY", demoNavigationEpoch, movingDemo.routeId, stop.latitude, stop.longitude, frame.seconds, frame.meters, at)
         movingDemoPhase = movingDemo.phase; movingDemoProgress = frame.progress
     }
+    // 개발용 Virtual Console 운전: 실제 SDK 속도·기어를 적분해 앱 안에서만 모의 위치를 움직인다(SIMULATED로만 전송).
+    // 위치 적분·전송은 프로세스 범위 ConsoleDriveRunner가 한다(주행 중 Pleos가 앱을 가려도 계속).
+    var consoleDriveRunning by mutableStateOf(ConsoleDriveRunner.running); private set
+    var consoleDriveFrame by mutableStateOf(ConsoleDriveRunner.frame); private set
+    private fun consoleSpeedMps(at: Long): Double? = sdkVehicle.speedMetersPerSecond.takeIf { sdkVehicle.connected && it.value != null && at - it.receivedAtMillis in 0..5_000 }
+        ?.value?.toDouble()?.takeIf { it.isFinite() }
+    private fun consoleGear(at: Long): Int? = sdkVehicle.gear.takeIf { sdkVehicle.connected && at - it.receivedAtMillis in 0..5_000 }?.value
+    private fun Int?.toGear() = when (this) { 4 -> Gear.PARK; 2 -> Gear.REVERSE; 1 -> Gear.NEUTRAL; 8 -> Gear.DRIVE; else -> Gear.UNKNOWN }
+    private fun consoleDriveContext() = ConsoleDriveContext(BuildConfig.DEBUG, trip.integrationMode == IntegrationMode.SDK,
+        institutionConnected && trip.tripId == institution.boundTrip, trip.phase, storageError == null,
+        foreground, sdkVehicle.uxRestricted.value == true)
+    /** 시작할 수 없는 이유(없으면 null). 화면에 그대로 보여 준다. */
+    val consoleDriveBlocker: String? get() = when {
+        !BuildConfig.DEBUG -> "개발용 빌드에서만 쓸 수 있습니다."
+        storageError != null -> "운행 저장 오류를 먼저 확인해 주세요."
+        trip.integrationMode != IntegrationMode.SDK -> "Pleos SDK 연결 운행에서만 쓸 수 있습니다."
+        !institutionConnected || trip.tripId != institution.boundTrip -> "기관 서버에 연결된 운행에서만 쓸 수 있습니다."
+        trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING) -> "운행을 시작한 뒤 쓸 수 있습니다."
+        consoleSpeedMps(now) == null -> "차량 속도 미수신 · ${sdkVehicle.speedMetersPerSecond.error ?: if (!sdkVehicle.connected) "SDK 차량 연결을 확인해 주세요." else "속도 갱신을 기다리는 중입니다."}"
+        else -> null
+    }
+    val consoleDriveSpeedKph: Double? get() = (if (consoleDriveRunning) ConsoleDriveRunner.speedMps else consoleSpeedMps(now))?.times(3.6)
+    val consoleDriveGearLabel: String get() = ConsoleDriveText.gearLabel(if (consoleDriveRunning) ConsoleDriveRunner.gear else consoleGear(now).toGear())
+    val consoleDriveUploadStatus: String get() = ConsoleDriveRunner.uploadStatus
+    /** 운행 카드에 보이는 한 줄. Virtual Console 운전 중일 때만. */
+    val consoleDriveLine: String? get() = consoleDriveFrame?.takeIf { consoleDriveRunning }?.let { ConsoleDriveText.cardLine(it) }
+    fun startConsoleDrive() {
+        if (!BuildConfig.DEBUG || !foreground || ConsoleDriveRunner.running) return
+        consoleDriveBlocker?.let { trackingStatus = it; return }
+        val at = System.currentTimeMillis()
+        ConsoleDriveRunner.hint(consoleSpeedMps(at), consoleGear(at).toGear(), at)
+        if (!ConsoleDriveRunner.start(getApplication(), trip, consoleDriveContext())) return
+        demoGeneration++
+        refreshConsoleDrive(); nextSyncAt = 0; syncInstitution(true)
+    }
+    fun stopConsoleDrive() { ConsoleDriveRunner.stop(); refreshConsoleDrive(); syncInstitution(true) }
+    /** 화면 쪽 동기화만 한다. 앱이 가려지거나 백그라운드여도 Runner는 멈추지 않는다. */
+    private fun refreshConsoleDrive() {
+        if (ConsoleDriveRunner.running) {
+            ConsoleDriveRunner.update(trip, consoleDriveContext())
+            if (foreground) { val at = System.currentTimeMillis(); ConsoleDriveRunner.hint(consoleSpeedMps(at), consoleGear(at).toGear(), at) }
+        }
+        val running = ConsoleDriveRunner.running
+        if (consoleDriveRunning && !running) { demoGeneration++; nextSyncAt = 0 }
+        consoleDriveRunning = running
+        consoleDriveFrame = if (running) ConsoleDriveRunner.frame else null
+    }
     val trackingControls get() = vehicleTrackingControls(
         institutionConnected, trip.tripId == institution.boundTrip, trip.phase,
         trip.onboardChildren.isNotEmpty() || trip.isPickup, trip.currentStop != null, trip.integrationMode,
@@ -209,6 +256,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         realToken = null
         realVehicle?.onStop(); realNavi?.onStop()
         clearMovingDemo()
+        // Virtual Console 운전은 여기서 멈추지 않는다(주행 중 UX 제한으로 앱이 가려져도 계속).
         audio.onBackground()
         engine.background(System.currentTimeMillis())
         publish()
@@ -226,6 +274,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         realNavi?.trackLocations = false // A separate read-only foreground service owns telemetry.
         updateTrackingService()
         refreshMovingDemo()
+        refreshConsoleDrive()
         if (foreground && storageError == null) syncInstitution()
     }
 
@@ -244,7 +293,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         } else if (!TripTrackingService.hasPermission(app)) {
             trackingStatus = "위치 권한 필요 · 운행 권한 확인에서 허용해 주세요."
         }
-        if (TripTrackingService.running) trackingStatus = trialPrefs.getString("trackingServiceStatus", "Pleos 위치 수신 대기")!!
+        if (TripTrackingService.running && !ConsoleDriveRunner.running) trackingStatus = trialPrefs.getString("trackingServiceStatus", "Pleos 위치 수신 대기")!!
     }
 
     private fun canReplaceInstitutionTrip(): Boolean = storageError == null && !syncing &&
@@ -311,20 +360,23 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         val enabled = trackingEnabled
         val generation = demoGeneration
         val navigation = demoTrackingNavigation
-        val fix = if (!enabled || !foreground || trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING)) null
+        // Virtual Console 운전 중에는 ConsoleDriveRunner가 모의 위치를 직접 보낸다. 여기서는 위치를 보내지 않는다.
+        val console = ConsoleDriveRunner.running
+        val fix = if (console || !enabled || !foreground || trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING)) null
             else (if (trip.integrationMode == IntegrationMode.SDK) realNavi?.trackingLocation else demoTrackingLocation)
                 ?.takeIf { it.valid(System.currentTimeMillis()) }
         viewModelScope.launch {
             try {
                 val count = withContext(Dispatchers.IO) {
                     val sent = institution.sync(snapshot)
-                    if (!(snapshot.integrationMode == IntegrationMode.SDK && enabled && TripTrackingService.running &&
+                    if (!console && !(snapshot.integrationMode == IntegrationMode.SDK && enabled && TripTrackingService.running &&
                         snapshot.phase in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING))) {
                         institution.reportTracking(snapshot, enabled, fix, navigation, stillCurrent = { generation == demoGeneration })
                     }
                     sent
                 }
-                if (snapshot.integrationMode != IntegrationMode.SDK || !enabled) trackingStatus = if (!enabled) "위치 공유 중지 · 기존 공유 링크 종료" else if (fix == null) "위치 미수신 · 보호자 화면에 갱신 대기로 표시" else if (fix.simulated) "모의 위치 전송 · 실제 차량 위치 아님" else "Pleos 내비 위치 전송 · SDK 수신 시각 기준"
+                if (console) trackingStatus = ConsoleDriveRunner.uploadStatus
+                else if (snapshot.integrationMode != IntegrationMode.SDK || !enabled) trackingStatus = if (!enabled) "위치 공유 중지 · 기존 공유 링크 종료" else if (fix == null) "위치 미수신 · 보호자 화면에 갱신 대기로 표시" else if (fix.simulated) "모의 위치 전송 · 실제 차량 위치 아님" else "Pleos 내비 위치 전송 · SDK 수신 시각 기준"
                 institutionStatus = "서버 기록 동기화 완료 · 이번 전송 ${count}건. 보호자 푸시는 서버에서 별도 처리합니다."
             } catch (e: Exception) { trackingStatus = "위치 전송 실패 · 보호자 화면은 갱신 지연으로 전환"; institutionStatus = "기기 기록 유지 · 전송 대기 ${institution.pending(snapshot)}건: ${e.message ?: "연결 실패"}" }
             finally {

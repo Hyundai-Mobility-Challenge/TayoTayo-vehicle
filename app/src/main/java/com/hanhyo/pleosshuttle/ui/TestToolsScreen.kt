@@ -50,6 +50,7 @@ import com.hanhyo.pleosshuttle.ui.component.guideAnchor
             demoPhase = vm.movingDemoPhase, demoProgress = vm.movingDemoProgress,
             onStart = vm::startMovingDemo, onPause = vm::pauseMovingDemo, onResume = vm::resumeMovingDemo, onStop = vm::stopMovingDemo,
             directionLabel = vm.tripDirectionLabel)
+        ConsoleDriveControls(vm)
     }
     val items = listOf(
         Triple("trials", "상황 바꾸기", "정차·이동·연결 끊김을 모의로 재현"),
