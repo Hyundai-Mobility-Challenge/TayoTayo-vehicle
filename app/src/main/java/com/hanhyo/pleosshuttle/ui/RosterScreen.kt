@@ -57,6 +57,10 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
 @Composable internal fun TripHistory(vm: ShuttleViewModel) {
     Section("하원 기록", "선생님이 확인한 기록입니다") {
         vm.trip.children.forEach { Text("${it.name.removePrefix("가상 ")} · ${it.status.label}", style = AppTheme.typography.body1SemiBold) }
+        // V-08: 기사 확인은 시각만 기록. 체크 없이 출발했으면 "기사 확인 없음"(D15).
+        if (vm.trip.phase != com.hanhyo.pleosshuttle.domain.TripPhase.PREPARING) Text(
+            if (vm.trip.departedWithoutDriverCheck) "기사 확인 없음" else "기사 확인 ${timeText(vm.trip.driverCheckedAtMillis)}",
+            modifier = Modifier.testTag("history-driver-check"))
         vm.trip.endRecord?.let { Text("종료 ${timeText(it.recordedAtMillis)} · 실내 직접 확인 ${timeText(it.manualInspectionAtMillis)}") }
         Text("탑승·하차·정정 기록 ${vm.trip.ledger.size}건")
     }

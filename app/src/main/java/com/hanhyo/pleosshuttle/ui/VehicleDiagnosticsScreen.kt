@@ -73,7 +73,8 @@ import com.hanhyo.pleosshuttle.ui.component.Section
     Foldout("탑승·하차 변경 이력", "${vm.trip.ledger.size}건 · 정정 전 기록 유지", "ledger-log") {
         if (vm.trip.ledger.isEmpty()) Text("아직 기록이 없습니다.")
         vm.trip.ledger.reversed().forEach { entry ->
-            Text("${timeText(entry.recordedAtMillis)} · ${entry.childId} · ${entry.before.label} → ${entry.after.label}")
+            Text(if (entry.isDriverCheckRecord) "${timeText(entry.recordedAtMillis)} · 기사 확인 ${if (entry.driverCheck == true) "체크" else "없음·해제"}"
+                else "${timeText(entry.recordedAtMillis)} · ${entry.childId} · ${entry.before.label} → ${entry.after.label}")
             Text(entry.reason, color = AppTheme.colors.textSecondary)
             HorizontalDivider(color = AppTheme.colors.outline)
         }

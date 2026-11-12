@@ -93,8 +93,12 @@ class InstitutionConnection(context: Context) {
         }
         val status = runCatching { call("$prefix/prepare", method = "POST").optString("status") }.getOrNull()
         if (status == "PREPARING") {
-            lifecycle("checklist", "/checklist", JSONObject().put("driverConfirmed", false), "PUT")
-            if (trip.phase != TripPhase.PREPARING) lifecycle("start", "/start")
+            // V-08: 출발 전 기사 확인은 출발할 때 한 번만 보낸다(체크 뒤 변경으로 해제될 수 있으므로 출발 전에는 보내지 않음).
+            // 서버 TripController.checklist: driverConfirmed=true면 trips.driver_checked_at 기록, false면 비워 둔 채 "NG" 항목만.
+            if (trip.phase != TripPhase.PREPARING) {
+                lifecycle("checklist", "/checklist", JSONObject().put(InstitutionTrips.DRIVER_CONFIRMED_FIELD, InstitutionTrips.driverConfirmed(trip)), "PUT")
+                lifecycle("start", "/start")
+            }
         } else if (status != null && status != "COMPLETED" && trip.phase != TripPhase.PREPARING) {
             if (!sent("start")) lifecycle("start", "/start")
         }
@@ -167,8 +171,14 @@ internal object InstitutionTrips {
      * - 미탑승 확인 취소(CONFIRMED_NOT_BOARDED → NOT_BOARDED): 서버에 상태를 EXPECTED로 되돌리는 이벤트가 없어
      *   스키마의 CORRECTION으로 이력만 남긴다(서버 상태는 NOT_BOARDED로 남음).
      */
-    /** 서버로 보낼 원장 항목. V-05 벨트 확인 기록은 기기 안에만 두고 보내지 않는다(D27 좌석·벨트 기록 보관 제외). */
-    fun serverLedger(ledger: List<LedgerEntry>): List<LedgerEntry> = ledger.filterNot { it.isBeltRecord }
+    /** 서버로 보낼 원장 항목. V-05 벨트 확인·V-08 기사 확인 기록은 기기 안에만 두고 출결 이벤트로 보내지 않는다(D27). */
+    fun serverLedger(ledger: List<LedgerEntry>): List<LedgerEntry> = ledger.filterNot { it.isBeltRecord || it.isDriverCheckRecord }
+
+    /** PUT /api/v1/trips/{id}/checklist 본문 필드 이름(TripController.checklist가 읽는 키). */
+    const val DRIVER_CONFIRMED_FIELD = "driverConfirmed"
+
+    /** V-08: 출발 시점에 기사 확인 체크가 있으면 true(서버가 driver_checked_at 기록), 없으면 false("기사 확인 없음"). */
+    fun driverConfirmed(trip: TripState): Boolean = trip.driverCheckedAtMillis != null
 
     fun ledgerEventType(before: Attendance, after: Attendance): String = when (after) {
         Attendance.ONBOARD -> "CHILD_BOARDED"

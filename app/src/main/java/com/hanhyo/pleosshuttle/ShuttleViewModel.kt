@@ -323,7 +323,10 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     }
     private fun dispatchAutomaticGuidance() {
         if (storageError != null) return
-        automaticGuidance.takeSpeech(trip, foreground)?.let { cue ->
+        // V-08 출발 전 요약은 흐름 카드가 [운행 시작] 단계를 보일 때와 같은 조건(정차 확인 · 차량 UX 제한 없음)에서만 읽는다.
+        val departureReady = engine.stationaryBlockers(now).isEmpty() &&
+            !(trip.integrationMode == IntegrationMode.SDK && sdkVehicle.uxRestricted.value == true)
+        automaticGuidance.takeSpeech(trip, foreground, departureReady)?.let { cue ->
             // Cancel stale destination speech before the new cue; the adapter rejects late callbacks.
             audio.stopSpeech()
             automaticAnnouncementKeys = (automaticAnnouncementKeys + cue.key).takeLast(100)

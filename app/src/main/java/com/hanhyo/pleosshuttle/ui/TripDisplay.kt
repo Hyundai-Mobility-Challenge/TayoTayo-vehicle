@@ -17,7 +17,7 @@ internal fun boolText(value: Boolean?, yes: String, no: String) = when (value) {
 internal fun <T> valueLabel(value: Observation<T>, now: Long): String = if (value.isFresh(now)) value.value.toString() else "미확인/오래됨"
 
 /** '가상 정류장 A · 서울숲' → '서울숲'. 화면에는 짧은 이름만 쓴다. */
-internal val Stop.shortName: String get() = if (name.endsWith(" · 가상")) name.removeSuffix(" · 가상") else name.substringAfter(" · ")
+internal val Stop.shortName: String get() = com.hanhyo.pleosshuttle.domain.stopLabel(this)
 
 /** 운행 화면 제목: 준비·완료 단계 이름 또는 지금 처리할 지점. */
 internal fun flowTitle(trip: TripState): String = when (trip.phase) {

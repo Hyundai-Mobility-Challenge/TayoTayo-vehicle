@@ -54,5 +54,9 @@ class SerialVersionUidPinTest {
         assertTrue(state.ledger.none { it.isBeltRecord })
         assertEquals(state.ledger, com.hanhyo.pleosshuttle.InstitutionTrips.serverLedger(state.ledger))
         assertEquals(state.onboardChildren.size, state.beltUncheckedCount)
+        // V-08 필드도 이전 파일에 없으므로 JVM 기본값: 기사 확인 없음(null), 원장 항목은 기사 확인 기록 아님(driverCheck=null).
+        assertEquals(null, state.driverCheckedAtMillis)
+        assertTrue(state.ledger.none { it.isDriverCheckRecord })
+        assertEquals(false, com.hanhyo.pleosshuttle.InstitutionTrips.driverConfirmed(state))
     }
 }

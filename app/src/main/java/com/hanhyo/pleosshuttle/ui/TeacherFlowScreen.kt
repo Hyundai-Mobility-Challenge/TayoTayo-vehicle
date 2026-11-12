@@ -108,7 +108,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                 Correction(child, vm, allowAlight = true)
             }
             tag == "start-trip" -> {
-                Text("${vm.trip.onboardChildren.size}명 탑승 · ${vm.trip.children.filter { it.status == Attendance.ONBOARD }.map { it.stopId }.distinct().size}곳 방문", style = question)
+                // 인원·벨트·경로 요약은 [운행 시작] 바로 위 "출발 전 확인" 블록(V-08)에 모아, 여기서는 중복하지 않는다.
                 if (vm.trip.confirmedNotBoardedChildren.isNotEmpty()) Text("미탑승 확인 ${vm.trip.confirmedNotBoardedChildren.size}명 · 출발 전에는 명단에서 취소할 수 있어요", style = hint, color = AppTheme.colors.textSecondary)
                 RouteCheckBody(vm, onOpenReorder)
             }

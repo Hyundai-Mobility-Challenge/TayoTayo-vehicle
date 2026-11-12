@@ -307,7 +307,9 @@ class ShuttleEngineTest {
         assertTrue(engine.confirmCabinInspection(now))
         assertTrue(engine.finishTrip(now))
         assertEquals(TripPhase.ENDED, engine.state.phase)
-        assertEquals(8, engine.state.ledger.size)
+        // 출결 8건 + V-08 "기사 확인 없음" 1건(체크 없이 출발, 서버 출결 이벤트 아님)
+        assertEquals(8, engine.state.ledger.count { !it.isDriverCheckRecord })
+        assertEquals(listOf(DriverCheckRecords.MISSING), engine.state.ledger.filter { it.isDriverCheckRecord }.map { it.reason })
     }
     @Test fun `마지막 아이 하차만 다음 지점으로 자동 전환하며 문 확인을 만들지 않는다`() {
         val engine = ready()
@@ -332,7 +334,9 @@ class ShuttleEngineTest {
             assertNull(engine.state.unlockAttempt)
         }
         assertNull(engine.state.currentStop)
-        assertEquals(8, engine.state.ledger.size)
+        // 출결 8건 + V-08 "기사 확인 없음" 1건(체크 없이 출발, 서버 출결 이벤트 아님)
+        assertEquals(8, engine.state.ledger.count { !it.isDriverCheckRecord })
+        assertEquals(listOf(DriverCheckRecords.MISSING), engine.state.ledger.filter { it.isDriverCheckRecord }.map { it.reason })
         assertTrue(engine.beginEndReview(now))
         assertNull(engine.state.endRecord)
         assertTrue(engine.inspectAndFinish(now))

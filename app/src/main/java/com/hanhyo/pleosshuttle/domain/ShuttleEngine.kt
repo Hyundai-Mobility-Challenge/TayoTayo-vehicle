@@ -20,6 +20,19 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         return true
     }
     private fun id(prefix: String, now: Long) = "$prefix-$now-${++sequence}"
+    /** V-08 기사 확인 원장 항목. 아이 기록이 아니므로 childId는 비우고, 서버 출결 이벤트로 보내지 않는다. */
+    private fun driverCheckEntry(checked: Boolean, reason: String, now: Long) =
+        LedgerEntry(id("driver", now), "", Attendance.ONBOARD, Attendance.ONBOARD, now, reason, driverCheck = checked)
+    /**
+     * D15: 기사 확인 뒤 출발 전에 출결(탑승 인원 포함)이나 출발 방문 순서가 바뀌면 체크를 푼다. 벨트 토글은 해당 없음
+     * ([departureChangeKey]). 운행 준비가 아니거나 체크가 없으면 아무것도 하지 않는다.
+     */
+    private fun clearDriverCheckIfChanged(before: TripState, cause: String, now: Long) {
+        if (before.phase != TripPhase.PREPARING || state.phase != TripPhase.PREPARING || state.driverCheckedAtMillis == null) return
+        if (departureChangeKey(before) == departureChangeKey(state)) return
+        state = state.copy(driverCheckedAtMillis = null, ledger = state.ledger + driverCheckEntry(false, DriverCheckRecords.autoCleared(cause), now))
+        lastMessage = "$lastMessage · 출발 전 변경으로 기사 확인을 해제했습니다. 다시 확인해 주세요."
+    }
     private fun diagnostic(entry: DiagnosticEntry) {
         state = state.copy(diagnostics = (state.diagnostics + entry).takeLast(500))
     }
@@ -90,7 +103,10 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     fun setRoutePolicy(objective: RouteObjective?, returnToOrigin: Boolean, now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("방문 순서 기준은 운행 준비에서 정합니다.")
         if (vehicle.connected && stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
-        return update(state.copy(routeObjective = objective, returnToOrigin = returnToOrigin, routeProposal = null, routeVersion = state.routeVersion + 1), "방문 순서 기준을 저장했습니다.")
+        val before = state
+        update(state.copy(routeObjective = objective, returnToOrigin = returnToOrigin, routeProposal = null, routeVersion = state.routeVersion + 1), "방문 순서 기준을 저장했습니다.")
+        clearDriverCheckIfChanged(before, "방문 순서 기준 변경", now)
+        return true
     }
     fun setResumePolicy(policy: ResumePolicy?): Boolean = update(state.copy(resumePolicy = policy), "운행 복귀 조건을 저장했습니다.")
 
@@ -184,13 +200,16 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
     private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long): Boolean {
         val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason)
-        return update(state.copy(
+        val before = state
+        update(state.copy(
             // 새로 탑승(정정 포함)한 아이의 벨트는 항상 "미확인"에서 시작한다(V-05). 하차 등 다른 변경은 벨트 값을 건드리지 않는다.
             children = state.children.map { if (it.id == child.id) it.copy(status = target, beltConfirmed = if (target == Attendance.ONBOARD) false else it.beltConfirmed) else it },
             ledger = state.ledger + event,
             handoverChildIds = state.handoverChildIds - child.id,
             directCabinCheckAtMillis = null,
         ), "${child.name}: ${target.label} 저장")
+        clearDriverCheckIfChanged(before, "탑승 인원·출결 변경", now)
+        return true
     }
     /**
      * V-05 벨트 착용 수동 확인. 탑승(ONBOARD) 중인 아이만, board()와 같은 정차 조건(V-11)에서만 기록한다.
@@ -227,13 +246,34 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (target == Attendance.ALIGHTED && (child.status != Attendance.ONBOARD || child.id !in state.handoverChildIds)) return reject("탑승 기록과 선생님의 보호자 대면 인계 확인이 필요합니다.")
         return changeAttendance(child, target, "정정: $reason", now)
     }
+    /**
+     * V-08 기사 확인 체크(D15·D37). 기사가 음성 요약을 듣고 말로 답하면 선생님이 체크한다(기사 조작 없음).
+     * 운행 준비 · 정차 확인(V-11)에서만. 시각만 저장하고 출발을 막는 데 쓰지 않는다.
+     */
+    fun setDriverChecked(checked: Boolean, now: Long): Boolean {
+        if (state.phase != TripPhase.PREPARING) return reject("기사 확인은 출발 전에 기록합니다.")
+        if (state.noTripToday) return reject(NO_TRIP_TODAY)
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        if (checked && state.onboardChildren.isEmpty()) return reject("탑승 기록이 있어야 기사 확인을 기록할 수 있습니다.")
+        if ((state.driverCheckedAtMillis != null) == checked) return reject(if (checked) "이미 기사 확인을 기록했습니다." else "기사 확인 기록이 없습니다.")
+        return update(state.copy(
+            driverCheckedAtMillis = if (checked) now else null,
+            ledger = state.ledger + driverCheckEntry(checked, if (checked) DriverCheckRecords.CHECKED else DriverCheckRecords.UNCHECKED, now),
+        ), if (checked) "기사 확인을 기록했습니다(시각만 저장)." else "기사 확인을 해제했습니다.")
+    }
+    fun toggleDriverCheck(now: Long): Boolean = setDriverChecked(state.driverCheckedAtMillis == null, now)
+
     fun startDriving(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("운행 준비 단계가 아닙니다.")
         if (state.noTripToday) return reject(NO_TRIP_TODAY)
         if (stationaryBlockers(now).isNotEmpty()) return reject("출발 전 정차 상태를 확인하세요.")
         if (state.onboardChildren.isEmpty()) return reject("선생님이 탑승 기록을 먼저 입력하세요.")
+        // V-08: 기사 확인이 없어도 출발은 막지 않는다. 대신 운행 기록에 "기사 확인 없음"을 남긴다(D15).
+        val missingDriverCheck = state.driverCheckedAtMillis == null
         invalidate(now, "운행 시작")
-        return update(state.copy(phase = TripPhase.DRIVING), "운행 화면으로 전환했습니다. 실제 차량 출발을 제어하지 않습니다.")
+        val ledger = if (missingDriverCheck) state.ledger + driverCheckEntry(false, DriverCheckRecords.MISSING, now) else state.ledger
+        return update(state.copy(phase = TripPhase.DRIVING, ledger = ledger),
+            "운행 화면으로 전환했습니다. 실제 차량 출발을 제어하지 않습니다." + if (missingDriverCheck) " 기사 확인 없음으로 기록했습니다." else "")
     }
     fun chooseAlighting(now: Long): Boolean {
         if (state.phase != TripPhase.DRIVING) return reject("운행 화면에서 하차를 선택하세요.")
@@ -396,7 +436,11 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (state.phase != TripPhase.PREPARING) return reject("운행 중 방문 순서를 변경하지 않습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태 확인 후 순서를 적용하세요.")
         if (!validOrder(order)) return reject("승인된 지점 전체를 중복 없이 포함해야 합니다.")
-        return update(state.copy(routeOrder = order.toList(), routeVersion = state.routeVersion + 1, routeProposal = null, routeIsExample = false), "방문 순서를 적용했습니다. 새 하차 지점은 추가하지 않았습니다.")
+        val before = state
+        update(state.copy(routeOrder = order.toList(), routeVersion = state.routeVersion + 1, routeProposal = null, routeIsExample = false), "방문 순서를 적용했습니다. 새 하차 지점은 추가하지 않았습니다.")
+        // 예시 순서를 [운행 시작]에서 자동 적용하는 경우는 보이던 순서 그대로라 해제하지 않는다(departureRouteOrder 비교).
+        clearDriverCheckIfChanged(before, "방문 순서 변경", now)
+        return true
     }
     fun applyPreview(now: Long): Boolean {
         val proposal = state.routeProposal ?: return reject("적용할 계산 결과가 없습니다.")
@@ -433,6 +477,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
             RoutePlanner.optimize(state.origin.id, order, RoutePlanner.syntheticMatrix(state.origin, state.stops, RouteObjective.FIXED), RouteObjective.FIXED, state.returnToOrigin, state.routeVersion)
         } catch (error: IllegalArgumentException) { return reject(error.message ?: "비용 행렬을 확인하세요.") }
         val before = state.routeOrder
+        val hadDriverCheck = state.driverCheckedAtMillis != null
         if (state.phase == TripPhase.PREPARING) {
             if (!previewRoute(proposal) || !applyPreview(now)) return false
         } else {
@@ -441,7 +486,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         }
         diagnostic(DiagnosticEntry(now, "방문 순서 변경", ResultStatus.TARGET_OBSERVED,
             "선생님이 정한 순서(고정 순서): ${before.joinToString(" → ")} ⇒ ${order.joinToString(" → ")}. 이유: ${reason ?: "선택 안 함"}. 이동 시간은 합성 값이며 실제 도로 시간이 아님"))
-        return update(state.copy(routeObjective = RouteObjective.FIXED), if (locked == 0) "정한 순서로 방문합니다." else "남은 방문 순서를 바꿨습니다. 다음 정류장부터 새 순서로 안내합니다.")
+        val cleared = if (hadDriverCheck && state.driverCheckedAtMillis == null) " 기사 확인이 해제되어 다시 확인이 필요합니다." else ""
+        return update(state.copy(routeObjective = RouteObjective.FIXED), (if (locked == 0) "정한 순서로 방문합니다." else "남은 방문 순서를 바꿨습니다. 다음 정류장부터 새 순서로 안내합니다.") + cleared)
     }
     fun invalidateConfirmation(reason: String, now: Long): Boolean { invalidate(now, reason); return true }
     fun editBlockReasons(now: Long): List<String> = buildList {

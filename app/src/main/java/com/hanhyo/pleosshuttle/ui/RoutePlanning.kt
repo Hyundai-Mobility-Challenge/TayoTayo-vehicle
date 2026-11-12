@@ -1,6 +1,8 @@
 package com.hanhyo.pleosshuttle.ui
 
 import com.hanhyo.pleosshuttle.domain.Attendance
+import com.hanhyo.pleosshuttle.domain.DepartureSummary
+import com.hanhyo.pleosshuttle.domain.departureRouteOrder
 import com.hanhyo.pleosshuttle.domain.RouteObjective
 import com.hanhyo.pleosshuttle.domain.RoutePlanner
 import com.hanhyo.pleosshuttle.domain.RouteTimeline
@@ -23,9 +25,21 @@ internal val routeCriteria = listOf(
 )
 
 /** 경로 확인에 보여줄 순서. 운행 시작 때 자동 계산될 순서라면 그 결과(RoutePlanner.plan)를 미리 보여준다. */
-internal fun displayedRouteOrder(trip: TripState): List<String> =
-    if (trip.phase == TripPhase.PREPARING && trip.routeIsExample) runCatching { RoutePlanner.plan(trip).stopOrder }.getOrDefault(trip.routeOrder)
-    else trip.routeOrder
+internal fun displayedRouteOrder(trip: TripState): List<String> = departureRouteOrder(trip)
+
+/** V-08 출발 전 확인 칩. [warn]이면 경고 톤(벨트 미확인 > 0, 아직 결정 안 된 어린이 > 0). */
+internal data class DepartureChip(val text: String, val warn: Boolean, val tag: String)
+
+internal fun departureChips(summary: DepartureSummary): List<DepartureChip> = buildList {
+    add(DepartureChip("탑승 ${summary.boarded}명 / 예정 ${summary.expected}명", warn = false, tag = "departure-riders"))
+    add(DepartureChip("벨트 미확인 ${summary.beltUnchecked}명", warn = summary.beltUnchecked > 0, tag = "departure-belt"))
+    if (summary.undecided > 0) add(DepartureChip("아직 결정 안 된 어린이 ${summary.undecided}명", warn = true, tag = "departure-undecided"))
+}
+
+/** "첫 정류장 서울숲 · 경로 서울숲 → 국립중앙박물관 → 올림픽공원" */
+internal fun departureRouteText(summary: DepartureSummary): String =
+    if (summary.stopNames.isEmpty()) "들를 정류장 없음"
+    else "첫 정류장 ${summary.firstStopName} · 경로 ${summary.stopNames.joinToString(" → ")}"
 
 /** '제안 순서로 되돌리기'의 기준. 정차 중이면 지나온 지점과 지금 정류장 위치는 고정한 채 거리 기준으로 다시 계산한다. */
 internal fun suggestedRouteOrder(trip: TripState, lockedCount: Int): List<String> = runCatching {

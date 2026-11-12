@@ -21,6 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -41,13 +44,16 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppSize
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.designsystem.theme.canvasDp
+import com.hanhyo.pleosshuttle.domain.DepartureSummary
 import com.hanhyo.pleosshuttle.domain.RouteObjective
+import com.hanhyo.pleosshuttle.domain.departureSummary
 import com.hanhyo.pleosshuttle.domain.RouteTimeline
 import com.hanhyo.pleosshuttle.domain.RouteWarning
 import com.hanhyo.pleosshuttle.domain.RouteTimelines
 import com.hanhyo.pleosshuttle.ui.component.Action
 import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
+import com.hanhyo.pleosshuttle.ui.component.Foldout
 
 private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직선거리로 만든 합성 이동 시간과 정차 3분을 더한 예시예요. 실제 도로 시간이 아니에요."
 
@@ -64,11 +70,14 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
         Text("복귀 ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
     }
     RouteStrip(vm, order, timeline)
-    StopMemos(vm, order)
+    // V-08: 차량 화면(2560x1440)에서 [운행 시작]이 스크롤 없이 보이도록 정류장 메모는 접어 둔다(펼치면 그대로 보임).
+    Foldout("정류장 메모", "${order.size}곳 · 필요할 때 펼쳐 보기", "stop-memos") { StopMemoLines(vm, order) }
     Text(if (trip.integrationMode == com.hanhyo.pleosshuttle.domain.IntegrationMode.SIMULATION)
-        "출발하면 모의 이동과 보호자 공유가 자동으로 시작돼요. 도착·인계·하차는 직접 확인해 주세요."
-        else "출발하면 위치와 내비 예상 도착 시간을 보호자에게 공유해요. 처음에는 위치 권한 허용이 필요해요.",
-        style = AppTheme.typography.body2Regular, color = AppTheme.colors.textSecondary)
+        "출발하면 모의 이동·보호자 공유 시작 · 도착·인계·하차는 직접 확인"
+        else "출발하면 위치·예상 도착 시간을 보호자에게 공유(처음엔 위치 권한 필요)",
+        style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
+    // V-08 출발 전 확인 요약 + 기사 확인 체크: [운행 시작] 바로 위(flow VS-06). 출발은 막지 않는다(D15).
+    DepartureCheckBlock(vm, departureSummary(trip, order))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
         Action("순서 바꾸기", "open-reorder", secondary = true, enabled = vm.engine.manualRouteBlockers(vm.now).isEmpty(), action = onOpenReorder)
         Box(Modifier.weight(1f)) {
@@ -120,16 +129,44 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
     ) { Text(marker, style = AppTheme.typography.caption2Bold, color = if (highlighted) AppTheme.colors.onPrimary else AppTheme.colors.textSecondary) }
 }
 
-@Composable private fun StopMemos(vm: ShuttleViewModel, order: List<String>) {
+@Composable private fun StopMemoLines(vm: ShuttleViewModel, order: List<String>) {
+    order.forEachIndexed { index, id ->
+        val stop = vm.trip.stops.first { it.id == id }
+        Text("${index + 1}  ${stop.shortName} · ${stopMemo(id) ?: "메모 없음"}", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * V-08 출발 전 확인 블록. 숫자 칩(경고 톤은 [departureChips]), 첫 정류장·경로, 기사 확인 체크, 요약 다시 듣기.
+ * 기사 확인은 기사가 음성 요약을 듣고 말로 답하면 선생님이 체크한다(D37). 체크 전이면 경고 줄만 보이고 출발은 막지 않는다.
+ */
+@Composable private fun DepartureCheckBlock(vm: ShuttleViewModel, summary: DepartureSummary) {
+    val type = AppTheme.typography
+    val checked = vm.trip.driverCheckedAtMillis != null
     Column(
-        Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card)).padding(AppSpacing.xl).testTag("stop-memos"),
+        Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card)).padding(AppSpacing.lg).testTag("departure-summary"),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
     ) {
-        Text("정류장 메모", style = AppTheme.typography.body1SemiBold)
-        order.forEachIndexed { index, id ->
-            val stop = vm.trip.stops.first { it.id == id }
-            Text("${index + 1}  ${stop.shortName} · ${stopMemo(id) ?: "메모 없음"}", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+            Text("출발 전 확인", style = type.body1SemiBold, modifier = Modifier.padding(top = AppSpacing.xs))
+            departureChips(summary).forEach { chip ->
+                StatusChip(chip.text, tone = if (chip.warn) ChipTone.DANGER else ChipTone.NEUTRAL, modifier = Modifier.testTag(chip.tag))
+            }
         }
+        Text(departureRouteText(summary), style = type.body2SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("departure-route"))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.weight(1f).heightIn(min = AppSize.touchMin)
+                    .toggleable(value = checked, role = Role.Checkbox) { vm.perform { toggleDriverCheck(it) } }
+                    .testTag("driver-check"),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = checked, onCheckedChange = null)
+                Text(if (checked) "기사 확인 ${timeText(vm.trip.driverCheckedAtMillis)} (기사님 답을 듣고 체크함)" else "기사 확인 (기사님께 읽어 드리고 답을 들은 뒤 체크)", style = type.body2SemiBold)
+            }
+            Action("요약 다시 듣기", "replay-departure-summary", secondary = true) { vm.replayGuidance() }
+        }
+        if (!checked) Text("기사 확인 필요 · 확인 없이도 출발할 수 있어요(기록에 \"기사 확인 없음\")", style = type.body2SemiBold, color = AppTheme.colors.primaryContent, modifier = Modifier.testTag("driver-check-warning"))
     }
 }
 

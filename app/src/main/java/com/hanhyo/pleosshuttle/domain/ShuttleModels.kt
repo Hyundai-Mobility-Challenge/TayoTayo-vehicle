@@ -157,9 +157,17 @@ data class LedgerEntry(
      * 이전 저장 파일의 항목은 JVM 기본값 null = 출결 기록으로 복원된다.
      */
     val belt: Boolean? = null,
+    /**
+     * V-08 기사 확인 기록(D15·D37). null = 아님. true = 선생님이 기사 구두 확인을 체크, false = 체크 해제·자동 해제·
+     * "기사 확인 없음" 출발. childId는 빈 문자열, before·after는 둘 다 ONBOARD(의미 없음). 기기 안에만 남기고
+     * 서버 출결 이벤트로 보내지 않는다(서버에는 체크리스트 driverConfirmed로만 전달). 이전 저장 파일은 JVM 기본값 null.
+     */
+    val driverCheck: Boolean? = null,
 ) : Serializable {
     /** V-05 벨트 기록이면 true. 서버 전송(InstitutionConnection)에서 제외한다. */
     val isBeltRecord: Boolean get() = belt != null
+    /** V-08 기사 확인 기록이면 true. 서버 출결 이벤트 전송에서 제외한다. */
+    val isDriverCheckRecord: Boolean get() = driverCheck != null
     companion object {
         /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
         private const val serialVersionUID: Long = 4960029191150688459L
@@ -287,6 +295,11 @@ data class TripState(
     val endRecord: EndRecord? = null,
     val diagnostics: List<DiagnosticEntry> = emptyList(),
     val revision: Long = 0,
+    /**
+     * V-08 기사 확인(D15): 선생님이 기사 구두 답을 듣고 체크한 시각. null = 체크 없음. 시각만 저장하고 기사 이름 등
+     * 개인정보는 저장하지 않는다(Run.driver_checked_at). 이전 저장 파일은 JVM 기본값 null = 체크 없음으로 복원된다.
+     */
+    val driverCheckedAtMillis: Long? = null,
 ) : Serializable {
     val currentStop: Stop? get() = routeOrder.getOrNull(currentStopIndex)?.let { id -> stops.find { it.id == id } }
     val onboardChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.ONBOARD }
@@ -308,6 +321,8 @@ data class TripState(
      */
     val beltUncheckedChildren: List<ChildRecord> get() = onboardChildren.filter { !it.beltConfirmed }
     val beltUncheckedCount: Int get() = beltUncheckedChildren.size
+    /** V-08: 출발 뒤인데 기사 확인 체크가 없었던 운행("기사 확인 없음"). 계산 프로퍼티(UID 고정). */
+    val departedWithoutDriverCheck: Boolean get() = phase != TripPhase.PREPARING && driverCheckedAtMillis == null
 
     companion object {
         /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
