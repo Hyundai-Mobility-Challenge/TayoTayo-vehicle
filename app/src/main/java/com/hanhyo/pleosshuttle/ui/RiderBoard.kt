@@ -2,10 +2,13 @@ package com.hanhyo.pleosshuttle.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -13,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import com.hanhyo.pleosshuttle.ShuttleViewModel
 import com.hanhyo.pleosshuttle.designsystem.theme.AppRadius
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSize
@@ -31,7 +35,7 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
 
 /*
  * V-03 탑승 명단 보드(v1.3, D39: 좌석 배치도 없음). 아이 행 목록(이름·상태·[벨트 자리])을 운행 화면 본문에 늘 보여준다.
- * 화면에 그릴 내용은 아래 순수 함수 riderBoard()가 TripState만 읽어 정한다(저장 필드 추가 없음, 직렬화 형식 그대로).
+ * 화면에 그릴 내용은 아래 순수 함수 riderBoard()가 TripState만 읽어 정한다. V-05 벨트 칩은 ChildRecord.beltConfirmed(JVM 기본값 false = 미확인)를 읽는다.
  */
 
 /** 행에서 누를 수 있는 기록. 엔진 호출은 흐름 카드와 같은 board / confirmNotBoarded / undoNotBoarded(V-04, V-02). */
@@ -43,6 +47,20 @@ internal enum class RiderAction(val label: String) {
 
 /** 행 강조. CURRENT_STOP = 지금(주행 중엔 다음) 정류장에서 내릴 아이(V-20), REMAINING = 종료 점검 때 차 안 기록이 남은 아이(V-22). */
 internal enum class RiderHighlight { NONE, CURRENT_STOP, REMAINING }
+
+/**
+ * V-05 벨트 수동 확인 칩. [toggleable]이면 칩을 눌러 확인/미확인을 바꾼다(운행 준비·하차 단계, 정차·조작 제한 없음).
+ * [warn]은 출발이 가까울 때(운행 준비의 [운행 시작] 단계, 정류장 정차 중 이 정류장 뒤에도 남는 아이) 미확인 강조.
+ * 경고만 하고 출발을 막지 않는다(V-08 원칙). 센서 값이 아니라 사람이 확인한 값만 보여준다(7절).
+ */
+internal data class RiderBelt(val confirmed: Boolean, val toggleable: Boolean, val warn: Boolean) {
+    val label: String get() = if (confirmed) "벨트 확인" else "벨트 미확인"
+    val tone: ChipTone get() = when {
+        confirmed -> ChipTone.INFO
+        warn -> ChipTone.DANGER
+        else -> ChipTone.NEUTRAL
+    }
+}
 
 internal data class RiderRow(
     val id: String,
@@ -56,8 +74,8 @@ internal data class RiderRow(
     val stopName: String?,
     val highlight: RiderHighlight,
     val actions: List<RiderAction>,
-    /** V-05 벨트 확인 자리. 다음 기능에서 채운다. 지금은 항상 null(표시 안 함). */
-    val belt: String? = null,
+    /** V-05 벨트 확인 칩. 탑승(ONBOARD) 중인 아이에게만(운행 준비·운행·하차 단계), 그 밖에는 null(표시 안 함). */
+    val belt: RiderBelt? = null,
 )
 
 internal data class RiderBoardModel(
@@ -69,6 +87,8 @@ internal data class RiderBoardModel(
     val summary: String,
     /** 단계별 한 줄 안내(예: 종료 점검의 잔류 아이 수). 없으면 null. */
     val note: String?,
+    /** true면 [note]가 V-05 벨트 미확인 경고(경고색으로 그림). */
+    val beltWarning: Boolean = false,
 )
 
 /** 보드 상태 문구. NOT_BOARDED는 enum 라벨("탑승 전")을 그대로 쓰고, 하차는 V-20 "하차 완료"로 보인다. */
@@ -102,6 +122,13 @@ internal fun riderBoard(
     val stopRank: (String) -> Int = { id ->
         visitOrder.indexOf(id).takeIf { it >= 0 } ?: (visitOrder.size + trip.stops.indexOfFirst { it.id == id }.let { if (it < 0) trip.stops.size else it })
     }
+    // V-05: 벨트 토글은 board()와 같은 조건(정차·조작 제한 없음)에서 운행 준비와 하차(정류장 정차 중) 단계에만.
+    val beltToggleable = !moving && stationary && (trip.phase == TripPhase.PREPARING || trip.phase == TripPhase.ALIGHTING)
+    val beltShown = trip.phase == TripPhase.PREPARING || trip.phase == TripPhase.DRIVING || trip.phase == TripPhase.ALIGHTING
+    // 출발 직전: 운행 준비에서 모두 결정되어 [운행 시작] 단계(흐름 카드 start-trip)일 때.
+    val departing = trip.phase == TripPhase.PREPARING && !trip.noTripToday && trip.undecidedChildren.isEmpty() && trip.onboardChildren.isNotEmpty()
+    // 재출발 전: 정류장 정차(하차 단계) 중 이 정류장에서 내리지 않고 계속 타고 가는 아이.
+    val staysAfterStop = { child: ChildRecord -> trip.phase == TripPhase.ALIGHTING && child.stopId != trip.currentStop?.id }
     val focusStopId = if (trip.phase == TripPhase.DRIVING || trip.phase == TripPhase.ALIGHTING) trip.currentStop?.id else null
     val rows = trip.children
         .sortedWith(compareBy<ChildRecord>({ stopRank(it.stopId) }, { displayName(it) }))
@@ -121,6 +148,9 @@ internal fun riderBoard(
                     else -> RiderHighlight.NONE
                 },
                 actions = if (readOnly) emptyList() else rowActions(trip, child),
+                belt = if (beltShown && child.status == Attendance.ONBOARD)
+                    RiderBelt(child.beltConfirmed, beltToggleable, warn = !child.beltConfirmed && (departing || staysAfterStop(child)))
+                else null,
             )
         }
     val count = { s: Attendance -> trip.children.count { it.status == s } }
@@ -130,15 +160,18 @@ internal fun riderBoard(
         if (trip.phase != TripPhase.PREPARING || count(Attendance.ALIGHTED) > 0) add("하차 완료 ${count(Attendance.ALIGHTED)}")
         if (count(Attendance.NOT_BOARDED) > 0) add("탑승 전 ${count(Attendance.NOT_BOARDED)}")
         if (count(Attendance.CONFIRMED_NOT_BOARDED) > 0) add("미탑승 확인 ${count(Attendance.CONFIRMED_NOT_BOARDED)}")
+        if (beltShown && trip.onboardChildren.isNotEmpty()) add("벨트 미확인 ${trip.beltUncheckedCount}")
     }.joinToString(" · ")
     val remaining = rows.count { it.highlight == RiderHighlight.REMAINING }
+    val beltWarnings = rows.count { it.belt?.warn == true }
     val note = when {
         moving -> "운행 중에는 조회만 할 수 있어요"
         trip.phase == TripPhase.END_REVIEW -> if (remaining > 0) "차 안에 남은 기록 ${remaining}명 · 직접 확인해 주세요" else "차 안에 남은 기록 없음 · 실내는 직접 확인해 주세요"
         trip.phase == TripPhase.PREPARING && !stationary -> "정차 후 기록할 수 있어요"
+        beltWarnings > 0 -> "벨트 미확인 ${beltWarnings}명 · 출발 전에 직접 확인해 주세요"
         else -> null
     }
-    return RiderBoardModel(rows, readOnly, moving, summary, note)
+    return RiderBoardModel(rows, readOnly, moving, summary, note, beltWarning = beltWarnings > 0)
 }
 
 /** 흐름 카드와 같은 규칙(feature 3): 미탑승 예정 아이는 [미탑승 확인]이 먼저. "오늘 운행 없음"이면 탑승·미탑승 확인 없음(엔진도 거부). */
@@ -180,7 +213,7 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
             Text(model.summary, style = type.body2SemiBold, color = AppTheme.colors.textSecondary, modifier = Modifier.testTag("rider-board-summary"))
             model.note?.let {
                 Text(it, style = type.body2SemiBold, modifier = Modifier.testTag("rider-board-note"),
-                    color = if (model.rows.any { r -> r.highlight == RiderHighlight.REMAINING }) AppTheme.colors.dangerContent else AppTheme.colors.textSecondary)
+                    color = if (model.beltWarning || model.rows.any { r -> r.highlight == RiderHighlight.REMAINING }) AppTheme.colors.dangerContent else AppTheme.colors.textSecondary)
             }
             model.rows.forEach { row -> RiderRowView(row, vm) }
         }
@@ -190,7 +223,7 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
 @Composable private fun RiderRowView(row: RiderRow, vm: ShuttleViewModel) {
     val colors = AppTheme.colors
     val (background, border) = when (row.highlight) {
-        RiderHighlight.NONE -> colors.surface to null
+        RiderHighlight.NONE -> if (row.belt?.warn == true) colors.surface to BorderStroke(AppSize.currentOutline, colors.danger) else colors.surface to null
         RiderHighlight.CURRENT_STOP -> colors.primaryContainer to BorderStroke(AppSize.currentOutline, colors.primaryStroke)
         RiderHighlight.REMAINING -> colors.dangerContainer to BorderStroke(AppSize.currentOutline, colors.danger)
     }
@@ -216,8 +249,7 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
                     row.badge?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("rider-badge-${row.id}")) }
                 }
                 StatusChip(row.statusLabel, tone = row.tone, modifier = Modifier.testTag("rider-status-${row.id}"))
-                // V-05 벨트 자리: 다음 기능에서 칩/토글을 넣는다.
-                row.belt?.let { StatusChip(it, modifier = Modifier.testTag("rider-belt-${row.id}")) }
+                row.belt?.let { BeltChip(it, row.id, vm) }
                 if (!compact) actions()
             }
             // 세로 분할(좁은 창)에서는 버튼을 이름 아래 줄로 내린다.
@@ -225,3 +257,19 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
         }
     }
 }
+
+/** V-05 벨트 칩. 누를 수 있으면 차량 화면 최소 터치 높이(touchMin)를 확보하고 스위치 역할로 확인/미확인을 바꾼다. */
+@Composable private fun BeltChip(belt: RiderBelt, childId: String, vm: ShuttleViewModel) {
+    val tag = riderBeltTag(childId)
+    if (!belt.toggleable) {
+        StatusChip(belt.label, tone = belt.tone, modifier = Modifier.testTag(tag))
+        return
+    }
+    Box(
+        Modifier.heightIn(min = AppSize.touchMin).testTag(tag)
+            .toggleable(value = belt.confirmed, role = Role.Switch) { vm.perform { toggleBelt(childId, it) } },
+        contentAlignment = Alignment.Center,
+    ) { StatusChip(belt.label, tone = belt.tone) }
+}
+
+internal fun riderBeltTag(childId: String) = "rider-belt-$childId"

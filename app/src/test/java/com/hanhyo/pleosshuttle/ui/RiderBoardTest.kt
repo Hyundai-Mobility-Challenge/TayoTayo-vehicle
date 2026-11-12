@@ -130,4 +130,65 @@ class RiderBoardTest {
         val empty = board(trip.with("child-c" to Attendance.ALIGHTED))
         assertTrue(empty.rows.none { it.highlight == RiderHighlight.REMAINING })
     }
+    // ---- V-05 벨트 수동 확인 ----
+    private fun TripState.belted(vararg ids: String) = copy(children = children.map { if (it.id in ids) it.copy(beltConfirmed = true) else it })
+
+    @Test fun `belt chip only for onboard rows and toggleable while preparing and stopped`() {
+        val trip = SampleTrip.create().with("child-a" to Attendance.ONBOARD, "child-b" to Attendance.ONBOARD).belted("child-b")
+        val byId = board(trip).rows.associateBy { it.id }
+        assertEquals(RiderBelt(confirmed = false, toggleable = true, warn = false), byId.getValue("child-a").belt)
+        assertEquals("벨트 미확인", byId.getValue("child-a").belt!!.label)
+        assertEquals("벨트 확인", byId.getValue("child-b").belt!!.label)
+        assertEquals(ChipTone.INFO, byId.getValue("child-b").belt!!.tone)
+        assertNull(byId.getValue("child-c").belt)
+        // 아직 탑승 결정 전 아이가 있으면 출발 단계가 아니므로 강조하지 않음
+        assertTrue(board(trip).rows.none { it.belt?.warn == true })
+        assertTrue(board(trip).summary.endsWith("벨트 미확인 1"))
+        assertEquals("rider-belt-child-a", riderBeltTag("child-a"))
+    }
+
+    @Test fun `belt is read only when not stopped, ux restricted or driving`() {
+        val trip = SampleTrip.create().with("child-a" to Attendance.ONBOARD)
+        assertFalse(board(trip, stationary = false).rows.first { it.id == "child-a" }.belt!!.toggleable)
+        assertFalse(board(trip, ux = true).rows.first { it.id == "child-a" }.belt!!.toggleable)
+        val driving = board(trip.copy(phase = TripPhase.DRIVING)).rows.first { it.id == "child-a" }.belt!!
+        assertFalse(driving.toggleable)
+        assertFalse(driving.warn)
+        val review = board(trip.copy(phase = TripPhase.END_REVIEW, currentStopIndex = 3))
+        assertNull(review.rows.first { it.id == "child-a" }.belt)
+        assertFalse(review.summary.contains("벨트"))
+    }
+
+    @Test fun `unchecked belts are highlighted at the start trip step`() {
+        val trip = SampleTrip.create().with("child-a" to Attendance.ONBOARD, "child-b" to Attendance.ONBOARD,
+            "child-c" to Attendance.ONBOARD, "child-d" to Attendance.CONFIRMED_NOT_BOARDED).belted("child-c")
+        val model = board(trip)
+        assertEquals(listOf("child-a", "child-b"), model.rows.filter { it.belt?.warn == true }.map { it.id })
+        assertEquals(ChipTone.DANGER, model.rows.first { it.id == "child-a" }.belt!!.tone)
+        assertTrue(model.beltWarning)
+        assertEquals("벨트 미확인 2명 · 출발 전에 직접 확인해 주세요", model.note)
+        assertTrue(model.summary.contains("벨트 미확인 2"))
+        // 모두 확인하면 경고 없음
+        val done = board(trip.belted("child-a", "child-b"))
+        assertFalse(done.beltWarning)
+        assertNull(done.note)
+        assertTrue(done.summary.contains("벨트 미확인 0"))
+    }
+
+    @Test fun `at a stop riders who stay aboard are highlighted before re-departure`() {
+        val trip = SampleTrip.create()
+            .with("child-a" to Attendance.ALIGHTED, "child-b" to Attendance.ONBOARD, "child-c" to Attendance.ONBOARD, "child-d" to Attendance.ONBOARD)
+            .belted("child-d").copy(phase = TripPhase.ALIGHTING, currentStopIndex = 0)
+        val model = board(trip)
+        val byId = model.rows.associateBy { it.id }
+        // 이 정류장에서 내리는 아이(b)는 강조하지 않고, 계속 타고 가는 미확인 아이(c)만 강조
+        assertFalse(byId.getValue("child-b").belt!!.warn)
+        assertTrue(byId.getValue("child-c").belt!!.warn)
+        assertFalse(byId.getValue("child-d").belt!!.warn)
+        assertTrue(byId.values.mapNotNull { it.belt }.all { it.toggleable })
+        assertTrue(model.readOnly) // 출결 버튼은 그대로 없음
+        assertEquals(RiderHighlight.NONE, byId.getValue("child-c").highlight)
+        assertEquals("벨트 미확인 1명 · 출발 전에 직접 확인해 주세요", model.note)
+        assertNull(byId.getValue("child-a").belt)
+    }
 }

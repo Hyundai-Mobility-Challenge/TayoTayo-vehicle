@@ -70,7 +70,7 @@ class InstitutionConnection(context: Context) {
         check(prefs.edit().putString("trip", trip.tripId).remove("pendingTrip").putStringSet("sent", emptySet()).commit())
     }
     fun recover(trip: TripState) { if (prefs.getString("pendingTrip", null) == trip.tripId) bind(trip) }
-    fun pending(trip: TripState): Int = if (trip.tripId != boundTrip) 0 else trip.ledger.count { it.id !in prefs.getStringSet("sent", emptySet()).orEmpty() }
+    fun pending(trip: TripState): Int = if (trip.tripId != boundTrip) 0 else InstitutionTrips.serverLedger(trip.ledger).count { it.id !in prefs.getStringSet("sent", emptySet()).orEmpty() }
 
     companion object { private val reportingLock = Any() }
     fun reportTracking(trip: TripState, enabled: Boolean, fix: TrackingLocation?, navigation: TrackingNavigation? = null,
@@ -121,7 +121,7 @@ class InstitutionConnection(context: Context) {
 
         val sentEvents = prefs.getStringSet("sentEvents", emptySet()).orEmpty().toMutableSet()
         val stopByChild = trip.children.associate { it.id to it.stopId }
-        val ledgerRows = trip.ledger.map { entry ->
+        val ledgerRows = InstitutionTrips.serverLedger(trip.ledger).map { entry ->
             val eventType = InstitutionTrips.ledgerEventType(entry.before, entry.after)
             Triple(entry.id, eventType, JSONObject().put("tripChildId", entry.childId).put("tripStopId", stopByChild[entry.childId]))
         }
@@ -167,6 +167,9 @@ internal object InstitutionTrips {
      * - 미탑승 확인 취소(CONFIRMED_NOT_BOARDED → NOT_BOARDED): 서버에 상태를 EXPECTED로 되돌리는 이벤트가 없어
      *   스키마의 CORRECTION으로 이력만 남긴다(서버 상태는 NOT_BOARDED로 남음).
      */
+    /** 서버로 보낼 원장 항목. V-05 벨트 확인 기록은 기기 안에만 두고 보내지 않는다(D27 좌석·벨트 기록 보관 제외). */
+    fun serverLedger(ledger: List<LedgerEntry>): List<LedgerEntry> = ledger.filterNot { it.isBeltRecord }
+
     fun ledgerEventType(before: Attendance, after: Attendance): String = when (after) {
         Attendance.ONBOARD -> "CHILD_BOARDED"
         Attendance.ALIGHTED -> "CHILD_DROPPED_OFF"

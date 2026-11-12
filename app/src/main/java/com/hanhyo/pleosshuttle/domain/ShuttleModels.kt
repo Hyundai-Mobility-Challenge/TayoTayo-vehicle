@@ -95,6 +95,12 @@ data class ChildRecord(
     val notExpectedToBoard: Boolean = false,
     /** 서버가 내려주는 미탑승 예정 사유(ABSENT / SELF_PICKUP / NOT_RIDING / OTHER). 없으면 null. */
     val notBoardingReason: String? = null,
+    /**
+     * V-05 벨트 착용 수동 확인(선생님이 직접 확인). 탑승(ONBOARD) 중인 아이에게만 의미가 있다.
+     * 이전 버전 저장 파일을 복원하면 JVM 기본값 false = "미확인"이 되므로 안전한 쪽으로 복원된다.
+     * 운행 중 화면 상태용이며 서버로 보내지 않는다(D27 좌석·벨트 기록 보관 제외).
+     */
+    val beltConfirmed: Boolean = false,
 ) : Serializable {
     /** 오늘 탑승 예정 여부. 기본값 탑승(D20). */
     val expectedToBoard: Boolean get() = !notExpectedToBoard
@@ -145,7 +151,15 @@ data class LedgerEntry(
     val recordedAtMillis: Long,
     val reason: String,
     val source: Source = Source.MANUAL,
+    /**
+     * null = 출결 기록(서버 전송 대상). 값이 있으면 V-05 벨트 수동 확인 기록(true 확인 / false 미확인)이고
+     * before·after는 둘 다 ONBOARD다. 벨트 기록은 기기 안에만 남기고 서버 이벤트로 보내지 않는다(D27).
+     * 이전 저장 파일의 항목은 JVM 기본값 null = 출결 기록으로 복원된다.
+     */
+    val belt: Boolean? = null,
 ) : Serializable {
+    /** V-05 벨트 기록이면 true. 서버 전송(InstitutionConnection)에서 제외한다. */
+    val isBeltRecord: Boolean get() = belt != null
     companion object {
         /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */
         private const val serialVersionUID: Long = 4960029191150688459L
@@ -288,6 +302,12 @@ data class TripState(
     /** 탑승 단계에서 아직 탑승 기록도 미탑승 확인도 없는 아이. */
     val undecidedChildren: List<ChildRecord> get() = children.filter { it.awaitingBoardingDecision }
     val confirmedNotBoardedChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.CONFIRMED_NOT_BOARDED }
+    /**
+     * V-05: 탑승 중인데 벨트를 아직 선생님이 확인하지 않은 아이 수. V-08 출발 전 확인·V-16 벨트 음성이 쓸 값.
+     * 출발을 막는 데 쓰지 않는다(경고만, V-08). 계산 프로퍼티라 직렬화 형식은 그대로(UID 고정).
+     */
+    val beltUncheckedChildren: List<ChildRecord> get() = onboardChildren.filter { !it.beltConfirmed }
+    val beltUncheckedCount: Int get() = beltUncheckedChildren.size
 
     companion object {
         /** 3c27718 빌드의 기본 계산값으로 고정. 저장된 trip-v1.bin 복원 호환(SerialVersionUidPinTest 참고). */

@@ -49,5 +49,10 @@ class SerialVersionUidPinTest {
         assertEquals(4, state.children.size)
         assertTrue(state.children.all { it.expectedToBoard })
         assertEquals(4, state.expectedRiderCount)
+        // V-05 필드는 이전 파일에 없으므로 JVM 기본값: 벨트 미확인(false), 원장 항목은 출결 기록(belt=null).
+        assertTrue(state.children.none { it.beltConfirmed })
+        assertTrue(state.ledger.none { it.isBeltRecord })
+        assertEquals(state.ledger, com.hanhyo.pleosshuttle.InstitutionTrips.serverLedger(state.ledger))
+        assertEquals(state.onboardChildren.size, state.beltUncheckedCount)
     }
 }

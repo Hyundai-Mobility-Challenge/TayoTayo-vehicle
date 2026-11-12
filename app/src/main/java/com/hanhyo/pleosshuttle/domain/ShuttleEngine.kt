@@ -185,11 +185,37 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long): Boolean {
         val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason)
         return update(state.copy(
-            children = state.children.map { if (it.id == child.id) it.copy(status = target) else it },
+            // 새로 탑승(정정 포함)한 아이의 벨트는 항상 "미확인"에서 시작한다(V-05). 하차 등 다른 변경은 벨트 값을 건드리지 않는다.
+            children = state.children.map { if (it.id == child.id) it.copy(status = target, beltConfirmed = if (target == Attendance.ONBOARD) false else it.beltConfirmed) else it },
             ledger = state.ledger + event,
             handoverChildIds = state.handoverChildIds - child.id,
             directCabinCheckAtMillis = null,
         ), "${child.name}: ${target.label} 저장")
+    }
+    /**
+     * V-05 벨트 착용 수동 확인. 탑승(ONBOARD) 중인 아이만, board()와 같은 정차 조건(V-11)에서만 기록한다.
+     * 허용 단계: 운행 준비(출발 전)와 하차(정류장 정차 중, 재출발 전). 운행(DRIVING)은 조회 전용이다.
+     * 출발을 막지 않으며(경고만), 기록은 기기 원장에만 남기고 서버로 보내지 않는다(D27).
+     */
+    fun setBeltConfirmed(childId: String, confirmed: Boolean, now: Long): Boolean {
+        if (state.phase != TripPhase.PREPARING && state.phase != TripPhase.ALIGHTING)
+            return reject("벨트 확인은 출발 전이나 정류장 정차 중에 기록합니다. 운행 중에는 조회만 할 수 있습니다.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.status != Attendance.ONBOARD) return reject("탑승 기록이 있는 어린이만 벨트를 확인합니다.")
+        val label = if (confirmed) "벨트 확인" else "벨트 미확인"
+        if (child.beltConfirmed == confirmed) return reject("이미 $label 상태입니다.")
+        val event = LedgerEntry(id("belt", now), child.id, Attendance.ONBOARD, Attendance.ONBOARD, now, "선생님 $label", belt = confirmed)
+        return update(state.copy(
+            children = state.children.map { if (it.id == child.id) it.copy(beltConfirmed = confirmed) else it },
+            ledger = state.ledger + event,
+        ), "${child.name}: $label")
+    }
+    fun confirmBelt(childId: String, now: Long): Boolean = setBeltConfirmed(childId, true, now)
+    fun unconfirmBelt(childId: String, now: Long): Boolean = setBeltConfirmed(childId, false, now)
+    fun toggleBelt(childId: String, now: Long): Boolean {
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        return setBeltConfirmed(childId, !child.beltConfirmed, now)
     }
     fun correct(childId: String, target: Attendance, reason: String, now: Long): Boolean {
         if (state.phase == TripPhase.DRIVING || state.phase == TripPhase.ENDED) return reject("운행 중과 종료 후에는 명단을 정정할 수 없습니다.")
