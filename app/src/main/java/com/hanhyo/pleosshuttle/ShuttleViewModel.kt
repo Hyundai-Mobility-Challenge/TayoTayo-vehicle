@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hanhyo.pleosshuttle.audio.AudioSnapshot
 import com.hanhyo.pleosshuttle.audio.LocalAudioAdapter
+import com.hanhyo.pleosshuttle.audio.SpeechStatus
 import com.hanhyo.pleosshuttle.domain.*
 import com.hanhyo.pleosshuttle.domain.VehicleSnapshot
 import com.hanhyo.pleosshuttle.sdk.RealVehicleAdapter
@@ -162,6 +163,16 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     private val automaticGuidance = AutomaticTripGuidance()
     internal var automaticAnnouncementKeys: List<String> = emptyList(); private set
     internal var automaticNavigationStops: List<String> = emptyList(); private set
+    // V-06 벨트 경고등: 메모리에서만 판단(TripState·원장·서버에 넣지 않음, D27).
+    private val beltTelltaleGuidance = BeltTelltaleGuidance()
+    private var beltTelltaleSpeechId: Long? = null
+    internal var beltTelltaleAnnouncements = 0; private set
+    /** 실제 차량 연결(SDK) 운행에서만 경고등을 쓴다. 모의 체험은 실제 어댑터를 멈추므로 항상 UNKNOWN. */
+    private fun beltTelltaleSignal(): BeltTelltaleSignal =
+        if (trip.integrationMode != IntegrationMode.SDK) BeltTelltaleSignal.UNKNOWN
+        else beltTelltaleSignal(sdkVehicle.seatBeltTelltale, now)
+    /** V-06 차량 전체 배너 한 줄(좌석·아이에 붙이지 않음). 없으면 null. */
+    val beltTelltaleBanner: String? get() = beltTelltaleBanner(trip, beltTelltaleSignal())
 
     init {
         try { store.load()?.let { engine.restore(it, now) } }
@@ -327,10 +338,18 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         val departureReady = engine.stationaryBlockers(now).isEmpty() &&
             !(trip.integrationMode == IntegrationMode.SDK && sdkVehicle.uxRestricted.value == true)
         automaticGuidance.takeSpeech(trip, foreground, departureReady)?.let { cue ->
+            // V-06: 운행 안내가 읽던 벨트 경고 음성을 끊으면, 경고가 계속 켜져 있을 때 안내가 끝난 뒤 다시 읽게 한다.
+            if (beltTelltaleSpeechId != null && audio.snapshot.speechRequestId == beltTelltaleSpeechId && audioBusy()) beltTelltaleGuidance.rearm()
             // Cancel stale destination speech before the new cue; the adapter rejects late callbacks.
             audio.stopSpeech()
             automaticAnnouncementKeys = (automaticAnnouncementKeys + cue.key).takeLast(100)
             audio.speak(cue.text)
+        }
+        // V-06: 경고등 음성은 다른 안내를 끊지 않는다. 말하는 중이면 기다렸다가 끝난 뒤 한 번 읽는다.
+        beltTelltaleGuidance.take(trip, beltTelltaleSignal(), foreground, audioBusy())?.let { cue ->
+            beltTelltaleAnnouncements++
+            audio.speak(cue.text)
+            beltTelltaleSpeechId = audio.snapshot.speechRequestId
         }
         val ready = trip.integrationMode == IntegrationMode.SIMULATION ||
             (!navi.busy && navi.routeState.isFresh(now, 6_000))
@@ -341,6 +360,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             navigateNext()
         }
     }
+
+    private fun audioBusy() = audio.snapshot.speechStatus in setOf(SpeechStatus.INITIALIZING, SpeechStatus.SPEAKING)
 
     fun markRouteCriteriaSeen() {
         if (routeCriteriaSeen) return

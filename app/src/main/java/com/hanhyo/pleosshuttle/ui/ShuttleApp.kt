@@ -137,6 +137,8 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
                 }
             }
             if (vm.panel != "flow") DetailTabs(vm)
+            // V-06 차량 벨트 경고등: 모든 단계·화면의 상태 줄 한 줄(주행 중에도 팝업 없이 띠만). 좌석·아이에 붙이지 않는다.
+            vm.beltTelltaleBanner?.let { Notice(it, Modifier.testTag("belt-telltale-banner"), error = true) }
             vm.storageError?.let { Notice(it, error = true) }
             vm.actionError?.let { Notice(it, error = true) }
             if (vm.panel == "flow") {

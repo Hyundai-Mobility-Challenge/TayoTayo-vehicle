@@ -2,6 +2,10 @@
     <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
     <uses-permission android:name="pleos.car.permission.CONTROL_CAR_DOORS" />
     <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <!-- V-06 벨트 경고등(Safety.registerTelltales/getTelltalesInfo) 읽기 전용 -->
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
+    <!-- Vehicle 2.3.2: registerTelltales는 PRIVATE_CAR_SAFETY를 요구(에뮬레이터 protectionLevel=normal) -->
+    <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_SAFETY" />
     <uses-permission android:name="android.car.permission.CAR_SPEED" />
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
