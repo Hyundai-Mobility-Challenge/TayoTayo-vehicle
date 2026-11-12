@@ -16,8 +16,8 @@ internal fun tripCue(trip: TripState): TripCue? {
     val name = stopLabel(stop)
     val alighting = alightingChildren(trip, trip.currentStop)
     val text = when (trip.phase) {
-        TripPhase.DRIVING -> if (trip.currentStop == null) "하차 지점 방문을 마쳤습니다. 출발지인 ${name}으로 돌아갑니다."
-            else approachSpeech(name, alighting.map(::spokenChildName))
+        TripPhase.DRIVING -> redepartureBeltPrefix(trip) + (if (trip.currentStop == null) "하차 지점 방문을 마쳤습니다. 출발지인 ${name}으로 돌아갑니다."
+            else approachSpeech(name, alighting.map(::spokenChildName)))
         TripPhase.ALIGHTING -> arrivalSpeech(name, alighting.map(::spokenChildName))
         TripPhase.END_REVIEW -> "운행을 마치기 전에 차량 실내를 직접 확인해 주세요."
         TripPhase.ENDED -> "하원 기록을 저장했습니다."
@@ -35,8 +35,19 @@ private fun stageKey(trip: TripState) = "${trip.tripId}:${trip.integrationMode}:
 internal fun alightingChildren(trip: TripState, stop: Stop?): List<ChildRecord> =
     if (stop == null) emptyList() else trip.children.filter { it.stopId == stop.id && it.status == Attendance.ONBOARD }
 
-/** 음성으로 읽는 이름. 화면 표시와 같이 "가상 " 접두어를 뗀다. */
-internal fun spokenChildName(child: ChildRecord): String = child.name.removePrefix("가상 ")
+/**
+ * V-16 재출발 벨트 안내. 정류장 기록을 마치고(또는 운행 복귀로) 다시 DRIVING이 된 첫 안내(currentStopIndex > 0)의 앞에 붙인다.
+ * 별도 안내를 만들지 않고 그 지점의 다음 목적지 안내와 한 문장으로 읽으므로 키·중복 방지·발화 조건이 그대로 같다
+ * (같은 단계 키면 다시 읽지 않음). 운행(DRIVING) 중에는 벨트 기록을 바꿀 수 없어 문구가 그 사이 바뀌지 않는다.
+ * 첫 출발(index 0)은 출발 전 요약(departureCue)이 이름을 읽으므로 붙이지 않는다. 미확인이 없으면 아무것도 붙이지 않는다.
+ */
+internal fun redepartureBeltPrefix(trip: TripState): String =
+    if (trip.phase != TripPhase.DRIVING || trip.currentStopIndex == 0) ""
+    else redepartureBeltSpeech(trip.beltUncheckedChildren.map(::spokenChildName))?.let { "$it " } ?: ""
+
+/** 예: "출발 전 벨트 확인: 어린이 다, 어린이 라 벨트 미확인." 미확인이 없으면 null(덧붙이지 않음). */
+internal fun redepartureBeltSpeech(names: List<String>): String? =
+    if (names.isEmpty()) null else "출발 전 벨트 확인: ${spokenNameList(names)} 벨트 미확인."
 
 /** 다음 지점 접근 안내. 예: "다음은 서울숲, 어린이 가, 어린이 나 하차." */
 internal fun approachSpeech(stopName: String, names: List<String>): String =

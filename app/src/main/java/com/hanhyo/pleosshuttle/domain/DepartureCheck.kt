@@ -16,6 +16,8 @@ data class DepartureSummary(
     /** 방문 순서대로 정류장 이름(내릴 아이가 없는 정류장도 순서에 남는다). */
     val stopNames: List<String>,
     val driverChecked: Boolean,
+    /** V-16: 벨트 미확인 아이의 음성용 이름(명단 순서). 이름은 차량 안 음성·화면에만 쓰고 키·원장·서버에는 넣지 않는다. */
+    val beltUncheckedNames: List<String> = emptyList(),
 ) {
     val firstStopName: String? get() = stopNames.firstOrNull()
 }
@@ -40,7 +42,23 @@ fun departureSummary(trip: TripState, order: List<String> = departureRouteOrder(
     undecided = trip.undecidedChildren.size,
     stopNames = order.mapNotNull { id -> trip.stops.find { it.id == id }?.let(::stopLabel) },
     driverChecked = trip.driverCheckedAtMillis != null,
+    beltUncheckedNames = trip.beltUncheckedChildren.map(::spokenChildName),
 )
+
+/** 음성으로 읽는 이름. 화면 표시와 같이 "가상 " 접두어를 뗀다(V-15·V-16 공통). */
+fun spokenChildName(child: ChildRecord): String = child.name.removePrefix("가상 ")
+
+/** V-16 음성 이름 목록 상한. 이보다 많으면 앞 [SPOKEN_NAMES_WHEN_TRUNCATED]명만 읽고 "외 n명"으로 줄인다. */
+const val MAX_SPOKEN_NAMES = 4
+const val SPOKEN_NAMES_WHEN_TRUNCATED = 3
+
+/**
+ * V-16 이름 나열. 4명까지는 모두 읽고, 5명 이상이면 앞 3명 + "외 n명"(한 문장이 4명 분량을 넘지 않게).
+ * 예: "어린이 다, 어린이 라" / "어린이 가, 어린이 나, 어린이 다 외 3명".
+ */
+fun spokenNameList(names: List<String>): String =
+    if (names.size <= MAX_SPOKEN_NAMES) names.joinToString(", ")
+    else "${names.take(SPOKEN_NAMES_WHEN_TRUNCATED).joinToString(", ")} 외 ${names.size - SPOKEN_NAMES_WHEN_TRUNCATED}명"
 
 /** V-08 음성 요약(V-15·V-16과 같은 존댓말 짧은 문장). 기사님이 듣고 말로 답하면 선생님이 체크한다(D37). */
 fun departureSpeech(summary: DepartureSummary): String = buildString {
@@ -49,7 +67,12 @@ fun departureSpeech(summary: DepartureSummary): String = buildString {
     summary.firstStopName?.let { append(", 첫 정류장 $it") }
     if (summary.stopNames.isNotEmpty()) append(", 경로 ${summary.stopNames.joinToString(", ")}")
     append(". ")
-    append(if (summary.beltUnchecked > 0) "벨트 미확인 ${summary.beltUnchecked}명. " else "벨트는 모두 확인했습니다. ")
+    append(when {
+        summary.beltUnchecked <= 0 -> "벨트는 모두 확인했습니다. "
+        // V-16: 출발 시 미확인 아이 이름 안내(인원 수 + 이름). 이름이 없으면(이전 호출 형식) 수만 읽는다.
+        summary.beltUncheckedNames.isEmpty() -> "벨트 미확인 ${summary.beltUnchecked}명. "
+        else -> "벨트 미확인 ${summary.beltUnchecked}명, ${spokenNameList(summary.beltUncheckedNames)}. "
+    })
     if (summary.undecided > 0) append("아직 결정 안 된 어린이 ${summary.undecided}명. ")
     append("기사님, 확인해 주세요.")
 }

@@ -47,6 +47,8 @@ class AutomaticTripGuidanceTest {
     private fun at(stopId: String, t: TripState = trip) = t.copy(currentStopIndex = t.routeOrder.indexOf(stopId))
     private val allOnboard = withStatus(trip, "child-a" to Attendance.ONBOARD, "child-b" to Attendance.ONBOARD,
         "child-c" to Attendance.ONBOARD, "child-d" to Attendance.ONBOARD)
+        // V-15 문구만 보려고 벨트는 모두 확인(재출발 벨트 안내 V-16은 BeltVoiceTest).
+        .let { t -> t.copy(children = t.children.map { it.copy(beltConfirmed = true) }) }
 
     @Test fun `문구 빌더는 이름을 쉼표로 잇고 없으면 없다고 말한다`() {
         assertEquals("다음은 서울숲, 어린이 가, 어린이 나 하차.", approachSpeech("서울숲", listOf("어린이 가", "어린이 나")))
