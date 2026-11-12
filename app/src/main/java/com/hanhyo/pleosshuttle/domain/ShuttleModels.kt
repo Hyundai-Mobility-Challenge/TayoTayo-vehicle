@@ -112,7 +112,18 @@ data class ChildRecord(
      * 이전 저장 파일을 복원하면 JVM 기본값 null = 동승 유지 아님(UID 고정, 필드 추가는 직렬화 호환).
      */
     val stayOnboardReason: String? = null,
+    /**
+     * V-27 등원 정류장 인계받음: 아이를 넘겨준 사람 유형 코드([PickupReceivers]). null = 아직 인계받지 않음.
+     * 이름은 받지도 저장하지도 않는다(7절). 이전 저장 파일은 JVM 기본값 null(UID 고정, 필드 추가는 직렬화 호환).
+     */
+    val receivedFromType: String? = null,
+    /** V-28 [보호자에게 도착 알림]을 보낸 시각. null = 호출 없음. 재호출·대기 한도는 없다(D30). 이전 저장 파일은 null. */
+    val guardianCalledAtMillis: Long? = null,
 ) : Serializable {
+    /** V-27: 등원 정류장에서 인계받음을 기록했는지. 등원 탑승은 이 값이 true일 때만 기록한다. */
+    val receivedAtStop: Boolean get() = receivedFromType != null
+    /** V-28: 보호자 호출(도착 알림)을 보냈는지. */
+    val guardianCalled: Boolean get() = guardianCalledAtMillis != null
     /** V-21: 보호자 미도착으로 동승 유지 중(또는 동승 유지 뒤 기관 인계로 하차한) 아이. */
     val staysOnboard: Boolean get() = stayOnboardReason != null
     /** 정류장에서 인계·하차 기록을 기다리는 아이: 탑승 중이고 동승 유지가 아님. 정류장 완료·하차 안내 기준. */
@@ -162,6 +173,53 @@ object StayOnboardReasons {
     }
 }
 
+/**
+ * V-25 운행 방향. 서버 trips.direction 값(TripController.direction: PICK_UP / DROP_OFF)을 그대로 쓴다.
+ * [TripState.direction]이 null(이전 저장 파일)이면 하원(DROP_OFF)으로 읽는다.
+ */
+object TripDirections {
+    const val PICK_UP = "PICK_UP"
+    const val DROP_OFF = "DROP_OFF"
+    /** 알 수 없는 값·null은 하원(기존 동작 유지). */
+    fun of(raw: String?): String = if (raw?.trim()?.uppercase() == PICK_UP) PICK_UP else DROP_OFF
+    fun label(raw: String?): String = if (of(raw) == PICK_UP) "등원" else "하원"
+    /** D25·OQ-26 제안안: 방향 기본값은 시간대. 정오 전이면 등원, 그 뒤면 하원. 선생님이 바꿀 수 있는 기본값일 뿐이다. */
+    fun defaultFor(hourOfDay: Int): String = if (hourOfDay in 0 until 12) PICK_UP else DROP_OFF
+}
+
+/**
+ * V-27 등원 정류장에서 아이를 넘겨준 사람 유형(고정 선택지). 이름은 받지 않는다(7절 개인정보 최소화).
+ * 대리(관계)의 관계 선택지는 flow.md 확정 전이라 유형 코드만 둔다.
+ */
+object PickupReceivers {
+    const val GUARDIAN = "GUARDIAN"
+    const val PROXY = "PROXY"
+    const val OTHER = "OTHER"
+    val ALL = listOf(GUARDIAN, PROXY, OTHER)
+    fun label(code: String?): String = when (code) {
+        GUARDIAN -> "보호자"
+        PROXY -> "대리"
+        else -> "기타"
+    }
+}
+
+/**
+ * 등원 원장 기록 종류([LedgerEntry.pickupAction]). 하원 기록은 모두 null이다.
+ * - RECEIVED: 정류장 인계받음(before·after 둘 다 NOT_BOARDED, 출결 상태는 그대로).
+ * - BOARDED: 인계받음 뒤 탑승(NOT_BOARDED/CONFIRMED_NOT_BOARDED → ONBOARD).
+ * - GUARDIAN_CALLED: 보호자에게 도착 알림(before·after 둘 다 NOT_BOARDED).
+ * - NOT_BOARDED_NOTIFY / NOT_BOARDED_SILENT: 정류장 미탑승 확인(보호자 미탑승 안내 선택 / 선택 안 함).
+ * - INSTITUTION_HANDOVER: 기관 담당자 인계 확인 후 하차 기록(ONBOARD → ALIGHTED).
+ */
+object PickupActions {
+    const val RECEIVED = "RECEIVED"
+    const val BOARDED = "BOARDED"
+    const val GUARDIAN_CALLED = "GUARDIAN_CALLED"
+    const val NOT_BOARDED_NOTIFY = "NOT_BOARDED_NOTIFY"
+    const val NOT_BOARDED_SILENT = "NOT_BOARDED_SILENT"
+    const val INSTITUTION_HANDOVER = "INSTITUTION_HANDOVER"
+}
+
 /** V-02 "오늘 미탑승 예정" 배지 문구. 탑승 예정인 아이는 null(배지 없음). 명단에서 빼지 않고 표시만 한다. */
 fun notBoardingBadge(child: ChildRecord): String? =
     if (child.expectedToBoard) null
@@ -209,7 +267,13 @@ data class LedgerEntry(
     val stopExcluded: Boolean? = null,
     /** [stopExcluded] 기록의 정류장 id. 그 밖의 기록은 null. */
     val stopId: String? = null,
+    /** 등원 기록 종류([PickupActions]). null = 하원·공통 기록(이전 저장 파일도 null). */
+    val pickupAction: String? = null,
+    /** 등원 인계받음·탑승 기록의 넘겨준 사람 유형([PickupReceivers]). 이름은 넣지 않는다. 그 밖은 null. */
+    val receivedFromType: String? = null,
 ) : Serializable {
+    /** 등원(V-26~V-29) 기록이면 true. */
+    val isPickupRecord: Boolean get() = pickupAction != null
     /** V-09 정류장 제외·다시 넣기 기록이면 true. 서버 출결 이벤트 전송에서 제외한다. */
     val isStopExclusionRecord: Boolean get() = stopExcluded != null
     /** V-05 벨트 기록이면 true. 서버 전송(InstitutionConnection)에서 제외한다. */
@@ -357,7 +421,15 @@ data class TripState(
      * 이전 저장 파일을 복원하면 JVM 기본값 null(= 뺀 정류장 없음)이 되므로 nullable로 두고 [excludedStops]로 읽는다.
      */
     val excludedStopIds: List<String>? = null,
+    /**
+     * V-25 운행 방향(Run.direction, [TripDirections]). null = 하원(이전 저장 파일은 JVM 기본값 null → DROP_OFF로 읽음).
+     */
+    val direction: String? = null,
 ) : Serializable {
+    /** null 안전 방향. 이전 저장 파일·알 수 없는 값은 DROP_OFF. */
+    val tripDirection: String get() = TripDirections.of(direction)
+    /** 등원 운행인지. */
+    val isPickup: Boolean get() = tripDirection == TripDirections.PICK_UP
     /** 뺀 정류장 id(null 안전). */
     val excludedStops: List<String> get() = excludedStopIds.orEmpty()
     val currentStop: Stop? get() = routeOrder.getOrNull(currentStopIndex)?.let { id -> stops.find { it.id == id } }

@@ -168,6 +168,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
 
     fun board(childId: String, now: Long): Boolean {
+        // V-27 등원: 탑승은 정류장 도착·정차 확인 뒤, 인계받음을 기록한 아이만(출발 전 탑승 기록 없음).
+        if (state.isPickup) return boardAtPickupStop(childId, now)
         if (state.phase != TripPhase.PREPARING) return reject("탑승 기록은 운행 준비에서 입력합니다.")
         if (state.noTripToday) return reject(NO_TRIP_TODAY)
         if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
@@ -186,6 +188,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
         if (child.status == Attendance.CONFIRMED_NOT_BOARDED) return reject("이미 미탑승 확인한 어린이입니다.")
         if (child.status != Attendance.NOT_BOARDED) return reject("탑승 또는 하차 기록이 있습니다. 정정 기능을 이용하세요.")
+        // V-26: 등원은 미탑승 예정(결석·직접 등원 알림) 아이만 출발 전에 확정한다. 알림이 없는 아이는 정류장에서(V-28).
+        if (state.isPickup && child.expectedToBoard) return reject("미탑승 예정 알림이 없는 어린이는 정류장에서 미탑승 확인합니다.")
         val reason = if (child.expectedToBoard) "선생님 미탑승 확인"
             else "선생님 미탑승 확인 · 오늘 미탑승 예정(${notBoardingReasonLabel(child.notBoardingReason) ?: "사유 없음"})"
         return changeAttendance(child, Attendance.CONFIRMED_NOT_BOARDED, reason, now)
@@ -198,8 +202,10 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (child.status != Attendance.CONFIRMED_NOT_BOARDED) return reject("미탑승 확인 기록이 없습니다.")
         return changeAttendance(child, Attendance.NOT_BOARDED, "미탑승 확인 취소", now)
     }
-    private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long, stayOnboard: Boolean? = null): Boolean {
-        val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason, stayOnboard = stayOnboard)
+    private fun changeAttendance(child: ChildRecord, target: Attendance, reason: String, now: Long, stayOnboard: Boolean? = null,
+                                 pickupAction: String? = null, receivedFromType: String? = null): Boolean {
+        val event = LedgerEntry(id("ledger", now), child.id, child.status, target, now, reason, stayOnboard = stayOnboard,
+            pickupAction = pickupAction, receivedFromType = receivedFromType)
         val before = state
         update(state.copy(
             // 새로 탑승(정정 포함)한 아이의 벨트는 항상 "미확인"에서 시작한다(V-05). 하차 등 다른 변경은 벨트 값을 건드리지 않는다.
@@ -301,6 +307,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (child.status == target) return reject("현재 기록과 같은 상태입니다.")
         if (target == Attendance.CONFIRMED_NOT_BOARDED) return reject("미탑승 확인은 탑승 단계의 [미탑승 확인]으로 기록합니다.")
         if (target == Attendance.ALIGHTED && (child.status != Attendance.ONBOARD || child.id !in state.handoverChildIds)) return reject("탑승 기록과 선생님의 보호자 대면 인계 확인이 필요합니다.")
+        // V-27 등원: 정정으로도 인계받음 없이 탑승을 만들지 않는다.
+        if (state.isPickup && target == Attendance.ONBOARD && !child.receivedAtStop) return reject("등원 탑승은 인계받음을 먼저 기록해야 합니다.")
         return changeAttendance(child, target, "정정: $reason", now)
     }
     /**
@@ -311,7 +319,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (state.phase != TripPhase.PREPARING) return reject("기사 확인은 출발 전에 기록합니다.")
         if (state.noTripToday) return reject(NO_TRIP_TODAY)
         if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
-        if (checked && state.onboardChildren.isEmpty()) return reject("탑승 기록이 있어야 기사 확인을 기록할 수 있습니다.")
+        // 등원은 출발 때 탄 아이가 없다(정류장에서 태움). 탈 아이 0명은 위 noTripToday로 막는다.
+        if (checked && !state.isPickup && state.onboardChildren.isEmpty()) return reject("탑승 기록이 있어야 기사 확인을 기록할 수 있습니다.")
         if ((state.driverCheckedAtMillis != null) == checked) return reject(if (checked) "이미 기사 확인을 기록했습니다." else "기사 확인 기록이 없습니다.")
         return update(state.copy(
             driverCheckedAtMillis = if (checked) now else null,
@@ -324,7 +333,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (state.phase != TripPhase.PREPARING) return reject("운행 준비 단계가 아닙니다.")
         if (state.noTripToday) return reject(NO_TRIP_TODAY)
         if (stationaryBlockers(now).isNotEmpty()) return reject("출발 전 정차 상태를 확인하세요.")
-        if (state.onboardChildren.isEmpty()) return reject("선생님이 탑승 기록을 먼저 입력하세요.")
+        // 등원(V-25)은 정류장에서 태우므로 출발 때 탑승 기록이 없어도 된다. 탈 아이 0명은 위 noTripToday로 막는다.
+        if (!state.isPickup && state.onboardChildren.isEmpty()) return reject("선생님이 탑승 기록을 먼저 입력하세요.")
         // V-08: 기사 확인이 없어도 출발은 막지 않는다. 대신 운행 기록에 "기사 확인 없음"을 남긴다(D15).
         val missingDriverCheck = state.driverCheckedAtMillis == null
         invalidate(now, "운행 시작")
@@ -338,7 +348,13 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         val blockers = stationaryBlockers(now)
         if (blockers.isNotEmpty()) return reject(blockers.joinToString(" · "))
         invalidate(now, "도착·정차 확인")
-        return update(state.copy(phase = TripPhase.ALIGHTING, unlockAttempt = null, handoverChildIds = emptySet()), "도착·정차 확인. 선생님이 보호자 인계와 하차를 기록합니다.")
+        return update(state.copy(phase = TripPhase.ALIGHTING, unlockAttempt = null, handoverChildIds = emptySet()),
+            if (state.isPickup) "도착·정차 확인. 선생님이 인계받음과 탑승을 기록합니다." else "도착·정차 확인. 선생님이 보호자 인계와 하차를 기록합니다.")
+    }
+    /** V-27 등원 정류장 [도착·정차 확인]. 하원 [도착·정차 확인]([chooseAlighting])과 같은 조건(운행 중 · 정차 확인)이다. */
+    fun arriveAtPickupStop(now: Long): Boolean {
+        if (!state.isPickup) return reject("등원 운행이 아닙니다.")
+        return chooseAlighting(now)
     }
     fun confirmSurroundings(now: Long): Boolean {
         if (state.phase != TripPhase.ALIGHTING) return reject("하차 화면에서 직접 확인합니다.")
@@ -393,6 +409,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         return update(state.copy(unlockConfirmation = null, manualDoorReason = reason, manualDoorAtMillis = now), "수동 대안을 기록했습니다. SDK 요청과 해제 완료 관측은 생성하지 않았습니다.")
     }
     fun confirmHandover(childId: String, now: Long): Boolean {
+        if (state.isPickup) return reject(PICKUP_NO_STOP_ALIGHTING)
         if (state.phase != TripPhase.ALIGHTING && state.phase != TripPhase.END_REVIEW) return reject("하차 또는 종료 확인 화면에서 인계를 기록합니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (surroundings.kind == SurroundingKind.WARNING) return reject("주변 위험 경고를 먼저 확인하세요.")
@@ -404,6 +421,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         return update(state.copy(handoverChildIds = state.handoverChildIds + childId), "선생님 보호자 대면 인계 확인을 기록했습니다.")
     }
     fun alight(childId: String, now: Long): Boolean {
+        if (state.isPickup) return reject(PICKUP_NO_STOP_ALIGHTING)
         if (state.phase != TripPhase.ALIGHTING) return reject("도착·정차 확인 후 하차를 기록합니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (surroundings.kind == SurroundingKind.WARNING) return reject("주변 위험 경고를 먼저 확인하세요.")
@@ -430,6 +448,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
      * 원장에 출결 기록(stayOnboard=true)을 남겨 서버에 GUARDIAN_NO_SHOW로 보낸다(D35 기관 쪽 자동 기록). 모의 모드는 기기 기록만.
      */
     fun markStayOnboard(childId: String, reasonCode: String, now: Long): Boolean {
+        // 등원 기관 담당자 부재 시 처리(OQ-29·D32)는 미확정이라 등원에서는 동승 유지를 기록하지 않는다.
+        if (state.isPickup) return reject(PICKUP_NO_STAY_ONBOARD)
         if (state.phase != TripPhase.ALIGHTING) return reject("동승 유지는 정류장 도착·정차 확인 뒤 인계 단계에서 기록합니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
         if (reasonCode !in StayOnboardReasons.ALL) return reject("동승 유지 사유를 선택해 주세요.")
@@ -447,6 +467,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
     /** V-21 동승 유지 취소. 같은 정류장(하차 단계)·정차 중에만. 아이는 다시 인계 확인 단계로 돌아간다. */
     fun undoStayOnboard(childId: String, now: Long): Boolean {
+        if (state.isPickup) return reject(PICKUP_NO_STAY_ONBOARD)
         if (state.phase != TripPhase.ALIGHTING) return reject("동승 유지 취소는 그 정류장에 정차 중일 때만 할 수 있습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
         val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
@@ -463,6 +484,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
      * 서버에는 CHILD_RETURNED_TO_ORG(기관 복귀)로 보낸다(보호자 하차 알림 CHILD_DROPPED_OFF가 아님).
      */
     fun returnStayOnboardToOrg(childId: String, now: Long): Boolean {
+        if (state.isPickup) return reject(PICKUP_NO_STAY_ONBOARD)
         if (state.phase != TripPhase.END_REVIEW) return reject("기관 인계는 복귀 후 종료 확인 단계에서 기록합니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
         val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
@@ -471,15 +493,21 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
     fun completeCurrentStop(now: Long): Boolean {
         if (state.phase != TripPhase.ALIGHTING || state.currentStop == null) return reject("현재 하차 지점이 없습니다.")
-        // V-21: 동승 유지 아이는 처리된 것으로 본다(내리지 않고 계속 타고 감).
-        if (state.currentStopChildren.any { it.awaitingAlighting }) return reject("현재 지점의 인계·하차 기록이 남아 있습니다.")
+        if (state.isPickup) {
+            // V-27: 등원 정류장은 그 정류장 아이가 모두 탑승 또는 미탑승 확인이어야 [다음 정류장으로].
+            if (state.currentStopChildren.any { it.status == Attendance.NOT_BOARDED }) return reject(PICKUP_STOP_PENDING)
+        } else if (state.currentStopChildren.any { it.awaitingAlighting }) {
+            // V-21: 동승 유지 아이는 처리된 것으로 본다(내리지 않고 계속 타고 감).
+            return reject("현재 지점의 인계·하차 기록이 남아 있습니다.")
+        }
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (surroundings.kind == SurroundingKind.WARNING) return reject("주변 위험 경고를 먼저 확인하세요.")
         if (state.unlockAttempt?.let { it.completedAtMillis == null } == true) return reject("별도 문 시험의 응답을 기다리고 있습니다.")
         diagnostic(DiagnosticEntry(now, "지점 기록 완료", ResultStatus.TARGET_OBSERVED,
             "현재 지점의 인계·하차 기록 완료로 다음 목적지 표시. 차량 출발 승인 또는 문·주변 안전 확인이 아님. 주변=${surroundings.kind}, 문시험=${state.unlockAttempt?.status}"))
         invalidate(now, "지점 기록 완료 후 다음 목적지 표시")
-        return update(state.copy(phase = TripPhase.DRIVING, currentStopIndex = state.currentStopIndex + 1, handoverChildIds = emptySet()), "하차 기록 완료 · 다음 지점을 안내합니다.")
+        return update(state.copy(phase = TripPhase.DRIVING, currentStopIndex = state.currentStopIndex + 1, handoverChildIds = emptySet()),
+            if (state.isPickup) "정류장 탑승 기록 완료 · 다음 지점을 안내합니다." else "하차 기록 완료 · 다음 지점을 안내합니다.")
     }
     fun startOperationalTrip(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("이미 운행을 시작했습니다.")
@@ -495,7 +523,10 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
 
     fun resumeWarnings(now: Long): List<String> = buildList {
-        if (state.currentStopChildren.any { it.awaitingAlighting }) add("현재 지점에 미하차 기록이 남아 있음")
+        if (state.isPickup) {
+            // V-28: 처리 안 된 아이가 남은 채 떠나면 다음 정차 화면에서 선생님이 미탑승 확인한다(자동 처리 없음).
+            if (state.currentStopChildren.any { it.status == Attendance.NOT_BOARDED }) add("현재 정류장에 탑승·미탑승 확인이 안 된 어린이가 있음")
+        } else if (state.currentStopChildren.any { it.awaitingAlighting }) add("현재 지점에 미하차 기록이 남아 있음")
         addAll(doorStationaryBlockers(now))
         if (surroundings.kind != SurroundingKind.DIRECT_CHECK_REQUIRED || surroundings.observedAtMillis == null || now - surroundings.observedAtMillis!! > MANUAL_CHECK_TTL) add("주변 정보 미확인 또는 오래됨")
         if (state.unlockAttempt?.status != ResultStatus.TARGET_OBSERVED) add("문 해제 목표 상태 관측 미확인")
@@ -513,6 +544,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         return update(state.copy(phase = TripPhase.DRIVING, currentStopIndex = state.currentStopIndex + 1, handoverChildIds = emptySet()), "운행 화면으로 복귀. 미하차 기록은 유지되며 실제 차량 출발을 제어하지 않습니다.")
     }
     fun beginEndReview(now: Long): Boolean {
+        // V-29: 등원의 종료 확인 단계는 [기관 도착 확인]으로만 들어간다.
+        if (state.isPickup) return arriveAtInstitution(now)
         if (state.phase == TripPhase.PREPARING || state.phase == TripPhase.ENDED) return reject("운행 중인 기록의 종료를 확인합니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (state.unlockAttempt != null && state.unlockAttempt?.completedAtMillis == null) return reject("문 요청 결과를 먼저 확인하세요.")
@@ -527,6 +560,8 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     fun finishTrip(now: Long): Boolean {
         if (state.phase != TripPhase.END_REVIEW) return reject("종료 확인 단계가 아닙니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("종료 기록 전 정차 상태를 다시 확인하세요.")
+        // V-29·S-19: 등원은 모든 아이가 기관 인계(하차 기록) 또는 미탑승 확인이어야 종료한다.
+        if (state.isPickup && state.undecidedChildren.isNotEmpty()) return reject("탑승도 미탑승 확인도 없는 어린이가 있습니다. 미탑승 확인해 주세요.")
         if (state.onboardChildren.isNotEmpty()) return reject("기록상 미하차 어린이가 남아 있습니다. 기록을 확인·정정하세요.")
         val inspected = state.directCabinCheckAtMillis ?: return reject("선생님의 직접 실내 확인이 필요합니다.")
         if (now < inspected || now - inspected > INSPECTION_TTL) return reject("직접 실내 확인이 오래되어 다시 확인해야 합니다.")
@@ -535,6 +570,135 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
             vehicleConnected = vehicle.connected, sensorCoverageKnown = false, observedVehicle = vehicle)
         return update(state.copy(phase = TripPhase.ENDED, endRecord = record), "운행 종료 기록 저장. 선생님 직접 실내 확인을 남기며 안전을 자동 판정하지 않습니다.")
     }
+
+    // ---------------- 등원(V-25~V-29). 하원 흐름은 위 함수들 그대로이며, 아래는 state.isPickup일 때만 동작한다. ----------------
+
+    /** 등원 정류장 기록 공통 조건: 등원 · 정류장 도착·정차 확인(ALIGHTING) · 정차 확인(V-11) · 현재 정류장 아이. */
+    private fun pickupStopChild(childId: String, now: Long, what: String): ChildRecord? {
+        if (!state.isPickup) { reject("$what 등원 운행에서 기록합니다."); return null }
+        if (state.phase != TripPhase.ALIGHTING) { reject("$what 정류장 도착·정차 확인 뒤 기록합니다."); return null }
+        val blockers = stationaryBlockers(now)
+        if (blockers.isNotEmpty()) { reject(blockers.joinToString(" · ")); return null }
+        val child = state.children.find { it.id == childId }
+        if (child == null) { reject("명단에 없는 어린이입니다."); return null }
+        if (child.stopId != state.currentStop?.id) { reject("현재 정류장의 어린이가 아닙니다."); return null }
+        return child
+    }
+
+    private fun receivedEntry(child: ChildRecord, receiverType: String, now: Long, reason: String) =
+        LedgerEntry(id("pickup", now), child.id, child.status, child.status, now, reason,
+            pickupAction = PickupActions.RECEIVED, receivedFromType = receiverType)
+
+    /**
+     * V-27 [인계받음]: 정류장에서 아이를 넘겨준 사람 유형(보호자 / 대리 / 기타)을 기록한다. 이름은 받지 않는다(7절).
+     * 출결 상태는 탑승 전 그대로이고, 이 기록 뒤에만 [탑승]([board])을 기록할 수 있다.
+     */
+    fun recordReceived(childId: String, receiverType: String, now: Long): Boolean {
+        val child = pickupStopChild(childId, now, "인계받음은") ?: return false
+        if (receiverType !in PickupReceivers.ALL) return reject("아이를 넘겨준 사람 유형을 선택해 주세요.")
+        if (child.status != Attendance.NOT_BOARDED) return reject("탑승 전인 어린이만 인계받음을 기록합니다. 미탑승 확인한 어린이는 탑승으로 정정하세요.")
+        if (child.receivedAtStop) return reject("이미 인계받음을 기록했습니다.")
+        val label = PickupReceivers.label(receiverType)
+        return update(state.copy(
+            children = state.children.map { if (it.id == child.id) it.copy(receivedFromType = receiverType) else it },
+            ledger = state.ledger + receivedEntry(child, receiverType, now, "정류장 인계받음 · $label"),
+        ), "${child.name}: 인계받음($label) 저장 · 탑승을 기록해 주세요.")
+    }
+
+    /** V-27 [탑승]: 인계받음 뒤에만. 벨트는 미확인에서 시작한다(V-05). */
+    private fun boardAtPickupStop(childId: String, now: Long): Boolean {
+        val child = pickupStopChild(childId, now, "등원 탑승은") ?: return false
+        if (child.status != Attendance.NOT_BOARDED) return reject("이미 탑승 또는 미탑승 확인 기록이 있습니다. 정정 기능을 이용하세요.")
+        if (!child.receivedAtStop) return reject("인계받음을 먼저 기록해야 탑승을 기록할 수 있습니다.")
+        return changeAttendance(child, Attendance.ONBOARD, "등원 정류장 인계받음 뒤 선생님 탑승 기록", now,
+            pickupAction = PickupActions.BOARDED, receivedFromType = child.receivedFromType)
+    }
+
+    /**
+     * V-28 [보호자에게 도착 알림]: 호출 시각만 기록한다(서버 guardian-calls로 전송). 재호출·대기 한도는 없다(D30).
+     * 보호자 응답("오늘 안 타요" 포함)은 미탑승을 확정하지 않는다(7절).
+     */
+    fun callGuardian(childId: String, now: Long): Boolean {
+        val child = pickupStopChild(childId, now, "보호자 도착 알림은") ?: return false
+        if (child.status != Attendance.NOT_BOARDED) return reject("탑승 전인 어린이만 보호자에게 도착 알림을 보냅니다.")
+        if (child.receivedAtStop) return reject("이미 인계받은 어린이입니다. 탑승을 기록해 주세요.")
+        if (child.guardianCalled) return reject("이미 도착 알림을 보냈습니다(재호출 없음).")
+        val event = LedgerEntry(id("call", now), child.id, child.status, child.status, now, "보호자에게 도착 알림",
+            pickupAction = PickupActions.GUARDIAN_CALLED)
+        return update(state.copy(
+            children = state.children.map { if (it.id == child.id) it.copy(guardianCalledAtMillis = now) else it },
+            ledger = state.ledger + event,
+        ), "${child.name}: 보호자에게 도착 알림을 보냈습니다.")
+    }
+
+    /**
+     * V-28 정류장 [미탑승 확인]. [notifyGuardian]이면 보호자 미탑승 안내 전송을 함께 선택한 것(D30). 기관 웹에는 자동 기록(D31).
+     * 정류장 도착·정차 확인 중(그 정류장 또는 이미 지난 정류장 아이 — 처리 안 된 채 떠난 아이는 다음 정차에서 확인)과
+     * 기관 도착 확인 뒤(종료 확인 단계)에만, 정차 확인(V-11) 중에만. 호출하지 않았어도 막지 않는다(경고는 [shouldSuggestGuardianCall]).
+     */
+    fun confirmNotBoardedAtStop(childId: String, notifyGuardian: Boolean, now: Long): Boolean {
+        if (!state.isPickup) return reject("정류장 미탑승 확인은 등원 운행에서 기록합니다.")
+        if (state.phase != TripPhase.ALIGHTING && state.phase != TripPhase.END_REVIEW) return reject("정류장 미탑승 확인은 정차 확인 뒤 기록합니다.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (state.phase == TripPhase.ALIGHTING && state.routeOrder.indexOf(child.stopId) > state.currentStopIndex)
+            return reject("아직 도착하지 않은 정류장의 어린이입니다.")
+        if (child.status == Attendance.CONFIRMED_NOT_BOARDED) return reject("이미 미탑승 확인한 어린이입니다.")
+        if (child.status != Attendance.NOT_BOARDED) return reject("탑승 또는 하차 기록이 있습니다. 정정 기능을 이용하세요.")
+        if (child.receivedAtStop) return reject("인계받은 어린이입니다. 탑승을 기록해 주세요.")
+        val reason = buildString {
+            append("등원 정류장 미탑승 확인")
+            if (!child.guardianCalled) append(" · 도착 알림 없이")
+            append(if (notifyGuardian) " · 보호자 미탑승 안내 보냄" else " · 보호자 미탑승 안내 안 보냄")
+        }
+        return changeAttendance(child, Attendance.CONFIRMED_NOT_BOARDED, reason, now,
+            pickupAction = if (notifyGuardian) PickupActions.NOT_BOARDED_NOTIFY else PickupActions.NOT_BOARDED_SILENT)
+    }
+
+    /**
+     * V-28 [탑승으로 정정]: 정류장 미탑승 확인 뒤 그 정류장을 떠나기 전에 아이가 나오면, 넘겨준 사람 유형과 함께
+     * 인계받음 → 탑승 순서로 기록한다(3.5절 정정 규칙).
+     */
+    fun correctNotBoardedToBoarded(childId: String, receiverType: String, now: Long): Boolean {
+        val child = pickupStopChild(childId, now, "탑승으로 정정은") ?: return false
+        if (receiverType !in PickupReceivers.ALL) return reject("아이를 넘겨준 사람 유형을 선택해 주세요.")
+        if (child.status != Attendance.CONFIRMED_NOT_BOARDED) return reject("미탑승 확인한 어린이만 탑승으로 정정합니다.")
+        val label = PickupReceivers.label(receiverType)
+        state = state.copy(
+            children = state.children.map { if (it.id == child.id) it.copy(receivedFromType = receiverType) else it },
+            ledger = state.ledger + receivedEntry(child, receiverType, now, "정정: 정류장 인계받음 · $label"),
+        )
+        val received = state.children.first { it.id == child.id }
+        return changeAttendance(received, Attendance.ONBOARD, "정정: 미탑승 확인 뒤 정류장에서 탑승", now,
+            pickupAction = PickupActions.BOARDED, receivedFromType = receiverType)
+    }
+
+    /**
+     * V-29 [기관 도착 확인]: 정류장 기록을 모두 마치고(남은 정류장 없음) 기관 앞에 정차했을 때. 종료 확인 단계(V-22)로 들어간다.
+     * 처리 안 된 아이가 남아 있어도 막지 않는다(이 화면에서 미탑승 확인, 종료는 [finishTrip]이 막음).
+     */
+    fun arriveAtInstitution(now: Long): Boolean {
+        if (!state.isPickup) return reject("기관 도착 확인은 등원 운행에서 기록합니다.")
+        if (state.phase != TripPhase.DRIVING) return reject("정류장 기록을 마치고 기관으로 출발한 뒤 기관 도착을 확인합니다.")
+        if (state.currentStop != null) return reject("남은 정류장이 있습니다. 정류장 기록을 먼저 마치세요.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        if (state.unlockAttempt != null && state.unlockAttempt?.completedAtMillis == null) return reject("문 요청 결과를 먼저 확인하세요.")
+        invalidate(now, "기관 도착 확인")
+        return update(state.copy(phase = TripPhase.END_REVIEW, directCabinCheckAtMillis = null),
+            "기관 도착 확인. 아이마다 기관 담당자 인계를 확인하고 하차를 기록하세요.")
+    }
+
+    /** V-29 아이별 기관 담당자 [인계 확인] → [하차 기록](D38 아이마다 따로). 기관 도착 확인 뒤 · 정차 중에만. */
+    fun handoverToInstitution(childId: String, now: Long): Boolean {
+        if (!state.isPickup) return reject("기관 인계는 등원 운행에서 기록합니다.")
+        if (state.phase != TripPhase.END_REVIEW) return reject("기관 도착 확인 뒤 기관 인계를 기록합니다.")
+        if (stationaryBlockers(now).isNotEmpty()) return reject(stationaryBlockers(now).joinToString(" · "))
+        val child = state.children.find { it.id == childId } ?: return reject("명단에 없는 어린이입니다.")
+        if (child.status != Attendance.ONBOARD) return reject("탑승 중인 어린이만 기관 인계로 하차 기록합니다.")
+        return changeAttendance(child, Attendance.ALIGHTED, "기관 담당자 인계 확인 후 하차 기록", now,
+            pickupAction = PickupActions.INSTITUTION_HANDOVER)
+    }
+
     fun previewRoute(proposal: RouteProposal): Boolean {
         if (state.phase != TripPhase.PREPARING || proposal.routeVersion != state.routeVersion) return reject("현재 운행 준비에 맞는 경로 계산이 아닙니다.")
         if (!validOrder(proposal.stopOrder)) return reject("승인된 지점 전체만 재정렬할 수 있습니다.")
@@ -618,6 +782,9 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         const val INSPECTION_TTL = 60_000L
         /** D34: 탈 아이 0명이면 운행하지 않음. */
         const val NO_TRIP_TODAY = "오늘 탈 어린이가 없어 운행하지 않습니다."
+        const val PICKUP_NO_STOP_ALIGHTING = "등원에서는 정류장 하차가 없습니다. 기관 도착 확인 뒤 기관 인계로 기록하세요."
+        const val PICKUP_NO_STAY_ONBOARD = "등원의 기관 담당자 부재 처리는 아직 정해지지 않았습니다(OQ-29)."
+        const val PICKUP_STOP_PENDING = "정류장의 어린이가 모두 탑승 또는 미탑승 확인이어야 다음 정류장으로 갈 수 있습니다."
         private val REAL_SOURCES = setOf(Source.SDK, Source.EMULATOR_INPUT)
     }
 }

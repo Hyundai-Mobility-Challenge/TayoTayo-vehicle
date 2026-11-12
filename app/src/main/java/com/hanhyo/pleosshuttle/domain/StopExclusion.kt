@@ -10,10 +10,13 @@ object StopExclusions {
      * 이 아이 때문에 정류장을 들러야 하는지.
      * - 운행 준비: 선생님이 미탑승 확인한 아이만 "안 탐"으로 본다(탑승 기록·아직 결정 전은 들를 수 있음 → 제외 제안 안 함).
      * - 출발 뒤: 지금 탑승 중이고 동승 유지(V-21)가 아닌 아이만. 동승 유지 아이는 원래 정류장을 이미 지났으므로 셈하지 않는다.
+     * - 등원(V-25) 출발 뒤: 아직 탑승도 미탑승 확인도 없는 아이(정류장에서 태우거나 미탑승 확인해야 함).
      */
-    fun needsStop(trip: TripState, child: ChildRecord): Boolean =
-        if (trip.phase == TripPhase.PREPARING) child.status != Attendance.CONFIRMED_NOT_BOARDED
-        else child.awaitingAlighting
+    fun needsStop(trip: TripState, child: ChildRecord): Boolean = when {
+        trip.phase == TripPhase.PREPARING -> child.status != Attendance.CONFIRMED_NOT_BOARDED
+        trip.isPickup -> child.status == Attendance.NOT_BOARDED
+        else -> child.awaitingAlighting
+    }
 
     fun hasRiders(trip: TripState, stopId: String): Boolean = trip.children.any { it.stopId == stopId && needsStop(trip, it) }
 

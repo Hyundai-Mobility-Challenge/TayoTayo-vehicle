@@ -72,6 +72,24 @@ internal fun boardingApproachSpeech(stopName: String, names: List<String>): Stri
     if (names.isEmpty()) "다음은 ${stopName} 정류장, 탈 어린이 없음." else "다음은 ${stopName} 정류장, ${names.joinToString(", ")} 탑승."
 
 /**
+ * V-15 등원 탑승 안내 대상: 이 정류장에서 아직 탑승도 미탑승 확인도 없는 아이(명단 순서). 미탑승 예정 배지 아이는 빼지 않는다
+ * (자동 제외 없음, V-26) — 아직 미탑승 확인 전이면 정류장에서 확인해야 하기 때문. 하원 운행이면 빈 목록. (아직 연결하지 않음)
+ */
+internal fun pickupBoardingChildren(trip: TripState, stop: Stop?): List<ChildRecord> =
+    if (!trip.isPickup || stop == null) emptyList()
+    else trip.children.filter { it.stopId == stop.id && it.status == Attendance.NOT_BOARDED }
+
+/** V-27 등원 정류장 도착 안내(아직 연결하지 않음). 예: "서울숲 정류장 도착, 어린이 가 탑승 예정. 인계받음과 탑승을 기록해 주세요." */
+internal fun pickupArrivalSpeech(stopName: String, names: List<String>): String =
+    if (names.isEmpty()) "${stopName} 정류장 도착, 탈 어린이 없음."
+    else "${stopName} 정류장 도착, ${spokenNameList(names)} 탑승 예정. 인계받음과 탑승을 기록해 주세요."
+
+/** V-29 기관 도착 안내(아직 연결하지 않음). 예: "기관 도착. 어린이 가, 어린이 나 기관 담당자에게 인계해 주세요." */
+internal fun institutionArrivalSpeech(names: List<String>): String =
+    if (names.isEmpty()) "기관 도착. 인계할 어린이가 없습니다. 차량 실내를 직접 확인해 주세요."
+    else "기관 도착. ${spokenNameList(names)} 기관 담당자에게 인계해 주세요."
+
+/**
  * V-08 출발 전 음성 요약. [운행 시작] 단계(모두 결정 · 탑승 1명 이상)에서만. 키에 출결·출발 순서를 넣어
  * 같은 내용이면 다시 읽지 않고, 탑승 인원·순서가 바뀌어 기사 확인이 풀리면 바뀐 요약을 한 번 더 읽는다(벨트 토글은 제외).
  */

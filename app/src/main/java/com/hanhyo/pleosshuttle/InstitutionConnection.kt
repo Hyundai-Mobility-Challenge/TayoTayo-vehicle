@@ -61,7 +61,8 @@ class InstitutionConnection(context: Context) {
         if (stops.isEmpty()) error("운행에 등록된 정류장이 없습니다.")
         check(prefs.edit().putString("pendingTrip", tripId).commit())
         val trip = TripState(tripId = tripId, integrationMode = IntegrationMode.SDK, origin = sample.origin,
-            stops = stops, routeOrder = stops.map { it.id }, routeIsExample = false, children = children)
+            stops = stops, routeOrder = stops.map { it.id }, routeIsExample = false, children = children,
+            direction = TripDirections.of(direction))
         bind(trip)
         return trip
     }
@@ -124,20 +125,26 @@ class InstitutionConnection(context: Context) {
         // (TripController.skip: PENDING/ARRIVED → SKIPPED, 되돌리는 API 없음) 운행 중에는 자동 재포함(D17)이 가능하므로
         // 더 이상 다시 넣을 수 없는 시점까지 기다린다. 서버 /complete는 COMPLETED·SKIPPED가 아닌 정류장이 있으면 거절한다.
         for (stopId in InstitutionTrips.stopsToSkip(trip)) lifecycle("stop-$stopId-skip", "/stops/$stopId/skip")
-        if (trip.phase == TripPhase.END_REVIEW) {
+        // 등원(V-29)은 기관 도착이 종착이라 "복귀 중"(RETURNING)을 보내지 않는다. 서버 /complete는 IN_PROGRESS도 받는다.
+        val sendReturn = !trip.isPickup
+        if (trip.phase == TripPhase.END_REVIEW && sendReturn) {
             lifecycle("return", "/return")
         }
         if (trip.phase == TripPhase.ENDED) {
-            lifecycle("return", "/return")
+            if (sendReturn) lifecycle("return", "/return")
             lifecycle("interior", "/interior-check", JSONObject().put("checked", true))
             lifecycle("complete", "/complete")
         }
 
         val sentEvents = sentEventIds(trip.tripId).toMutableSet()
         val stopByChild = trip.children.associate { it.id to it.stopId }
-        val ledgerRows = InstitutionTrips.serverLedger(trip.ledger).map { entry ->
+        val serverEntries = InstitutionTrips.serverLedger(trip.ledger)
+        val guardianCalls = serverEntries.mapNotNull { e -> InstitutionTrips.guardianCallRequest(trip.tripId, e)?.let { e.id to it } }.toMap()
+        val ledgerRows = serverEntries.map { entry ->
             val eventType = InstitutionTrips.ledgerEventType(entry)
-            Triple(entry.id, eventType, JSONObject().put("tripChildId", entry.childId).put("tripStopId", stopByChild[entry.childId]))
+            val body = JSONObject().put("tripChildId", entry.childId).put("tripStopId", stopByChild[entry.childId])
+            InstitutionTrips.eventPayload(entry).takeIf { it.isNotEmpty() }?.let { body.put("payload", JSONObject(it)) }
+            Triple(entry.id, eventType, body)
         }
         val handovers = trip.handoverChildIds.map { id -> Triple("handover-$id", "CHILD_HANDED_OVER", JSONObject().put("tripChildId", id).put("tripStopId", stopByChild[id])) }
         for ((key, type, body) in ledgerRows + handovers) {
@@ -145,6 +152,9 @@ class InstitutionConnection(context: Context) {
             body.put("clientEventId", UUID.nameUUIDFromBytes("${trip.tripId}:$key".toByteArray()).toString())
                 .put("eventType", type).put("occurredAt", Instant.now().toString())
             if (type == "CHILD_NOT_BOARDED") body.put("reason", "OTHER")
+            // V-28: 보호자 호출은 guardian-calls로 실제 알림을 열고(서버가 열린 호출이 있으면 그 호출을 돌려줘 중복 알림 없음),
+            // 같은 원장 항목을 GUARDIAN_CALL_REQUESTED 이벤트로도 남긴다. 둘 다 성공해야 전송 완료로 표시한다.
+            guardianCalls[key]?.let { (path, callBody) -> call(path, JSONObject(callBody)) }
             call("$prefix/events", body)
             sentEvents.add(key); check(prefs.edit().putStringSet(InstitutionTrips.sentEventsKey(trip.tripId), sentEvents.toSet()).commit()); count++
         }
@@ -225,11 +235,51 @@ internal object InstitutionTrips {
      * 그 밖은 [ledgerEventType] (before, after) 규칙.
      */
     fun ledgerEventType(entry: LedgerEntry): String = when {
+        entry.pickupAction != null -> pickupEventType(entry.pickupAction)
         entry.stayOnboard == false -> "CORRECTION"
         entry.stayOnboard == true && entry.after == Attendance.ALIGHTED -> "CHILD_RETURNED_TO_ORG"
         entry.stayOnboard == true && entry.after == Attendance.ONBOARD -> "GUARDIAN_NO_SHOW"
         else -> ledgerEventType(entry.before, entry.after)
     }
+
+    /**
+     * 등원(V-26~V-29) 원장 항목 → 서버 이벤트 유형. 서버 TripController.updateChildFromEvent·openapi eventType enum 기준:
+     * - 정류장 인계받음(RECEIVED): CHILD_HANDED_OVER → trip_children.status=HANDED_OVER, handed_over_at(3.5절 정류장 `handed_over`).
+     *   등원 전용 "보호자에게서 인계받음" 이벤트는 서버에 없다. 넘겨준 사람 유형은 payload로만 보내며 서버는 payload를 저장하지 않는다.
+     * - 탑승(BOARDED): CHILD_BOARDED → status=BOARDED.
+     * - 보호자 도착 알림(GUARDIAN_CALLED): GUARDIAN_CALL_REQUESTED(이력만, 상태 변화 없음). 실제 알림은 [guardianCallRequest].
+     * - 정류장 미탑승 확인(NOT_BOARDED_*): TEACHER_CONFIRMED_NOT_BOARDED → status=NOT_BOARDED(기관 웹 자동 기록, D31).
+     *   보호자 미탑승 안내 선택(D30)은 payload notifyGuardian으로만 보낸다(서버에 이 안내 발송 경로 없음).
+     * - 기관 인계 하차(INSTITUTION_HANDOVER): CHILD_RECEIVED_BY_ORG → status=DROPPED_OFF + 보호자 알림(notifyChildDroppedOff).
+     */
+    fun pickupEventType(action: String): String = when (action) {
+        PickupActions.RECEIVED -> "CHILD_HANDED_OVER"
+        PickupActions.BOARDED -> "CHILD_BOARDED"
+        PickupActions.GUARDIAN_CALLED -> "GUARDIAN_CALL_REQUESTED"
+        PickupActions.NOT_BOARDED_NOTIFY, PickupActions.NOT_BOARDED_SILENT -> "TEACHER_CONFIRMED_NOT_BOARDED"
+        PickupActions.INSTITUTION_HANDOVER -> "CHILD_RECEIVED_BY_ORG"
+        else -> "CORRECTION"
+    }
+
+    /** 이벤트 payload(서버 openapi TripEvent.payload). 이름 등 개인정보는 넣지 않는다. 하원 기록은 빈 맵(payload 없음). */
+    fun eventPayload(entry: LedgerEntry): Map<String, Any> = buildMap {
+        entry.receivedFromType?.let { put("receivedFromType", it) }
+        when (entry.pickupAction) {
+            PickupActions.NOT_BOARDED_NOTIFY -> put("notifyGuardian", true)
+            PickupActions.NOT_BOARDED_SILENT -> put("notifyGuardian", false)
+        }
+    }
+
+    /**
+     * V-28 보호자 호출 요청(ShareAndCallController.openCall, 차량 credential 허용). 보호자 호출 원장 항목만 (경로, 본문)을 돌려준다.
+     * [LedgerEntry.childId]는 서버 tripChildId다(createTrip). 서버는 같은 아이의 열린 호출(10분)이 있으면 새로 만들지 않는다.
+     */
+    fun guardianCallRequest(tripId: String, entry: LedgerEntry): Pair<String, Map<String, String>>? =
+        if (entry.pickupAction != PickupActions.GUARDIAN_CALLED || entry.childId.isBlank()) null
+        else "/api/v1/trips/$tripId/children/${entry.childId}/guardian-calls" to mapOf("callType" to GUARDIAN_CALL_TYPE)
+
+    /** 서버 openCall이 받는 유일한 callType. */
+    const val GUARDIAN_CALL_TYPE = "CHILD_NOT_AT_STOP"
 
     fun ledgerEventType(before: Attendance, after: Attendance): String = when (after) {
         Attendance.ONBOARD -> "CHILD_BOARDED"
