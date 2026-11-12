@@ -68,4 +68,39 @@ class InstitutionTripsTest {
         val bytes = ByteArrayOutputStream().also { ObjectOutputStream(it).use { out -> out.writeObject(child) } }.toByteArray()
         assertEquals(child, ObjectInputStream(ByteArrayInputStream(bytes)).use { it.readObject() as ChildRecord })
     }
+
+    private fun entry(id: String, belt: Boolean? = null, driver: Boolean? = null) =
+        LedgerEntry(id, if (driver != null) "" else "c1", Attendance.NOT_BOARDED, Attendance.ONBOARD, 0L, "", belt = belt, driverCheck = driver)
+
+    @Test fun pendingCountsAllServerEntriesWhenNothingSent() {
+        assertEquals(2, InstitutionTrips.pendingCount(listOf(entry("a"), entry("b")), emptySet()))
+    }
+
+    @Test fun pendingCountsOnlyUnsentEntries() {
+        assertEquals(1, InstitutionTrips.pendingCount(listOf(entry("a"), entry("b")), setOf("a", "handover-c1")))
+        assertEquals(0, InstitutionTrips.pendingCount(listOf(entry("a"), entry("b")), setOf("a", "b")))
+    }
+
+    @Test fun pendingNeverCountsBeltOrDriverCheckRecords() {
+        val ledger = listOf(entry("a"), entry("belt", belt = true), entry("belt2", belt = false), entry("drv", driver = true), entry("drv2", driver = false))
+        assertEquals(1, InstitutionTrips.pendingCount(ledger, emptySet()))
+        assertEquals(0, InstitutionTrips.pendingCount(ledger, setOf("a")))
+    }
+
+    @Test fun sentEventsAreIsolatedPerTrip() {
+        val stored = mapOf(InstitutionTrips.sentEventsKey("1") to setOf("a"), InstitutionTrips.sentEventsKey("2") to setOf("b"))
+        assertEquals(setOf("a"), InstitutionTrips.sentEventIds("1", stored))
+        assertEquals(setOf("b"), InstitutionTrips.sentEventIds("2", stored))
+        assertEquals(emptySet<String>(), InstitutionTrips.sentEventIds("3", stored))
+        val stale = InstitutionTrips.staleSentKeys("2", stored.keys + listOf("sent", "sentEvents", "trip", "2:start"))
+        assertEquals(setOf("sentEvents:1", "sent", "sentEvents"), stale.toSet())
+    }
+
+    @Test fun legacyKeysAreToleratedAndWrongTypesIgnored() {
+        val stored = mapOf("sentEvents" to setOf("a"), "sent" to emptySet<String>(), InstitutionTrips.sentEventsKey("1") to setOf("b"))
+        assertEquals(setOf("a", "b"), InstitutionTrips.sentEventIds("1", stored))
+        assertEquals(0, InstitutionTrips.pendingCount(listOf(entry("a"), entry("b")), InstitutionTrips.sentEventIds("1", stored)))
+        val broken = mapOf("sentEvents" to "oops", "sent" to 3, InstitutionTrips.sentEventsKey("1") to true)
+        assertEquals(emptySet<String>(), InstitutionTrips.sentEventIds("1", broken))
+    }
 }

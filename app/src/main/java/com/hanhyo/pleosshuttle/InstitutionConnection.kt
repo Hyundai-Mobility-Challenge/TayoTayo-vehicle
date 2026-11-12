@@ -67,10 +67,16 @@ class InstitutionConnection(context: Context) {
     }
 
     fun bind(trip: TripState) {
-        check(prefs.edit().putString("trip", trip.tripId).remove("pendingTrip").putStringSet("sent", emptySet()).commit())
+        val stored = prefs.all
+        // 같은 운행을 다시 묶을 때만 기존(구버전 전역 키 포함) 전송 기록을 유지하고, 다른 운행 기록은 지운다.
+        val keep = if (boundTrip == trip.tripId) InstitutionTrips.sentEventIds(trip.tripId, stored) else emptySet()
+        val edit = prefs.edit().putString("trip", trip.tripId).remove("pendingTrip")
+        InstitutionTrips.staleSentKeys(trip.tripId, stored.keys).forEach { edit.remove(it) }
+        check(edit.putStringSet(InstitutionTrips.sentEventsKey(trip.tripId), keep).commit())
     }
     fun recover(trip: TripState) { if (prefs.getString("pendingTrip", null) == trip.tripId) bind(trip) }
-    fun pending(trip: TripState): Int = if (trip.tripId != boundTrip) 0 else InstitutionTrips.serverLedger(trip.ledger).count { it.id !in prefs.getStringSet("sent", emptySet()).orEmpty() }
+    private fun sentEventIds(tripId: String) = InstitutionTrips.sentEventIds(tripId, prefs.all)
+    fun pending(trip: TripState): Int = if (trip.tripId != boundTrip) 0 else InstitutionTrips.pendingCount(trip.ledger, sentEventIds(trip.tripId))
 
     companion object { private val reportingLock = Any() }
     fun reportTracking(trip: TripState, enabled: Boolean, fix: TrackingLocation?, navigation: TrackingNavigation? = null,
@@ -123,7 +129,7 @@ class InstitutionConnection(context: Context) {
             lifecycle("complete", "/complete")
         }
 
-        val sentEvents = prefs.getStringSet("sentEvents", emptySet()).orEmpty().toMutableSet()
+        val sentEvents = sentEventIds(trip.tripId).toMutableSet()
         val stopByChild = trip.children.associate { it.id to it.stopId }
         val ledgerRows = InstitutionTrips.serverLedger(trip.ledger).map { entry ->
             val eventType = InstitutionTrips.ledgerEventType(entry.before, entry.after)
@@ -136,7 +142,7 @@ class InstitutionConnection(context: Context) {
                 .put("eventType", type).put("occurredAt", Instant.now().toString())
             if (type == "CHILD_NOT_BOARDED") body.put("reason", "OTHER")
             call("$prefix/events", body)
-            sentEvents.add(key); check(prefs.edit().putStringSet("sentEvents", sentEvents).commit()); count++
+            sentEvents.add(key); check(prefs.edit().putStringSet(InstitutionTrips.sentEventsKey(trip.tripId), sentEvents.toSet()).commit()); count++
         }
         return count
     }
@@ -173,6 +179,23 @@ internal object InstitutionTrips {
      */
     /** 서버로 보낼 원장 항목. V-05 벨트 확인·V-08 기사 확인 기록은 기기 안에만 두고 출결 이벤트로 보내지 않는다(D27). */
     fun serverLedger(ledger: List<LedgerEntry>): List<LedgerEntry> = ledger.filterNot { it.isBeltRecord || it.isDriverCheckRecord }
+
+    /** 서버가 받은(전송 성공) 이벤트 키 집합의 운행별 SharedPreferences 키. */
+    fun sentEventsKey(tripId: String) = "sentEvents:$tripId"
+    /** 구버전 빌드가 쓰던 운행 구분 없는 전역 키(쓰기: "sentEvents", 읽기: "sent"). */
+    val LEGACY_SENT_KEYS = listOf("sentEvents", "sent")
+
+    /** [stored](prefs.all)에서 [tripId]의 전송 완료 키. 구버전 전역 키도 합치고, 타입이 다르면 무시한다. */
+    fun sentEventIds(tripId: String, stored: Map<String, *>): Set<String> =
+        (listOf(sentEventsKey(tripId)) + LEGACY_SENT_KEYS)
+            .flatMap { (stored[it] as? Set<*>).orEmpty().filterIsInstance<String>() }.toSet()
+
+    /** [tripId]에 묶을 때 지울 키: 다른 운행의 전송 기록과 구버전 전역 키. */
+    fun staleSentKeys(tripId: String, keys: Collection<String>): List<String> =
+        keys.filter { it in LEGACY_SENT_KEYS || (it.startsWith("sentEvents:") && it != sentEventsKey(tripId)) }
+
+    /** 전송 대기 = 서버 전송 대상 원장 항목 중 서버가 아직 받지 않은 것. */
+    fun pendingCount(ledger: List<LedgerEntry>, sentIds: Set<String>): Int = serverLedger(ledger).count { it.id !in sentIds }
 
     /** PUT /api/v1/trips/{id}/checklist 본문 필드 이름(TripController.checklist가 읽는 키). */
     const val DRIVER_CONFIRMED_FIELD = "driverConfirmed"
