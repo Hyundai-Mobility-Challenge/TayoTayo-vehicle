@@ -201,7 +201,17 @@ data class LedgerEntry(
      * 출결 기록이므로 서버로 보낸다(InstitutionTrips.ledgerEventType).
      */
     val stayOnboard: Boolean? = null,
+    /**
+     * V-09·D17 정류장 제외 기록. null = 아님(이전 저장 파일도 null). true = 정류장 제외(선생님 확인), false = 다시 넣기
+     * (선생님 [다시 넣기] 또는 다시 탈 아이가 생겨 자동 재포함). childId는 빈 문자열, before·after는 둘 다 ONBOARD(의미 없음).
+     * 출결 이벤트가 아니므로 서버 이벤트로 보내지 않는다(서버에는 종료 때 stops/{id}/skip으로만, InstitutionConnection.sync).
+     */
+    val stopExcluded: Boolean? = null,
+    /** [stopExcluded] 기록의 정류장 id. 그 밖의 기록은 null. */
+    val stopId: String? = null,
 ) : Serializable {
+    /** V-09 정류장 제외·다시 넣기 기록이면 true. 서버 출결 이벤트 전송에서 제외한다. */
+    val isStopExclusionRecord: Boolean get() = stopExcluded != null
     /** V-05 벨트 기록이면 true. 서버 전송(InstitutionConnection)에서 제외한다. */
     val isBeltRecord: Boolean get() = belt != null
     /** V-08 기사 확인 기록이면 true. 서버 출결 이벤트 전송에서 제외한다. */
@@ -342,7 +352,14 @@ data class TripState(
      * 개인정보는 저장하지 않는다(Run.driver_checked_at). 이전 저장 파일은 JVM 기본값 null = 체크 없음으로 복원된다.
      */
     val driverCheckedAtMillis: Long? = null,
+    /**
+     * V-09·D17 선생님이 확인해 방문 순서에서 뺀 정류장 id(내릴 아이 없음). 뺀 정류장은 [routeOrder]에서도 빠진다.
+     * 이전 저장 파일을 복원하면 JVM 기본값 null(= 뺀 정류장 없음)이 되므로 nullable로 두고 [excludedStops]로 읽는다.
+     */
+    val excludedStopIds: List<String>? = null,
 ) : Serializable {
+    /** 뺀 정류장 id(null 안전). */
+    val excludedStops: List<String> get() = excludedStopIds.orEmpty()
     val currentStop: Stop? get() = routeOrder.getOrNull(currentStopIndex)?.let { id -> stops.find { it.id == id } }
     val onboardChildren: List<ChildRecord> get() = children.filter { it.status == Attendance.ONBOARD }
     /** V-21: 지금 동승 유지로 타고 있는 아이(복귀 후 기관 인계 대상). */

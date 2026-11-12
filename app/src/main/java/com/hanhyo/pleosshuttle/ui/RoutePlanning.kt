@@ -80,8 +80,13 @@ internal fun routeChanges(trip: TripState): List<RouteChange> = buildList {
     trip.children.filter { it.status == Attendance.NOT_BOARDED || it.status == Attendance.CONFIRMED_NOT_BOARDED }.forEach {
         add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else "탑승 기록 없음"}"))
     }
-    trip.stops.filter { stop -> trip.children.none { it.stopId == stop.id && (it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED) } }.forEach {
-        add(RouteChange("하차 없음", "${it.shortName} · 내릴 친구가 없어도 순서에는 남아요"))
+    trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }
+        .filter { stop -> trip.children.none { it.stopId == stop.id && (it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED) } }.forEach {
+        add(RouteChange("하차 없음", "${it.shortName} · 빼기 전까지 순서에 남아요"))
+    }
+    // V-09·D17: 선생님이 뺀 정류장. 다시 탈 아이가 생기면 자동으로 다시 들어간다.
+    trip.excludedStops.mapNotNull { id -> trip.stops.find { it.id == id } }.forEach {
+        add(RouteChange("뺀 정류장", "${it.shortName} · 방문 순서에서 뺐어요"))
     }
 }
 

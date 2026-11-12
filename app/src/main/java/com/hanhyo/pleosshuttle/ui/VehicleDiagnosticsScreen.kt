@@ -73,6 +73,7 @@ import com.hanhyo.pleosshuttle.ui.component.Section
         if (vm.trip.ledger.isEmpty()) Text("아직 기록이 없습니다.")
         vm.trip.ledger.reversed().forEach { entry ->
             Text(if (entry.isDriverCheckRecord) "${timeText(entry.recordedAtMillis)} · 기사 확인 ${if (entry.driverCheck == true) "체크" else "없음·해제"}"
+                else if (entry.isStopExclusionRecord) "${timeText(entry.recordedAtMillis)} · 정류장 ${entry.stopId} ${if (entry.stopExcluded == true) "제외" else "다시 넣기"}"
                 else "${timeText(entry.recordedAtMillis)} · ${entry.childId} · ${entry.before.label} → ${entry.after.label}")
             Text(entry.reason, color = AppTheme.colors.textSecondary)
             HorizontalDivider(color = AppTheme.colors.outline)

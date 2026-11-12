@@ -208,7 +208,64 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
             handoverChildIds = state.handoverChildIds - child.id,
             directCabinCheckAtMillis = null,
         ), "${child.name}: ${target.label} 저장")
+        reincludeStopsWithRiders(now)
         clearDriverCheckIfChanged(before, "탑승 인원·출결 변경", now)
+        return true
+    }
+    /** V-09 정류장 제외·다시 넣기 원장 항목. 아이 기록이 아니므로 childId는 비우고, 서버 출결 이벤트로 보내지 않는다. */
+    private fun stopEntry(stopId: String, excluded: Boolean, reason: String, now: Long) =
+        LedgerEntry(id("stop", now), "", Attendance.ONBOARD, Attendance.ONBOARD, now, reason, stopExcluded = excluded, stopId = stopId)
+    private fun stopName(stopId: String) = state.stops.find { it.id == stopId }?.let(::stopLabel) ?: stopId
+
+    /**
+     * D17 넣기는 자동: 실제 상태 전이로 뺀 정류장에 다시 내릴 아이가 생기면 방문 순서에 다시 넣는다(운행 준비·정차 중).
+     * routeVersion이 올라가 다음 목적지 안내 때 Pleos 경유지를 새 순서로 다시 요청한다(V-12).
+     */
+    private fun reincludeStopsWithRiders(now: Long) {
+        val ids = StopExclusions.autoReinclude(state)
+        if (ids.isEmpty()) return
+        val message = lastMessage
+        ids.forEach { id ->
+            state = state.copy(routeOrder = StopExclusions.insertOrder(state, id), excludedStopIds = state.excludedStops - id,
+                routeVersion = state.routeVersion + 1, routeProposal = null,
+                ledger = state.ledger + stopEntry(id, false, StopExclusions.Records.AUTO_INCLUDED, now))
+            diagnostic(DiagnosticEntry(now, "정류장 다시 넣기", ResultStatus.TARGET_OBSERVED, "자동 재포함: $id · 다시 내릴 어린이 있음"))
+        }
+        update(state, "$message · ${ids.joinToString { stopName(it) }} 정류장에 내릴 어린이가 생겨 방문 순서에 다시 넣었어요." +
+            if (state.phase == TripPhase.PREPARING) "" else " 다음 출발 때 경로를 다시 안내해요.")
+    }
+
+    /**
+     * V-09·D17 빈 정류장 빼기(선생님 확인). 아직 들르지 않았고 내릴 아이가 0명인 정류장만, 운행 준비·정차 중(V-11)에만.
+     * 방문 순서·도착 예정·출발 요약·내비 경유지에서 빠지고, 원장에 기록한다. 서버에는 종료 때 skip으로 알린다.
+     */
+    fun excludeStop(stopId: String, now: Long): Boolean {
+        manualRouteBlockers(now).firstOrNull()?.let { return reject(it) }
+        val index = state.routeOrder.indexOf(stopId)
+        if (index < 0) return reject("방문 순서에 없는 정류장입니다.")
+        if (index < lockedRouteCount()) return reject("이미 방문했거나 정차 중인 정류장은 뺄 수 없습니다.")
+        if (StopExclusions.hasRiders(state, stopId)) return reject("내릴 어린이가 있는 정류장은 뺄 수 없습니다.")
+        val before = state
+        update(state.copy(routeOrder = state.routeOrder - stopId, excludedStopIds = state.excludedStops + stopId,
+            routeVersion = state.routeVersion + 1, routeProposal = null,
+            ledger = state.ledger + stopEntry(stopId, true, StopExclusions.Records.EXCLUDED, now)),
+            "${stopName(stopId)} 정류장을 방문 순서에서 뺐어요." + if (state.phase == TripPhase.PREPARING) "" else " 다음 출발 때 경로를 다시 안내해요.")
+        diagnostic(DiagnosticEntry(now, "정류장 제외", ResultStatus.TARGET_OBSERVED, "선생님 확인으로 제외: $stopId · 내릴 어린이 없음"))
+        clearDriverCheckIfChanged(before, "정류장 제외", now)
+        return true
+    }
+
+    /** 뺀 정류장 다시 넣기(선생님). 운행 준비·정차 중에만. 지나온 지점 뒤 가장 가까운 위치에 넣는다. */
+    fun includeStop(stopId: String, now: Long): Boolean {
+        manualRouteBlockers(now).firstOrNull()?.let { return reject(it) }
+        if (stopId !in state.excludedStops) return reject("뺀 정류장이 아닙니다.")
+        val before = state
+        update(state.copy(routeOrder = StopExclusions.insertOrder(state, stopId), excludedStopIds = state.excludedStops - stopId,
+            routeVersion = state.routeVersion + 1, routeProposal = null,
+            ledger = state.ledger + stopEntry(stopId, false, StopExclusions.Records.INCLUDED, now)),
+            "${stopName(stopId)} 정류장을 방문 순서에 다시 넣었어요.")
+        diagnostic(DiagnosticEntry(now, "정류장 다시 넣기", ResultStatus.TARGET_OBSERVED, "선생님 다시 넣기: $stopId"))
+        clearDriverCheckIfChanged(before, "정류장 다시 넣기", now)
         return true
     }
     /**
@@ -548,7 +605,11 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
     fun unlockBlockReasons(now: Long): List<String> = unlockBlockers(now)
 
-    private fun validOrder(order: List<String>): Boolean = order.size == state.stops.size && order.toSet().size == order.size && order.toSet() == state.stops.map { it.id }.toSet()
+    /** 방문 순서는 승인된 정류장 중 뺀 정류장(V-09)을 제외한 전체를 중복 없이 포함해야 한다. */
+    private fun validOrder(order: List<String>): Boolean {
+        val approved = state.stops.map { it.id }.toSet() - state.excludedStops.toSet()
+        return order.size == approved.size && order.toSet().size == order.size && order.toSet() == approved
+    }
 
     companion object {
         const val CONFIRMATION_TTL = 5_000L

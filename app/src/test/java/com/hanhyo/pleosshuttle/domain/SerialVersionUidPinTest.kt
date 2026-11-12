@@ -62,5 +62,9 @@ class SerialVersionUidPinTest {
         assertTrue(state.children.none { it.staysOnboard })
         assertTrue(state.ledger.none { it.stayOnboard != null })
         assertTrue(state.stayOnboardChildren.isEmpty())
+        // V-09 필드도 이전 파일에 없으므로 JVM 기본값 null: 뺀 정류장 없음, 원장 항목은 정류장 제외 기록 아님.
+        assertEquals(null, state.excludedStopIds)
+        assertTrue(state.excludedStops.isEmpty())
+        assertTrue(state.ledger.none { it.isStopExclusionRecord })
     }
 }

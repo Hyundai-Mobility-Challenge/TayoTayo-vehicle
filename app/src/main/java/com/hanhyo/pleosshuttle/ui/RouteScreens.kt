@@ -50,6 +50,8 @@ import com.hanhyo.pleosshuttle.domain.departureSummary
 import com.hanhyo.pleosshuttle.domain.RouteTimeline
 import com.hanhyo.pleosshuttle.domain.RouteWarning
 import com.hanhyo.pleosshuttle.domain.RouteTimelines
+import com.hanhyo.pleosshuttle.domain.StopExclusions
+import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.ui.component.Action
 import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
@@ -70,6 +72,7 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
         Text("복귀 ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
     }
     RouteStrip(vm, order, timeline)
+    StopExclusionSuggestions(vm)
     // V-08: 차량 화면(2560x1440)에서 [운행 시작]이 스크롤 없이 보이도록 정류장 메모는 접어 둔다(펼치면 그대로 보임).
     Foldout("정류장 메모", "${order.size}곳 · 필요할 때 펼쳐 보기", "stop-memos") { StopMemoLines(vm, order) }
     Text(if (trip.integrationMode == com.hanhyo.pleosshuttle.domain.IntegrationMode.SIMULATION)
@@ -198,6 +201,42 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
 
 @Composable private fun SideTitle(text: String) {
     Text(text, style = AppTheme.typography.body3SemiBold, color = AppTheme.colors.textSecondary)
+}
+
+/**
+ * V-09·D17 빈 정류장 제외 제안. 아직 들르지 않은 정류장 중 내릴 어린이가 0명(선생님 미탑승 확인만 남음)이면 한 줄씩
+ * [이 정류장 빼기]를 보인다. 기본값은 순서에 남음 — 선생님이 눌러야 빠진다. 뺀 정류장은 [다시 넣기]로 되돌린다.
+ * 운행 준비와 정차 중(V-11)에만 보이고, 정차 확인이 안 되면 버튼이 꺼진다. 아무것도 없으면 그리지 않는다.
+ */
+@Composable internal fun StopExclusionSuggestions(vm: ShuttleViewModel) {
+    val trip = vm.trip
+    val suggestions = StopExclusions.suggestions(trip)
+    val excluded = if (trip.phase == TripPhase.PREPARING || trip.phase == TripPhase.ALIGHTING)
+        trip.excludedStops.mapNotNull { id -> trip.stops.find { it.id == id } } else emptyList()
+    if (suggestions.isEmpty() && excluded.isEmpty()) return
+    val enabled = vm.engine.manualRouteBlockers(vm.now).isEmpty()
+    Column(
+        Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card))
+            .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm).testTag("stop-exclusion"),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+    ) {
+        suggestions.forEach { stop ->
+            Row(Modifier.fillMaxWidth().testTag("exclusion-suggestion-${stop.id}"), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                StatusChip("제외 제안", tone = ChipTone.ACCENT)
+                Text("${stop.shortName} · 내릴 어린이 없음", Modifier.weight(1f), style = AppTheme.typography.body2SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Action("이 정류장 빼기", "exclude-stop-${stop.id}", secondary = true, enabled = enabled) { vm.perform { excludeStop(stop.id, it) } }
+            }
+        }
+        excluded.forEach { stop ->
+            Row(Modifier.fillMaxWidth().testTag("excluded-stop-${stop.id}"), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                StatusChip("뺀 정류장")
+                Text("${stop.shortName} · 방문 순서·길 안내에서 빠짐", Modifier.weight(1f), style = AppTheme.typography.body2Regular, color = AppTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Action("다시 넣기", "include-stop-${stop.id}", secondary = true, enabled = enabled) { vm.perform { includeStop(stop.id, it) } }
+            }
+        }
+        if (suggestions.isNotEmpty()) Text("빼지 않으면 순서에 그대로 남아요 · 다시 탈 어린이가 생기면 자동으로 다시 넣어요",
+            style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
+    }
 }
 
 // ---- L9 순서 바꾸기 -----------------------------------------------------------

@@ -120,6 +120,10 @@ class InstitutionConnection(context: Context) {
                 lifecycle("$key-complete", "/stops/$serverId/complete")
             }
         }
+        // V-09·D17: 선생님이 뺀 정류장은 복귀(종료 확인) 뒤에만 서버에 skip으로 알린다. 서버 skip은 되돌릴 수 없고
+        // (TripController.skip: PENDING/ARRIVED → SKIPPED, 되돌리는 API 없음) 운행 중에는 자동 재포함(D17)이 가능하므로
+        // 더 이상 다시 넣을 수 없는 시점까지 기다린다. 서버 /complete는 COMPLETED·SKIPPED가 아닌 정류장이 있으면 거절한다.
+        for (stopId in InstitutionTrips.stopsToSkip(trip)) lifecycle("stop-$stopId-skip", "/stops/$stopId/skip")
         if (trip.phase == TripPhase.END_REVIEW) {
             lifecycle("return", "/return")
         }
@@ -178,7 +182,16 @@ internal object InstitutionTrips {
      *   스키마의 CORRECTION으로 이력만 남긴다(서버 상태는 NOT_BOARDED로 남음).
      */
     /** 서버로 보낼 원장 항목. V-05 벨트 확인·V-08 기사 확인 기록은 기기 안에만 두고 출결 이벤트로 보내지 않는다(D27). */
-    fun serverLedger(ledger: List<LedgerEntry>): List<LedgerEntry> = ledger.filterNot { it.isBeltRecord || it.isDriverCheckRecord }
+    /** V-09 정류장 제외·다시 넣기 기록도 출결 이벤트가 아니므로 보내지 않는다(서버에는 [stopsToSkip]의 skip으로만). */
+    fun serverLedger(ledger: List<LedgerEntry>): List<LedgerEntry> = ledger.filterNot { it.isBeltRecord || it.isDriverCheckRecord || it.isStopExclusionRecord }
+
+    /**
+     * 서버 POST /trips/{id}/stops/{stopId}/skip 대상(차량 credential 허용: ApiAuthorizationInterceptor.isTripDeviceOperation).
+     * 복귀 뒤(종료 확인·종료)에만, 끝까지 빠진 정류장. 운행 중에는 다시 넣을 수 있어 보내지 않는다.
+     */
+    fun stopsToSkip(trip: TripState): List<String> =
+        if (trip.phase != TripPhase.END_REVIEW && trip.phase != TripPhase.ENDED) emptyList()
+        else trip.excludedStops.filter { id -> id !in trip.routeOrder && trip.stops.any { it.id == id } }
 
     /** 서버가 받은(전송 성공) 이벤트 키 집합의 운행별 SharedPreferences 키. */
     fun sentEventsKey(tripId: String) = "sentEvents:$tripId"

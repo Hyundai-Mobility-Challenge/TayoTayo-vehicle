@@ -94,7 +94,7 @@ class TripTrackingService : Service() {
                 val key = "${current.tripId}/${current.routeVersion}/${current.currentStopIndex}"
                 if (key != routeKey) {
                     navi?.invalidateTracking()
-                    val upcoming=current.routeOrder.drop(current.currentStopIndex).take(3).mapNotNull { id -> current.stops.find { it.id==id } }
+                    val upcoming=com.hanhyo.pleosshuttle.domain.navigationWaypoints(current)
                     navi?.expectTrackingStops(upcoming.map { it.latitude to it.longitude },upcoming.map { it.name })
                     routeKey = key; navi?.refresh()
                 }

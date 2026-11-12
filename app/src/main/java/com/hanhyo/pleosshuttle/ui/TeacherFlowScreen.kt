@@ -174,6 +174,8 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
             tag == "stationary-status" -> Text(vm.engine.stationaryBlockers(vm.now).firstOrNull() ?: "차량 상태 확인 중", style = question, modifier = Modifier.testTag(tag))
             else -> Text("지금은 조작할 수 없어요.", style = question)
         }
+        // V-09·D17: 정차 중(하차 단계)에 아직 들르지 않은 정류장이 빈 정류장이 되면(정정 등) 여기서 제외를 제안한다.
+        if (vm.trip.phase == com.hanhyo.pleosshuttle.domain.TripPhase.ALIGHTING) StopExclusionSuggestions(vm)
         VehicleTrackingSummary(vm)
     }
 }

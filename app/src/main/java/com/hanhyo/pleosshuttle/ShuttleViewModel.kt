@@ -527,7 +527,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         val next = trip.currentStop ?: trip.origin
         if (trip.integrationMode == IntegrationMode.SIMULATION) simulatedNavigation = "모의 안내 · ${next.name} (${next.latitude}, ${next.longitude})"
         else {
-            val upcoming = trip.routeOrder.drop(trip.currentStopIndex).take(3).mapNotNull { id -> trip.stops.find { it.id==id } }.ifEmpty { listOf(trip.origin) }
+            val upcoming = navigationWaypoints(trip).ifEmpty { listOf(trip.origin) }
             realNavi?.requestStops(upcoming.map { com.hanhyo.pleosshuttle.sdk.NaviDestination(it.name,it.latitude,it.longitude) })
         }
     }
