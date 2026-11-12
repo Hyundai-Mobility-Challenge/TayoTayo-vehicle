@@ -27,11 +27,11 @@ import com.hanhyo.pleosshuttle.ui.component.DialogButton
 import com.hanhyo.pleosshuttle.ui.component.appTextFieldColors
 import com.hanhyo.pleosshuttle.ui.component.guideAnchor
 
-/** 아이 한 명의 기록 행(이름 · 상태 / 가상 좌석 · 하차 지점). */
+/** 아이 한 명의 기록 행(이름 · 상태 / 하차 지점). 좌석 배정은 삭제됨(D39). */
 @Composable internal fun ChildCard(child: ChildRecord, vm: ShuttleViewModel, actions: @Composable RowScope.() -> Unit) {
     ChildCard(
         title = "${child.name}  ·  ${child.status.label}",
-        detail = "${child.virtualSeat} · ${vm.trip.stops.first { it.id == child.stopId }.name}",
+        detail = vm.trip.stops.first { it.id == child.stopId }.name,
         actions = actions,
     )
 }

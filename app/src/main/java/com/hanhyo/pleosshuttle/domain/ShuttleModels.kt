@@ -56,9 +56,26 @@ data class ChildRecord(
     val id: String,
     val name: String,
     val stopId: String,
+    /** 좌석 배정 삭제(D39)로 화면에 표시하지 않음. 저장된 기록 복원 호환을 위해 필드만 유지. */
     val virtualSeat: String,
     val status: Attendance = Attendance.NOT_BOARDED,
-) : Serializable
+    /**
+     * 서버 boardingExpected=false(결석·직접 픽업 등 오늘 미탑승 예정)일 때 true.
+     * 반대 의미로 저장하는 이유: 이전 버전에서 저장된 기록을 Java 직렬화로 복원하면 새 필드는
+     * JVM 기본값(false)이 되므로, 기본값이 곧 "탑승 예정"(D20: 미제출 기본값 탑승)이 되도록 함.
+     */
+    val notExpectedToBoard: Boolean = false,
+    /** 서버가 내려주는 미탑승 예정 사유(ABSENT / SELF_PICKUP / NOT_RIDING / OTHER). 없으면 null. */
+    val notBoardingReason: String? = null,
+) : Serializable {
+    /** 오늘 탑승 예정 여부. 기본값 탑승(D20). */
+    val expectedToBoard: Boolean get() = !notExpectedToBoard
+
+    companion object {
+        /** 필드 추가 전 클래스의 기본 계산값을 고정해, 이미 저장된 운행 기록을 계속 복원할 수 있게 함. */
+        private const val serialVersionUID: Long = 91676870627885723L
+    }
+}
 
 data class Stop(val id: String, val name: String, val latitude: Double, val longitude: Double) : Serializable
 

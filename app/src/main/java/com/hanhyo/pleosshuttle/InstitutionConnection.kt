@@ -39,8 +39,8 @@ class InstitutionConnection(context: Context) {
     fun createTrip(): TripState {
         val result = call("/api/v1/vehicle/trips?direction=$direction")
         val rows = result.optJSONArray("items") ?: JSONArray()
-        if (rows.length() == 0) error("오늘 차량에 배정된 등원 운행이 없습니다. 기관에서 운행을 먼저 생성해 주세요.")
-        val tripId = rows.getJSONObject(0).optString("id")
+        val candidates = (0 until rows.length()).map { rows.getJSONObject(it) }.map { it.optString("id") to it.optString("status") }
+        val tripId = InstitutionTrips.selectActiveTripId(candidates) ?: error(InstitutionTrips.noTripMessage(direction))
         val value = call("/api/v1/trips/$tripId/prepare", method = "POST")
         val stopRows = value.optJSONArray("stops") ?: JSONArray()
         val sample = SampleTrip.create()
@@ -54,8 +54,9 @@ class InstitutionConnection(context: Context) {
         val children = (0 until childrenRows.length()).mapIndexed { i, index ->
             val row = childrenRows.getJSONObject(index)
             val stopId = if (row.isNull("tripStopId")) stops.firstOrNull()?.id ?: "" else row.optString("tripStopId")
-            ChildRecord(row.optString("tripChildId"), row.optString("childName", "어린이"), stopId, "미배정",
-                when (row.optString("status")) { "BOARDED" -> Attendance.ONBOARD; "NOT_BOARDED" -> Attendance.NOT_BOARDED; "DROPPED_OFF" -> Attendance.ALIGHTED; else -> Attendance.NOT_BOARDED })
+            InstitutionTrips.childRecord(row.optString("tripChildId"), row.optString("childName", "어린이"), stopId,
+                row.optString("status"), row.opt("boardingExpected"),
+                if (row.isNull("notBoardedReason")) null else row.optString("notBoardedReason"))
         }
         if (stops.isEmpty()) error("운행에 등록된 정류장이 없습니다.")
         check(prefs.edit().putString("pendingTrip", tripId).commit())
@@ -134,5 +135,36 @@ class InstitutionConnection(context: Context) {
             sentEvents.add(key); check(prefs.edit().putStringSet("sentEvents", sentEvents).commit()); count++
         }
         return count
+    }
+}
+
+/** Pure mapping of the vehicle trip API responses (TripController.vehicleTrips / getTrip), kept JSON-free for unit tests. */
+internal object InstitutionTrips {
+    /** Server trip statuses that are still operable: PREPARING / IN_PROGRESS / RETURNING. COMPLETED·CANCELLED are finished. */
+    val ACTIVE_TRIP_STATUSES = setOf("PREPARING", "IN_PROGRESS", "RETURNING")
+
+    fun directionLabel(direction: String) = if (direction == "PICK_UP") "등원" else "하원"
+
+    fun noTripMessage(direction: String) =
+        "오늘 차량에 배정된 ${directionLabel(direction)} 운행이 없습니다. 기관에서 운행을 먼저 생성해 주세요."
+
+    /** [trips] is (id, status) in server order (id desc). Returns the newest not-finished trip. */
+    fun selectActiveTripId(trips: List<Pair<String, String>>): String? =
+        trips.firstOrNull { (id, status) -> id.isNotBlank() && status in ACTIVE_TRIP_STATUSES }?.first
+
+    /** boardingExpected is TINYINT(1): JSON boolean (MySQL driver) or 0/1. Missing/unknown → 탑승 예정(D20). */
+    fun boardingExpected(raw: Any?): Boolean = when (raw) {
+        is Boolean -> raw
+        is Number -> raw.toInt() != 0
+        is String -> when (raw.trim().lowercase()) { "false", "0" -> false; else -> true }
+        else -> true
+    }
+
+    fun childRecord(id: String, name: String, stopId: String, status: String, boardingExpected: Any?, notBoardedReason: String?): ChildRecord {
+        val expected = boardingExpected(boardingExpected)
+        return ChildRecord(id, name, stopId, "미배정",
+            when (status) { "BOARDED" -> Attendance.ONBOARD; "NOT_BOARDED" -> Attendance.NOT_BOARDED; "DROPPED_OFF" -> Attendance.ALIGHTED; else -> Attendance.NOT_BOARDED },
+            notExpectedToBoard = !expected,
+            notBoardingReason = notBoardedReason?.takeIf { it.isNotBlank() })
     }
 }
