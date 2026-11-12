@@ -73,7 +73,7 @@ class SdkRuntimeDeviceTest {
                 waitUntil(10_000) {
                     val v = vehicleState.get(); val n = naviState.get()
                     v.speedMetersPerSecond.receivedAtMillis >= started && v.gear.receivedAtMillis >= started &&
-                        (v.supportedSeatAreas.isNotEmpty() || v.diagnostics.any { it.contains("capability ERROR") }) &&
+                        (v.supportedBeltAreas.isNotEmpty() || v.diagnostics.any { it.contains("capability ERROR") }) &&
                         n.destination.observedAtMillis?.let { it >= started } == true && n.routeState.observedAtMillis?.let { it >= started } == true
                 }
                 val session = JSONObject().put("index", sessionIndex + 1).put("startedAtMillis", started)
@@ -210,9 +210,8 @@ class SdkRuntimeDeviceTest {
     private fun VehicleSnapshot.json() = JSONObject().put("versions", JSONObject(versions)).put("connected", connected).put("emulatorGuard", emulatorGuard).put("unlockBlockReason", unlockBlockReason)
         .put("speed", speedMetersPerSecond.json()).put("gear", gear.json()).put("parkingBrake", parkingBrake.json()).put("parkingBrakeSupported", parkingBrakeSupported).put("doorLocked", doorLocked.json()).put("doorRequest", doorRequest.json())
         .put("uxRestricted", uxRestricted.json()).put("activeUxRestrictions", activeUxRestrictions ?: JSONObject.NULL)
-        .put("supportedDoorAreas", JSONArray(supportedDoorAreas)).put("supportedSeatAreas", JSONArray(supportedSeatAreas)).put("supportedBeltAreas", JSONArray(supportedBeltAreas))
+        .put("supportedDoorAreas", JSONArray(supportedDoorAreas)).put("supportedBeltAreas", JSONArray(supportedBeltAreas))
         .put("selectedDoorArea", selectedDoorArea ?: JSONObject.NULL)
-        .put("seatOccupancy", JSONObject().also { json -> seatOccupancy.forEach { (area, observation) -> json.put(area, observation.json()) } })
         .put("seatBelts", JSONObject().also { json -> seatBelts.forEach { (area, observation) -> json.put(area, observation.json()) } })
     private fun NaviSnapshot.json() = JSONObject().put("versions", JSONObject(versions)).put("destination", destination.json()).put("routeState", routeState.json()).put("routeMode", routeMode ?: JSONObject.NULL).put("routeIsRouting", routeIsRouting ?: JSONObject.NULL).put("termsAccepted", termsAccepted ?: JSONObject.NULL)
         .put("navigationStatus", navigationStatus).put("outcome", outcome.name).put("message", message).put("busy", busy).put("initialSnapshot", initialSnapshot ?: JSONObject.NULL)

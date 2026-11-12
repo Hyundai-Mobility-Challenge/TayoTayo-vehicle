@@ -10,7 +10,6 @@ import ai.pleos.playground.vehicle.constant.telltale.TelltaleType
 import ai.pleos.playground.vehicle.constant.area.DoorValue
 import ai.pleos.playground.vehicle.listener.DoorLockStateListener
 import ai.pleos.playground.vehicle.listener.SeatBeltBuckledStateListener
-import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
 import ai.pleos.playground.vehicle.listener.TelltaleInfoListener
 import android.car.Car
 import android.car.VehicleGear
@@ -51,7 +50,6 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
     /** 경고등 구독을 시도한 세대인지. listener 등록이 권한 등으로 실패해도 주기 조회(getTelltalesInfo)는 따로 시도한다. */
     private var telltaleWatched = false
     private val cleanups = mutableListOf<() -> Unit>()
-    private val occupancyAreas = mutableMapOf<String, SeatArea>()
     private val beltAreas = mutableMapOf<String, SeatArea>()
     private val inflight = mutableSetOf<String>()
     private val lastLoggedObservations = mutableMapOf<String, String>()
@@ -149,11 +147,6 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
                 updateDoor(result)
             }
         }
-        occupancyAreas.toMap().forEach { (name, area) ->
-            read("seat:$name", currentEpoch, { ok, fail -> v.getSeat().getCurrentSeatOccupancy(area, ok, fail) }) { result ->
-                snapshot = snapshot.copy(seatOccupancy = snapshot.seatOccupancy + (name to result)); publish()
-            }
-        }
         beltAreas.toMap().forEach { (name, area) ->
             read("belt:$name", currentEpoch, { ok, fail -> v.getSeat().getCurrentSeatBeltBuckledState(area, ok, fail) }) { result ->
                 snapshot = snapshot.copy(seatBelts = snapshot.seatBelts + (name to result)); publish()
@@ -184,15 +177,7 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
                 else snapshot = snapshot.copy(doorLocked = SdkObservation(outcome = SdkOutcome.UNSUPPORTED, error = "ROW_2_RIGHT를 포함하는 원본 SDK Area 미지원"))
                 refresh()
             } }, onFailed = { e -> handler.post { if (running && epoch == startEpoch) { doorWritable = false; snapshot = snapshot.copy(doorLocked = failure(e, "Vehicle capability")); log("Door capability ERROR $e") } } })
-            v.getSeat().checkSeatOccupancyCapabilities(onComplete = { _, areas -> handler.post {
-                if (!running || epoch != startEpoch) return@post
-                val supported = exactSupportedAreas(areas) { it.values.map { value -> value.name } }
-                supported.forEach { occupancyAreas[it.key] = it.original }
-                snapshot = snapshot.copy(supportedSeatAreas = supported.map { it.key })
-                log("Seat occupancy capability originalAreas=$areas exactGroups=${snapshot.supportedSeatAreas}")
-                occupancyAreas.forEach { (name, area) -> registerOccupancy(name, area, startEpoch) }
-                refresh()
-            } }, onFailed = { e -> handler.post { if (running && epoch == startEpoch) log("Seat capability ERROR $e") } })
+            // V-07 삭제(D39): 좌석 점유(checkSeatOccupancyCapabilities/registerSeatOccupancy)는 구독하지 않는다.
             v.getSeat().checkSeatBeltBuckledCapabilities(onComplete = { _, areas -> handler.post {
                 if (!running || epoch != startEpoch) return@post
                 val supported = exactSupportedAreas(areas) { it.values.map { value -> value.name } }
@@ -232,15 +217,6 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
         }
         try { door.registerDoorLockState(selected.original, listener); doorListener = listener; cleanups += { door.unregisterDoorLockState(selected.original, listener) }; log("SUBSCRIBE epoch=$startEpoch key=door/${selected.key} serial=${++subscriptionSerial} app call returned") }
         catch (e: Exception) { log("Door listener ERROR $e") }
-    }
-    private fun registerOccupancy(name: String, area: SeatArea, startEpoch: Long) {
-        val seat = vehicle?.getSeat() ?: return
-        val listener = object : SeatOccupancyListener {
-            override fun onSeatOccupancyUpdated(value: Boolean?) = dispatch(startEpoch) { snapshot = snapshot.copy(seatOccupancy = snapshot.seatOccupancy + (name to observed(value, "실제 Vehicle SDK listener"))); publish() }
-            override fun onFailed(exception: Exception) = dispatch(startEpoch) { snapshot = snapshot.copy(seatOccupancy = snapshot.seatOccupancy + (name to failure(exception, "Vehicle SDK listener"))); publish() }
-        }
-        try { seat.registerSeatOccupancy(area, listener); cleanups += { seat.unregisterSeatOccupancy(area, listener) }; log("SUBSCRIBE epoch=$startEpoch key=occupancy/$name serial=${++subscriptionSerial} app call returned") }
-        catch (e: Exception) { log("Occupancy $name listener ERROR $e") }
     }
     private fun registerBelt(name: String, area: SeatArea, startEpoch: Long) {
         val seat = vehicle?.getSeat() ?: return
@@ -424,7 +400,7 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
         val cleanupCount = cleanups.size
         var cleanupFailures = 0
         cleanups.forEach { cleanup -> runCatching(cleanup).onFailure { cleanupFailures++; log("Listener cleanup ERROR $it") } }; cleanups.clear()
-        doorListener = null; telltaleListener = null; telltaleWatched = false; selectedDoorCapability = null; occupancyAreas.clear(); beltAreas.clear(); inflight.clear(); doorWritable = false
+        doorListener = null; telltaleListener = null; telltaleWatched = false; selectedDoorCapability = null; beltAreas.clear(); inflight.clear(); doorWritable = false
         runCatching { uxManager?.unregisterListener() }.onFailure { log("UX listener cleanup ERROR $it") }; uxManager = null
         runCatching { car?.disconnect() }.onFailure { log("AAOS disconnect ERROR $it") }; car = null
         runCatching { vehicle?.release() }.onFailure { log("Vehicle release ERROR $it") }; vehicle = null

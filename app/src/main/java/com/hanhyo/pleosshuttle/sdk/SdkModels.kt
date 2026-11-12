@@ -28,7 +28,6 @@ data class VehicleSnapshot(
     val parkingBrake: SdkObservation<Boolean> = SdkObservation(),
     val parkingBrakeSupported: Boolean = false,
     val doorLocked: SdkObservation<Boolean> = SdkObservation(),
-    val seatOccupancy: Map<String, SdkObservation<Boolean>> = emptyMap(),
     val seatBelts: Map<String, SdkObservation<Boolean>> = emptyMap(),
     /** V-06 차량 벨트 경고등. 메모리 관측값만(저장·전송 안 함). */
     val seatBeltTelltale: SdkObservation<BeltTelltaleState> = SdkObservation(),
@@ -36,7 +35,6 @@ data class VehicleSnapshot(
     val activeUxRestrictions: Int? = null,
     val supportedDoorAreas: List<String> = emptyList(),
     val selectedDoorArea: String? = null,
-    val supportedSeatAreas: List<String> = emptyList(),
     val supportedBeltAreas: List<String> = emptyList(),
     val diagnostics: List<String> = emptyList(),
     val versions: Map<String, String> = emptyMap(),

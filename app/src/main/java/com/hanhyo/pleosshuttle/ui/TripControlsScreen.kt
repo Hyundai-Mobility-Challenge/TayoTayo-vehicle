@@ -97,8 +97,7 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
                 Correction(child, vm, allowAlight = true)
             }
         }
-        Sensors(vm)
-        Notice("모든 좌석이 비어 있어도 잔류 아동 없음이나 안전을 자동 확정하지 않습니다. 센서가 관측하지 못하는 가상 좌석도 있습니다.")
+        Notice("남아 있는 어린이가 없는지 직접 살펴보세요. 앱은 잔류 아동 없음이나 안전을 자동 확정하지 않습니다.")
         Action("선생님 · 실내를 직접 확인했음", "confirm-cabin") { vm.perform { confirmCabinInspection(it) } }
         Text("직접 확인: ${timeText(vm.trip.directCabinCheckAtMillis)}")
         Action("종료 기록 저장", "finish-trip", enabled = vm.trip.onboardChildren.isEmpty() && vm.trip.directCabinCheckAtMillis != null) { vm.perform { finishTrip(it) } }
@@ -109,7 +108,6 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
     Section("운행 종료 기록을 저장했습니다", "직접 확인과 관측 한계를 함께 보존했습니다") {
         val end = vm.trip.endRecord
         Text("종료 ${timeText(end?.recordedAtMillis)} · 직접 실내 확인 ${timeText(end?.manualInspectionAtMillis)}")
-        Text("관측상 점유 Area: ${end?.occupiedAreaLabels}\n미확인·오래된 Area: ${end?.unknownOrStaleAreaLabels}\n센서 범위 확인: ${end?.sensorCoverageKnown}")
         Notice(end?.statement ?: "종료 기록 미확인")
         Action("진단·이력 보기", "view-history") { vm.panel = "diagnostics" }
         Action("완료 기록 보관 후 새 모의 운행", "new-trip", secondary = true) { vm.startNewSimulationTrip() }

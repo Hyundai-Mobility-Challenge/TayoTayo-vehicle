@@ -123,9 +123,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
             }
             tag == "complete-stop" -> Action("다음 지점으로", tag, prominent = true) { vm.perform { completeCurrentStop(it) } }
             tag == "confirm-finish" -> {
-                val occupied = vm.vehicle.seats.count { it.occupancy.isFresh(vm.now) && it.occupancy.value == true }
                 Text("남아 있는 어린이가 없는지 직접 살펴보세요.", style = question)
-                Text(if (occupied > 0) "좌석 점유 감지 ${occupied}곳 · 직접 확인 필요" else "센서가 확인하지 못하는 좌석이 있을 수 있어요.", color = warning, style = type.body2SemiBold)
                 Action("실내 확인 완료 · 운행 종료", tag, prominent = true) { vm.perform { inspectAndFinish(it) } }
             }
             tag == "view-history" -> {

@@ -409,12 +409,12 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (state.unlockAttempt != null && state.unlockAttempt?.completedAtMillis == null) return reject("문 요청 결과를 먼저 확인하세요.")
         invalidate(now, "운행 종료 검토")
-        return update(state.copy(phase = TripPhase.END_REVIEW, directCabinCheckAtMillis = null), "명단·좌석 관측·미확인 정보·직접 실내 확인을 각각 검토하세요.")
+        return update(state.copy(phase = TripPhase.END_REVIEW, directCabinCheckAtMillis = null), "명단과 선생님 직접 실내 확인을 각각 검토하세요.")
     }
     fun confirmCabinInspection(now: Long): Boolean {
         if (state.phase != TripPhase.END_REVIEW) return reject("종료 확인 단계가 아닙니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
-        return update(state.copy(directCabinCheckAtMillis = now), "선생님 직접 실내 확인 기록. 센서와 명단의 불일치는 별도로 남습니다.")
+        return update(state.copy(directCabinCheckAtMillis = now), "선생님 직접 실내 확인 기록.")
     }
     fun finishTrip(now: Long): Boolean {
         if (state.phase != TripPhase.END_REVIEW) return reject("종료 확인 단계가 아닙니다.")
@@ -422,10 +422,10 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (state.onboardChildren.isNotEmpty()) return reject("기록상 미하차 어린이가 남아 있습니다. 기록을 확인·정정하세요.")
         val inspected = state.directCabinCheckAtMillis ?: return reject("선생님의 직접 실내 확인이 필요합니다.")
         if (now < inspected || now - inspected > INSPECTION_TTL) return reject("직접 실내 확인이 오래되어 다시 확인해야 합니다.")
-        val record = EndRecord(now, inspected, state.onboardChildren.map { it.id }, vehicle.seats.filter { it.occupancy.isFresh(now) && it.occupancy.value == true }.map { it.areaId }, vehicle.seats.filter { !it.occupancy.isFresh(now) }.map { it.areaId }, vehicle.connected, sensorCoverageKnown = false, observedVehicle = vehicle,
-            occupiedAreaLabels = vehicle.seats.filter { it.occupancy.isFresh(now) && it.occupancy.value == true }.map { it.areaLabel },
-            unknownOrStaleAreaLabels = vehicle.seats.filter { !it.occupancy.isFresh(now) }.map { it.areaLabel })
-        return update(state.copy(phase = TripPhase.ENDED, endRecord = record), "운행 종료 기록 저장. 좌석 미확인·불일치도 기록에 보존하며 안전을 자동 판정하지 않습니다.")
+        // V-07 삭제(D39): 좌석 점유 관측은 종료 기록에 넣지 않는다. 점유 필드는 저장 호환용으로 빈 값만 채운다.
+        val record = EndRecord(now, inspected, state.onboardChildren.map { it.id }, occupiedAreas = emptyList(), unknownOrStaleAreas = emptyList(),
+            vehicleConnected = vehicle.connected, sensorCoverageKnown = false, observedVehicle = vehicle)
+        return update(state.copy(phase = TripPhase.ENDED, endRecord = record), "운행 종료 기록 저장. 선생님 직접 실내 확인을 남기며 안전을 자동 판정하지 않습니다.")
     }
     fun previewRoute(proposal: RouteProposal): Boolean {
         if (state.phase != TripPhase.PREPARING || proposal.routeVersion != state.routeVersion) return reject("현재 운행 준비에 맞는 경로 계산이 아닙니다.")

@@ -55,9 +55,9 @@ class ShuttleEngineTest {
         assertTrue(engine.state.ledger.last().reason.contains("다른 가상 어린이"))
     }
 
-    @Test fun `좌석 점유와 벨트 관측은 어린이 기록을 바꾸지 않는다`() {
+    @Test fun `좌석 벨트 관측은 어린이 기록을 바꾸지 않는다`() {
         val engine = ready()
-        engine.updateVehicle(parked().copy(seats = listOf(SeatObservation(33, observed(true), observed(true)))), now)
+        engine.updateVehicle(parked().copy(seats = listOf(SeatObservation(33, beltFastened = observed(true)))), now)
         assertTrue(engine.state.children.all { it.status == Attendance.NOT_BOARDED })
         assertTrue(engine.state.ledger.isEmpty())
         assertEquals(33, engine.vehicle.seats.single().areaId)
@@ -256,17 +256,18 @@ class ShuttleEngineTest {
         assertEquals(TripPhase.END_REVIEW, engine.state.phase)
     }
 
-    @Test fun `종료는 센서 미확인과 점유 불일치를 기록에 남긴다`() {
+    @Test fun `종료 기록은 좌석 관측으로 어린이 잔류를 판정하지 않는다(V-07 삭제)`() {
         val initial = SampleTrip.create().copy(phase = TripPhase.END_REVIEW, children = SampleTrip.create().children.map { it.copy(status = Attendance.ALIGHTED) })
         val engine = ShuttleEngine(initial)
         engine.updateVehicle(parked().copy(seats = listOf(SeatObservation(1, observed(true), areaLabel = "ROW_1_LEFT"), SeatObservation(2, areaLabel = "ROW_1_RIGHT"))), now)
         assertFalse(engine.finishTrip(now))
         assertTrue(engine.confirmCabinInspection(now))
         assertTrue(engine.finishTrip(now))
-        assertEquals(listOf(1), engine.state.endRecord!!.occupiedAreas)
-        assertEquals(listOf(2), engine.state.endRecord!!.unknownOrStaleAreas)
-        assertEquals(listOf("ROW_1_LEFT"), engine.state.endRecord!!.occupiedAreaLabels)
-        assertEquals(listOf("ROW_1_RIGHT"), engine.state.endRecord!!.unknownOrStaleAreaLabels)
+        // 예전 형식의 좌석 관측이 들어와도 저장 호환용 필드는 비워 둔다(D39).
+        assertEquals(emptyList<Int>(), engine.state.endRecord!!.occupiedAreas)
+        assertEquals(emptyList<Int>(), engine.state.endRecord!!.unknownOrStaleAreas)
+        assertEquals(emptyList<String>(), engine.state.endRecord!!.occupiedAreaLabels)
+        assertEquals(emptyList<String>(), engine.state.endRecord!!.unknownOrStaleAreaLabels)
         assertFalse(engine.state.endRecord!!.statement.contains("잔류 아동 없음"))
     }
 

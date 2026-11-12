@@ -29,7 +29,7 @@ import java.io.File
 enum class TrialScenario(val label: String) {
     PARKED("정차 · P"), MOVING("이동 중"), SIGNAL("신호 정차 · D"), UNKNOWN("속도·기어 미확인"),
     STALE("관측 갱신 중단"), WARNING("접근 물체 경고"), DISCONNECTED("센서 연결 끊김"),
-    OCCUPIED("좌석 점유 불일치"), ACCEPT_ONLY("문 수락 후 잠금 유지")
+    ACCEPT_ONLY("문 수락 후 잠금 유지")
 }
 
 class ShuttleViewModel(application: Application) : AndroidViewModel(application) {
@@ -431,8 +431,9 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         speedKph = s.speedMetersPerSecond.map { it.toDouble() * 3.6 },
         gear = s.gear.map { when(it) { 4 -> Gear.PARK; 2 -> Gear.REVERSE; 1 -> Gear.NEUTRAL; 8 -> Gear.DRIVE; else -> Gear.UNKNOWN } },
         parkingBrake = s.parkingBrake.map { it }, doorLocked = s.doorLocked.map { it },
-        seats = (s.seatOccupancy.keys + s.seatBelts.keys).distinct().mapIndexed { index, area ->
-            SeatObservation(index + 1, s.seatOccupancy[area]?.map { it } ?: Observation(), s.seatBelts[area]?.map { it } ?: Observation(), areaLabel = area)
+        // V-07 삭제(D39): 좌석 점유는 받지 않는다. 좌석별 벨트 관측만 진단용으로 옮긴다.
+        seats = s.seatBelts.keys.mapIndexed { index, area ->
+            SeatObservation(index + 1, beltFastened = s.seatBelts[area]?.map { it } ?: Observation(), areaLabel = area)
         },
         connectionGeneration = sdkGeneration,
         parkingBrakeSupported = s.parkingBrakeSupported,
@@ -459,7 +460,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             gear = observed(if(unknown) null else if(scenario in listOf(TrialScenario.MOVING,TrialScenario.SIGNAL)) Gear.DRIVE else Gear.PARK),
             parkingBrake = observed(if(unknown) null else scenario !in listOf(TrialScenario.MOVING,TrialScenario.SIGNAL)),
             doorLocked = observed(if(connected) simLocked else null),
-            seats = listOf(SeatObservation(101, observed(if(connected) scenario == TrialScenario.OCCUPIED else null), observed(if(connected) false else null))),
+            seats = listOf(SeatObservation(101, beltFastened = observed(if(connected) false else null))),
             connectionGeneration = simGeneration, parkingBrakeSupported = true
         ), at)
         val nextKind = if (scenario == TrialScenario.WARNING) SurroundingKind.WARNING else SurroundingKind.UNKNOWN
@@ -602,7 +603,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             appendLine("trip=${trip.tripId} phase=${trip.phase} current=${trip.currentStop?.name}")
             appendLine("local fictional data only; source/time/status are independent")
             appendLine("SDK: ${sdkVehicle.versions}; Navi: ${navi.versions}")
-            appendLine("areas=${sdkVehicle.supportedDoorAreas}/${sdkVehicle.supportedSeatAreas}/${sdkVehicle.supportedBeltAreas}")
+            appendLine("areas=${sdkVehicle.supportedDoorAreas}/${sdkVehicle.supportedBeltAreas}")
             sdkVehicle.diagnostics.forEach(::appendLine); navi.diagnostics.forEach(::appendLine)
             trip.diagnostics.forEach { appendLine(it.toString()) }; trip.ledger.forEach { appendLine(it.toString()) }
             audioState.events.forEach(::appendLine)

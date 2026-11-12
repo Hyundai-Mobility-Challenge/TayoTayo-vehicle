@@ -41,8 +41,13 @@ data class Observation<T>(
     }
 }
 
+/**
+ * 좌석 Area별 관측. 지금은 좌석별 벨트 체결 진단에만 쓴다.
+ * 이전 저장 운행(trip-v1.bin)에 이 클래스가 들어 있어 지우면 복원 시 ClassNotFoundException이 나므로 유지한다.
+ */
 data class SeatObservation(
     val areaId: Int,
+    /** deprecated: V-07 삭제(D39), 저장 호환용으로만 유지. 새로 채우지 않으며 어떤 판단·문구에도 쓰지 않는다. */
     val occupancy: Observation<Boolean> = Observation(),
     val beltFastened: Observation<Boolean> = Observation(),
     val areaLabel: String = areaId.toString(),
@@ -237,12 +242,16 @@ data class EndRecord(
     val recordedAtMillis: Long,
     val manualInspectionAtMillis: Long,
     val remainingChildIds: List<String>,
+    /** deprecated: V-07 삭제(D39), 저장 호환용으로만 유지. 새 기록은 항상 빈 목록. */
     val occupiedAreas: List<Int>,
+    /** deprecated: V-07 삭제(D39), 저장 호환용으로만 유지. 새 기록은 항상 빈 목록. */
     val unknownOrStaleAreas: List<Int>,
     val vehicleConnected: Boolean,
     val sensorCoverageKnown: Boolean,
     val observedVehicle: VehicleSnapshot = VehicleSnapshot(),
+    /** deprecated: V-07 삭제(D39), 저장 호환용으로만 유지. */
     val occupiedAreaLabels: List<String> = occupiedAreas.map { it.toString() },
+    /** deprecated: V-07 삭제(D39), 저장 호환용으로만 유지. */
     val unknownOrStaleAreaLabels: List<String> = unknownOrStaleAreas.map { it.toString() },
     val statement: String = "선생님 직접 실내 확인과 운행 기록을 저장함. 센서 관측은 안전 보증이 아님.",
 ) : Serializable {
