@@ -35,7 +35,7 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
                     // V-02: 결석·직접 픽업 등은 배지로만 표시하고 명단에서 빼지 않는다.
                     notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("roster-badge-${child.id}")) }
                 }
-                StatusChip(child.status.label, tone = if (child.status == Attendance.ALIGHTED) ChipTone.INFO else ChipTone.NEUTRAL)
+                StatusChip(child.status.label, tone = riderTone(child.status))
                 NotBoardedActions(child, vm, tagPrefix = "roster-")
                 Correction(child, vm, allowAlight = vm.trip.phase == TripPhase.END_REVIEW)
             }

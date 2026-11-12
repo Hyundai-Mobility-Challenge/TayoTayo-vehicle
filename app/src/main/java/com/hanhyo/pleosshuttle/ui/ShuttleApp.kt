@@ -215,6 +215,8 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
             if (compact) Text("차내 기록 ${vm.trip.onboardChildren.size}명  ·  남은 ${vm.trip.remainingStopCount}곳  ·  ${vm.trip.phase.label}", style = AppTheme.typography.body3SemiBold, color = AppTheme.colors.textSecondary)
             if (reordering) ReorderBody(vm, draft!!, { draft = it }, onClose = { draft = null })
             else TeacherFlow(vm, guide, onBoardingReviewed, onOpenReorder = openReorder)
+            // V-03 탑승 명단 보드: 흐름 카드(지금 할 일) 아래에 모든 아이 행을 늘 보인다. 순서 바꾸기 중에는 그 작업만 보인다.
+            if (!reordering) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
             // 세로 분할에는 왼쪽 패널이 없으므로 같은 보조 정보를 본문 아래에 둔다.
             if (compact && (reordering || routeCheck)) side(Modifier.fillMaxWidth())
         }

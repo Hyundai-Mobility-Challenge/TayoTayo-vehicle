@@ -14,7 +14,8 @@ enum class ResultStatus(val label: String) {
  * NOT_BOARDED는 "아직 탑승 기록 없음(미결정)", CONFIRMED_NOT_BOARDED는 선생님이 직접 확정한 미탑승(V-02, 7절 사람이 확인).
  */
 enum class Attendance(val label: String) {
-    NOT_BOARDED("미탑승"), ONBOARD("탑승 기록"), ALIGHTED("하차 기록"),
+    /** NOT_BOARDED = 아직 결정 전(탑승 기록·미탑승 확인 모두 없음). [미탑승 확인] 버튼과 헷갈리지 않게 "탑승 전"으로 표시. 상수 이름은 직렬화되므로 바꾸지 않는다. */
+    NOT_BOARDED("탑승 전"), ONBOARD("탑승 기록"), ALIGHTED("하차 기록"),
     CONFIRMED_NOT_BOARDED("미탑승 확인"),
 }
 enum class Gear(val label: String) { PARK("P"), REVERSE("R"), NEUTRAL("N"), DRIVE("D"), UNKNOWN("미확인") }

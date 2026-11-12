@@ -17,7 +17,8 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppSize
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.designsystem.theme.canvasDp
 
-internal enum class ChipTone { NEUTRAL, INFO, ACCENT, DANGER }
+/** MUTED: 끝난 상태(예: 하차 완료)처럼 눈에 덜 띄어야 하는 칩. */
+internal enum class ChipTone { NEUTRAL, INFO, ACCENT, DANGER, MUTED }
 
 /** 헤더·명단의 상태 칩. 색만으로 상태를 구분하지 않도록 항상 글자를 함께 쓴다. */
 @Composable internal fun StatusChip(text: String, modifier: Modifier = Modifier, tone: ChipTone = ChipTone.NEUTRAL) {
@@ -27,6 +28,7 @@ internal enum class ChipTone { NEUTRAL, INFO, ACCENT, DANGER }
         ChipTone.INFO -> colors.infoContainer to colors.infoContent
         ChipTone.ACCENT -> colors.primaryContainer to colors.primaryContent
         ChipTone.DANGER -> colors.dangerContainer to colors.dangerContent
+        ChipTone.MUTED -> colors.neutralTag to colors.onNeutralTag
     }
     Surface(
         modifier = modifier,
