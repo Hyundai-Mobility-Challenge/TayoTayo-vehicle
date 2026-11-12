@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.hanhyo.pleosshuttle.FlowGuide
 import com.hanhyo.pleosshuttle.NO_RIDERS_TAG
 import com.hanhyo.pleosshuttle.NO_TRIP_TODAY_TAG
+import com.hanhyo.pleosshuttle.PICKUP_INSTITUTION_TAG
 import com.hanhyo.pleosshuttle.PICKUP_PREPARE_TAG
 import com.hanhyo.pleosshuttle.PICKUP_STOP_TAG
 import com.hanhyo.pleosshuttle.pickupBoardingChildren
@@ -34,7 +35,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
 /** Teacher actions are explicit; destination and guidance advance after the last child record. */
 @Composable internal fun TeacherFlow(vm: ShuttleViewModel, guide: FlowGuide, onBoardingReviewed: () -> Unit, onOpenReorder: () -> Unit) {
     val tag = guide.targetTag
-    val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "not-boarded-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}", "return-org-${it.id}", "end-not-boarded-${it.id}", "institution-handover-${it.id}") }
+    val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "not-boarded-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}", "return-org-${it.id}") }
     val pickup = vm.trip.isPickup
     val stationary = vm.engine.stationaryBlockers(vm.now).isEmpty()
     val uxLocked = vm.trip.integrationMode == IntegrationMode.SDK && vm.sdkVehicle.uxRestricted.value == true
@@ -58,6 +59,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
             child != null -> child.name.removePrefix("가상 ")
             tag == PICKUP_PREPARE_TAG -> "등원 명단을 확인해 주세요"
             tag == PICKUP_STOP_TAG -> "인계받고 태워 주세요"
+            tag == PICKUP_INSTITUTION_TAG -> "기관 담당자에게 인계해 주세요"
             tag == "start-trip" -> "${vm.tripDirectionLabel} 준비가 끝났어요"
             tag == "arrive-stop" -> "도착하면 확인해 주세요"
             tag == "arrive-origin" -> if (pickup) "기관으로 가요" else "출발지로 돌아가요"
@@ -87,8 +89,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
             }
             tag == PICKUP_PREPARE_TAG -> PickupPrepareBody(vm, onBoardingReviewed)
             tag == PICKUP_STOP_TAG -> PickupStopBody(vm, remainingReorder)
-            pickup && child != null && (tag?.startsWith("end-not-boarded-") == true || tag?.startsWith("institution-handover-") == true) ->
-                PickupEndStep(vm, child, tag!!)
+            tag == PICKUP_INSTITUTION_TAG -> PickupInstitutionBody(vm)
             (tag?.startsWith("board-") == true || tag?.startsWith("not-boarded-") == true) && child != null -> {
                 // V-02: 미탑승 예정 배지는 표시만 하고, 탑승·미탑승은 선생님이 정한다. 미탑승 예정이거나 탑승 마침 뒤면 [미탑승 확인]이 먼저.
                 notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("not-expected-badge-${child.id}")) }

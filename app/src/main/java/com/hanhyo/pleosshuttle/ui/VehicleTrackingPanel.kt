@@ -15,7 +15,7 @@ import com.hanhyo.pleosshuttle.ui.component.Action
 
 @Composable internal fun VehicleTrackingSummary(vm: ShuttleViewModel) {
     Column(Modifier.fillMaxWidth().padding(top = 16.dp).testTag("vehicle-tracking-summary"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("보호자 하원 진행 · 위치 공유", style = AppTheme.typography.body1SemiBold)
+        Text("보호자 ${vm.tripDirectionLabel} 진행 · 위치 공유", style = AppTheme.typography.body1SemiBold)
         Text(vm.trackingControls.guidance, style = AppTheme.typography.body3Regular)
         if (vm.trackingEnabled) Text(vm.trackingStatus, style = AppTheme.typography.body3Regular)
         Action("기관 · 배정 명단", "open-tracking-settings", secondary = true) { vm.panel = "institution" }
@@ -33,8 +33,9 @@ import com.hanhyo.pleosshuttle.ui.component.Action
     simulation: Boolean, onEnabled: (Boolean) -> Unit, onDemo: () -> Unit,
     demoPhase: MovingDemoPhase = MovingDemoPhase.STOPPED, demoProgress: Int = 0,
     onStart: () -> Unit = {}, onPause: () -> Unit = {}, onResume: () -> Unit = {}, onStop: () -> Unit = {},
+    directionLabel: String = "하원",
 ) {
-    Text("보호자 하원 위치 전송", style = MaterialTheme.typography.titleLarge)
+    Text("보호자 $directionLabel 위치 전송", style = MaterialTheme.typography.titleLarge)
     Text(state.source)
     Text(state.guidance, modifier = Modifier.testTag("vehicle-tracking-guidance"))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

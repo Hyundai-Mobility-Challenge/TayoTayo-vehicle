@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import com.hanhyo.pleosshuttle.PICKUP_INSTITUTION_TAG
 import com.hanhyo.pleosshuttle.PICKUP_PREPARE_TAG
 import com.hanhyo.pleosshuttle.PICKUP_STOP_TAG
 import com.hanhyo.pleosshuttle.ShuttleViewModel
@@ -49,8 +50,8 @@ import com.hanhyo.pleosshuttle.ui.component.guideAnchor
  * 등원(V-25~V-29) 흐름 카드 본문. 엔진 호출만 하고 규칙은 PickupFlow(순수)와 ShuttleEngine이 정한다.
  * - VS-17 등원 운행 준비: PickupPrepareBody
  * - VS-18 정류장 인계받음·탑승: PickupStopBody (+ VS-04 (b) 미탑승 확인 시트, VS-14 정류장 모드 정정)
- * - VS-20 최소 구현: PickupEndStep(처리 안 된 아이 미탑승 확인, 아이마다 기관 인계)
- * VS-19 호출 대기 화면·등원 음성은 2부(호출은 기록과 "호출함 HH:mm" 표시까지만).
+ * - VS-19 보호자 호출 상태: 정류장 행 안에 호출 시각·지난 시간(한도·재호출 없음, D30), 응답 자리는 PickupFlow.guardianResponseLabel
+ * - VS-20 기관 도착·기관 인계·종료: PickupInstitutionBody
  */
 
 private fun shortName(child: ChildRecord) = child.name.removePrefix("가상 ")
@@ -110,10 +111,18 @@ private fun shortName(child: ChildRecord) = child.name.removePrefix("가상 ")
                     Text(shortName(child), style = type.titleBold)
                     val details = listOfNotNull(
                         child.receivedFromType?.let { "인계: ${PickupReceivers.label(it)}" },
-                        child.guardianCalledAtMillis?.let { "호출함 ${hourMinuteText(it)}" },
                         if (child.status == Attendance.ONBOARD) (if (child.beltConfirmed) "벨트 확인" else "벨트 미확인") else null,
                     )
                     if (details.isNotEmpty()) Text(details.joinToString(" · "), style = type.body2Regular, color = AppTheme.colors.textSecondary, modifier = Modifier.testTag("pickup-detail-${child.id}"))
+                    // VS-19: 호출한 아이(아직 탑승 전)는 호출 시각과 지난 시간을 보인다. vm.now가 0.5초마다 바뀌어 분 단위로 갱신된다.
+                    if (child.status == Attendance.NOT_BOARDED && !child.receivedAtStop) PickupFlow.callElapsedLabel(child, vm.now)?.let { elapsed ->
+                        Text("보호자 호출 중 · ${hourMinuteText(child.guardianCalledAtMillis!!)} 호출 · $elapsed", style = type.body2SemiBold,
+                            color = AppTheme.colors.primaryContent, modifier = Modifier.testTag("pickup-call-${child.id}"))
+                    } else child.guardianCalledAtMillis?.let {
+                        Text("호출함 ${hourMinuteText(it)}", style = type.body2Regular, color = AppTheme.colors.textSecondary, modifier = Modifier.testTag("pickup-call-${child.id}"))
+                    }
+                    // VS-19 / P-21 응답 자리: 서버 응답이 아직 없어 항상 null(표시 없음).
+                    PickupFlow.guardianResponseLabel(child)?.let { Text(it, style = type.body2Regular, modifier = Modifier.testTag("pickup-call-response-${child.id}")) }
                     PickupFlow.notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT) }
                 }
                 StatusChip(PickupFlow.statusLabel(trip, child), tone = riderTone(child), modifier = Modifier.testTag("pickup-status-${child.id}"))
@@ -170,19 +179,73 @@ private fun shortName(child: ChildRecord) = child.name.removePrefix("가상 ")
     }
 }
 
-/** VS-20 최소 구현(2부에서 화면 확장): 처리 안 된 아이 미탑승 확인, 탄 아이마다 기관 담당자 인계 후 하차 기록. */
-@Composable internal fun PickupEndStep(vm: ShuttleViewModel, child: ChildRecord, tag: String) {
+/**
+ * VS-20 기관 도착·기관 인계·실내 확인·종료(S-19). 맨 위에 처리 안 된 아이(탑승 전·미탑승 예정, 지나친 정류장 포함) [미탑승 확인](시트 (b)),
+ * 다음에 탄 아이마다 기관 담당자 [기관 인계 확인 · 하차 기록](D38 아이마다 따로), 마지막에 실내 직접 확인 체크와 [운행 종료].
+ * 기관 담당자 부재 처리(keep 버튼, D32)는 미확정이라 두지 않는다.
+ */
+@Composable internal fun PickupInstitutionBody(vm: ShuttleViewModel) {
+    val trip = vm.trip
     val type = AppTheme.typography
-    var sheet by remember(tag) { mutableStateOf(false) }
-    if (tag.startsWith("end-not-boarded-")) {
-        Text("탑승도 미탑승 확인도 없어요 · 오늘 안 탔나요?", style = type.titleBold)
-        Text("${vm.trip.stops.find { it.id == child.stopId }?.shortName ?: "정류장 없음"} · 탑승 전", style = type.body2Regular, color = AppTheme.colors.textSecondary)
-        Action("미탑승 확인", tag, prominent = true) { sheet = true }
-        if (sheet) PickupNotBoardedDialog(vm, child) { sheet = false }
-    } else {
-        Text("기관 담당자에게 직접 인계했나요?", style = type.titleBold)
-        Text("아이마다 따로 인계를 확인해요.", style = type.body2Regular, color = AppTheme.colors.textSecondary)
-        Action("기관 인계 확인 · 하차 기록", tag, prominent = true) { vm.perform { handoverToInstitution(child.id, it) } }
+    val stationary = vm.engine.stationaryBlockers(vm.now).isEmpty()
+    val unresolved = PickupFlow.unresolvedAtInstitution(trip)
+    val onboard = PickupFlow.awaitingInstitutionHandover(trip)
+    var sheetChildId by remember(trip.tripId) { mutableStateOf<String?>(null) }
+    // 실내 직접 확인은 마지막에 한다. 처리할 아이가 바뀌면 다시 확인한다.
+    var cabinChecked by remember(trip.tripId, unresolved.size, onboard.size) { mutableStateOf(false) }
+    val handed = trip.children.count { it.status == Attendance.ALIGHTED }
+    Text("기관 도착 · 기관 인계 ${handed}명 완료 · 남은 ${onboard.size}명", style = type.titleBold,
+        modifier = Modifier.testTag("pickup-institution-header").guideAnchor(PICKUP_INSTITUTION_TAG))
+    if (unresolved.isNotEmpty()) {
+        Column(Modifier.fillMaxWidth().testTag("pickup-unresolved"), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
+            Text("처리 안 된 어린이 ${unresolved.size}명 · 먼저 미탑승 확인해 주세요", style = type.body2SemiBold, color = AppTheme.colors.primaryContent)
+            unresolved.forEach { child ->
+                RowCard(highlight = true, tag = "pickup-unresolved-${child.id}") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+                            Text(shortName(child), style = type.titleBold)
+                            Text("${trip.stops.find { it.id == child.stopId }?.shortName ?: "정류장 없음"} · 탑승 전", style = type.body2Regular, color = AppTheme.colors.textSecondary)
+                            PickupFlow.notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT) }
+                        }
+                        Action("미탑승 확인", "end-not-boarded-${child.id}", secondary = true, enabled = stationary) { sheetChildId = child.id }
+                    }
+                }
+            }
+        }
+    }
+    if (onboard.isNotEmpty()) Text("기관 담당자에게 직접 인계한 뒤 아이마다 기록해요.", style = type.body2Regular, color = AppTheme.colors.textSecondary)
+    onboard.forEach { child ->
+        RowCard(highlight = false, tag = "pickup-handover-row-${child.id}") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(shortName(child), style = type.titleBold)
+                    Text("기관 도착 · 인계 대기", style = type.body2Regular, color = AppTheme.colors.textSecondary)
+                }
+                Action("기관 인계 확인 · 하차 기록", "institution-handover-${child.id}", enabled = stationary) { vm.perform { handoverToInstitution(child.id, it) } }
+            }
+        }
+    }
+    val ready = unresolved.isEmpty() && onboard.isEmpty()
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = AppSize.touchMin)
+            .toggleable(value = cabinChecked, enabled = ready, role = Role.Checkbox) { cabinChecked = it }
+            .testTag("pickup-cabin-check"),
+        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = cabinChecked, onCheckedChange = null, enabled = ready)
+        Text("기록된 아이 외에 차에 남은 아이가 없어요(직접 확인)", style = type.body2SemiBold,
+            color = if (ready) AppTheme.colors.textPrimary else AppTheme.colors.textTertiary)
+    }
+    PickupFlow.institutionFinishBlocker(trip, cabinChecked)?.let {
+        Text(it, style = type.body2SemiBold, color = AppTheme.colors.primaryContent, modifier = Modifier.testTag("pickup-finish-blocker"))
+    }
+    Action("운행 종료", "confirm-finish", prominent = true, enabled = stationary && PickupFlow.institutionFinishBlocker(trip, cabinChecked) == null) {
+        // 실내 확인 기록과 종료 기록을 한 번에 남긴다(엔진 finishTrip이 S-19 조건을 다시 검사).
+        vm.perform { inspectAndFinish(it) }
+    }
+    Text("앱은 차 안이 비었는지 자동으로 판정하지 않아요.", style = type.caption1Regular, color = AppTheme.colors.textSecondary)
+    sheetChildId?.let { id -> trip.children.find { it.id == id } }?.let { child ->
+        PickupNotBoardedDialog(vm, child) { sheetChildId = null }
     }
 }
 

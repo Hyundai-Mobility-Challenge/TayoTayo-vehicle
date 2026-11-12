@@ -19,6 +19,8 @@ internal const val NO_RIDERS_TAG = "no-riders"
 internal const val PICKUP_PREPARE_TAG = "pickup-prepare"
 /** VS-18 등원 정류장 인계받음·탑승(이 정류장 아이 행 + [다음 정류장으로]/[기관으로 출발]). */
 internal const val PICKUP_STOP_TAG = "pickup-stop"
+/** VS-20 기관 도착 뒤 한 화면: 처리 안 된 아이 [미탑승 확인] → 아이마다 기관 인계 → 실내 확인 → [운행 종료]. */
+internal const val PICKUP_INSTITUTION_TAG = "pickup-institution"
 
 internal fun nextFlowGuide(
     trip: TripState,
@@ -87,16 +89,8 @@ private fun pickupFlowGuide(trip: TripState, boardingReviewed: Boolean, surround
         trip.unlockAttempt?.let { it.completedAtMillis == null } == true -> FlowGuide("운전자", "별도 문 시험 응답 대기", "시험 진행 중", "door-result")
         else -> FlowGuide("선생님", "인계받음·탑승", "정류장 아이마다 기록", PICKUP_STOP_TAG)
     }
-    TripPhase.END_REVIEW -> {
-        // VS-20 최소 구현: 처리 안 된 아이 미탑승 확인 → 탄 아이마다 기관 인계(하차 기록) → 실내 확인 후 종료.
-        val unresolved = PickupFlow.unresolvedAtInstitution(trip).firstOrNull()
-        val onboard = PickupFlow.awaitingInstitutionHandover(trip).firstOrNull()
-        when {
-            unresolved != null -> FlowGuide("선생님", "미탑승 확인", "처리 안 된 어린이", "end-not-boarded-${unresolved.id}")
-            onboard != null -> FlowGuide("선생님", "기관 인계", "기관 담당자 인계", "institution-handover-${onboard.id}")
-            else -> FlowGuide("선생님", "실내 확인 후 종료", "직접 확인과 종료 저장", "confirm-finish")
-        }
-    }
+    // VS-20: 처리 안 된 아이 미탑승 확인 → 탄 아이마다 기관 인계(하차 기록) → 실내 확인 → [운행 종료](S-19). 한 화면에서 처리한다.
+    TripPhase.END_REVIEW -> FlowGuide("선생님", "기관 인계", "아이마다 기관 담당자 인계", PICKUP_INSTITUTION_TAG)
     TripPhase.ENDED -> FlowGuide("완료", "등원 기록 저장", "기록 확인", "view-history")
     TripPhase.DRIVING -> error("Handled above")
 }

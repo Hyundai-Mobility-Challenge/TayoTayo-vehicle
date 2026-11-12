@@ -12,6 +12,7 @@ internal data class TripCue(val key: String, val text: String)
  */
 internal fun tripCue(trip: TripState): TripCue? {
     if (trip.phase == TripPhase.PREPARING) return departureCue(trip)
+    if (trip.isPickup) return pickupCue(trip)
     val stop = trip.currentStop ?: trip.origin
     val name = stopLabel(stop)
     val alighting = alightingChildren(trip, trip.currentStop)
@@ -27,6 +28,30 @@ internal fun tripCue(trip: TripState): TripCue? {
     val key = if (trip.phase == TripPhase.DRIVING && trip.currentStop != null) "$base:${alighting.map { it.id }.sorted().joinToString("|")}" else base
     return TripCue(key, text)
 }
+
+/**
+ * 등원(V-25) 안내. 하원 문장("내릴 어린이", "출발지로 돌아갑니다")을 쓰지 않는다. 키 규칙은 하원과 같다:
+ * 다음 정류장 안내 키에는 그 정류장에서 탈 아이 id 집합을 넣고(주행 중 바뀌면 한 번 더), 도착 안내 키에는 넣지 않는다.
+ * 재출발 벨트 경고(V-16)는 하원과 같은 [redepartureBeltPrefix]를 앞에 붙인다(등원은 탄 아이 모두 기관까지 감).
+ */
+private fun pickupCue(trip: TripState): TripCue? {
+    val stop = trip.currentStop
+    val boarding = pickupBoardingChildren(trip, stop)
+    val text = when (trip.phase) {
+        TripPhase.DRIVING -> redepartureBeltPrefix(trip) +
+            (if (stop == null) institutionApproachSpeech() else boardingApproachSpeech(stopLabel(stop), boarding.map(::spokenChildName)))
+        TripPhase.ALIGHTING -> pickupArrivalSpeech(stopLabel(stop ?: trip.origin), boarding.map(::spokenChildName))
+        TripPhase.END_REVIEW -> institutionArrivalSpeech(trip.onboardChildren.map(::spokenChildName))
+        TripPhase.ENDED -> "등원 기록을 저장했습니다."
+        TripPhase.PREPARING -> return null
+    }
+    val base = stageKey(trip)
+    val key = if (trip.phase == TripPhase.DRIVING && stop != null) "$base:${boarding.map { it.id }.sorted().joinToString("|")}" else base
+    return TripCue(key, text)
+}
+
+/** 등원 마지막 정류장을 떠난 뒤(기관으로 가는 중) 안내. */
+internal fun institutionApproachSpeech(): String = "다음은 기관입니다. 도착하면 아이마다 기관 담당자에게 인계해 주세요."
 
 /** 단계 키(지점·단계 단위). 내비 요청은 하차 대상이 바뀌어도 목적지가 같으므로 이 키만 쓴다. */
 private fun stageKey(trip: TripState) = "${trip.tripId}:${trip.integrationMode}:${trip.routeVersion}:${trip.currentStopIndex}:${trip.phase}"
@@ -67,24 +92,24 @@ internal fun arrivalSpeech(stopName: String, names: List<String>): String =
     if (names.isEmpty()) "${stopName} 도착, 내릴 어린이 없음."
     else "${stopName} 도착, ${names.joinToString(", ")} 하차 예정. 보호자 인계와 하차를 기록해 주세요."
 
-/** V-15 등원 문구(등원 흐름이 아직 없어 연결하지 않음). 예: "다음은 서울숲 정류장, 어린이 가 탑승." */
+/** V-15 등원 다음 정류장 안내([pickupCue]). 예: "다음은 서울숲 정류장, 어린이 가 탑승." */
 internal fun boardingApproachSpeech(stopName: String, names: List<String>): String =
     if (names.isEmpty()) "다음은 ${stopName} 정류장, 탈 어린이 없음." else "다음은 ${stopName} 정류장, ${names.joinToString(", ")} 탑승."
 
 /**
  * V-15 등원 탑승 안내 대상: 이 정류장에서 아직 탑승도 미탑승 확인도 없는 아이(명단 순서). 미탑승 예정 배지 아이는 빼지 않는다
- * (자동 제외 없음, V-26) — 아직 미탑승 확인 전이면 정류장에서 확인해야 하기 때문. 하원 운행이면 빈 목록. (아직 연결하지 않음)
+ * (자동 제외 없음, V-26) — 아직 미탑승 확인 전이면 정류장에서 확인해야 하기 때문. 하원 운행이면 빈 목록.
  */
 internal fun pickupBoardingChildren(trip: TripState, stop: Stop?): List<ChildRecord> =
     if (!trip.isPickup || stop == null) emptyList()
     else trip.children.filter { it.stopId == stop.id && it.status == Attendance.NOT_BOARDED }
 
-/** V-27 등원 정류장 도착 안내(아직 연결하지 않음). 예: "서울숲 정류장 도착, 어린이 가 탑승 예정. 인계받음과 탑승을 기록해 주세요." */
+/** V-27 등원 정류장 도착 안내([pickupCue]). 예: "서울숲 정류장 도착, 어린이 가 탑승 예정. 인계받음과 탑승을 기록해 주세요." */
 internal fun pickupArrivalSpeech(stopName: String, names: List<String>): String =
     if (names.isEmpty()) "${stopName} 정류장 도착, 탈 어린이 없음."
     else "${stopName} 정류장 도착, ${spokenNameList(names)} 탑승 예정. 인계받음과 탑승을 기록해 주세요."
 
-/** V-29 기관 도착 안내(아직 연결하지 않음). 예: "기관 도착. 어린이 가, 어린이 나 기관 담당자에게 인계해 주세요." */
+/** V-29 기관 도착 안내([pickupCue]). 예: "기관 도착. 어린이 가, 어린이 나 기관 담당자에게 인계해 주세요." */
 internal fun institutionArrivalSpeech(names: List<String>): String =
     if (names.isEmpty()) "기관 도착. 인계할 어린이가 없습니다. 차량 실내를 직접 확인해 주세요."
     else "기관 도착. ${spokenNameList(names)} 기관 담당자에게 인계해 주세요."

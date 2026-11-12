@@ -148,6 +148,40 @@ object PickupFlow {
     fun notBoardingBadge(child: ChildRecord): String? =
         if (child.expectedToBoard) null else "미탑승 예정 · ${pickupNoticeLabel(child.notBoardingReason)}"
 
+    // ---------------- VS-19 보호자 호출 상태(정류장 행 안). 대기 한도·재호출 없음(D30). ----------------
+
+    /**
+     * 호출 뒤 지난 시간 문구. 1분 미만 "방금 호출", 그 뒤 "호출 n분 전"(분 단위로 바뀜). 한도 없이 계속 센다.
+     * 시계가 거꾸로 가면(now < 호출 시각) "방금 호출"로 둔다. 호출이 없으면 null.
+     */
+    fun callElapsedLabel(child: ChildRecord, now: Long): String? {
+        val at = child.guardianCalledAtMillis ?: return null
+        val minutes = ((now - at).coerceAtLeast(0L) / 60_000L)
+        return if (minutes < 1) "방금 호출" else "호출 ${minutes}분 전"
+    }
+
+    /**
+     * VS-19 / P-21 보호자 응답(곧 나가요 / 오늘 안 타요 / 응답 없음) 표시 자리. 서버(S-20)가 아직 응답을 내려주지 않으므로
+     * 지금은 항상 null(화면에 응답 줄 없음). 응답이 들어오면 여기서 문구를 돌려주면 정류장 행이 그대로 보여 준다.
+     * 응답은 참고용이며 "오늘 안 타요"도 미탑승을 확정하지 않는다(7절).
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun guardianResponseLabel(child: ChildRecord): String? = null
+
+    // ---------------- VS-20 기관 도착·기관 인계·종료(S-19). ----------------
+
+    /**
+     * [운행 종료]를 막는 이유(없으면 null). 기관 도착 확인 뒤(종료 확인 단계)에, 처리 안 된 아이(탑승 전·미탑승 예정, 지나친 정류장 포함)가
+     * 없고, 탄 아이가 모두 기관 인계(하차 기록)되고, 선생님이 실내를 직접 확인했을 때만 종료한다.
+     */
+    fun institutionFinishBlocker(trip: TripState, cabinChecked: Boolean): String? = when {
+        !trip.isPickup || trip.phase != TripPhase.END_REVIEW -> "기관 도착 확인 뒤 종료해요"
+        unresolvedAtInstitution(trip).isNotEmpty() -> "처리 안 된 어린이 ${unresolvedAtInstitution(trip).size}명 · 미탑승 확인해 주세요"
+        awaitingInstitutionHandover(trip).isNotEmpty() -> "기관 인계 전 어린이 ${awaitingInstitutionHandover(trip).size}명 · 아이마다 인계해 주세요"
+        !cabinChecked -> "차 안에 남은 아이가 없는지 직접 확인해 주세요"
+        else -> null
+    }
+
     /** 3.5절 등원 차량 표기. 행 상태 칩 문구. */
     fun statusLabel(trip: TripState, child: ChildRecord): String = when (stateKey(trip, child)) {
         AT_STOP -> "이번 탑승"

@@ -127,7 +127,7 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
         ) {
             AppHeader(runName = "${vm.tripDirectionLabel} 한 바퀴", compact = compact) {
                 if (!compact) {
-                    StatusChip(vm.trip.phase.label, tone = ChipTone.INFO)
+                    StatusChip(phaseLabel(vm.trip), tone = ChipTone.INFO)
                     StatusChip("차내 기록 ${vm.trip.onboardChildren.size}명")
                     StatusChip("남은 ${vm.trip.remainingStopCount}곳")
                 }
@@ -220,7 +220,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
                 .testTag("main-scroll"),
             verticalArrangement = Arrangement.spacedBy(if (compact) AppSpacing.xl else 0.dp),
         ) {
-            if (compact) Text("차내 기록 ${vm.trip.onboardChildren.size}명  ·  남은 ${vm.trip.remainingStopCount}곳  ·  ${vm.trip.phase.label}", style = AppTheme.typography.body3SemiBold, color = AppTheme.colors.textSecondary)
+            if (compact) Text("차내 기록 ${vm.trip.onboardChildren.size}명  ·  남은 ${vm.trip.remainingStopCount}곳  ·  ${phaseLabel(vm.trip)}", style = AppTheme.typography.body3SemiBold, color = AppTheme.colors.textSecondary)
             if (reordering) ReorderBody(vm, draft!!, { draft = it }, onClose = { draft = null })
             else TeacherFlow(vm, guide, onBoardingReviewed, onOpenReorder = openReorder)
             // V-03 탑승 명단 보드: 흐름 카드(지금 할 일) 아래에 모든 아이 행을 늘 보인다. 순서 바꾸기 중에는 그 작업만 보인다.
@@ -315,7 +315,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
             )
         }
         Spacer(Modifier.weight(1f))
-        Text(vm.trip.phase.label, style = AppTheme.typography.body1SemiBold)
+        Text(phaseLabel(vm.trip), style = AppTheme.typography.body1SemiBold)
     }
 }
 

@@ -1,6 +1,7 @@
 package com.hanhyo.pleosshuttle.ui
 
 import com.hanhyo.pleosshuttle.InstitutionTrips
+import com.hanhyo.pleosshuttle.PICKUP_INSTITUTION_TAG
 import com.hanhyo.pleosshuttle.PICKUP_PREPARE_TAG
 import com.hanhyo.pleosshuttle.PICKUP_STOP_TAG
 import com.hanhyo.pleosshuttle.TrackingTransition
@@ -188,24 +189,54 @@ class PickupScreenRulesTest {
         assertTrue("park" in prep.state.routeOrder)
     }
 
-    @Test fun `VS-20 최소 단계는 처리 안 된 아이, 아이마다 기관 인계, 실내 확인 순서로 종료한다`() {
+    @Test fun `VS-20 처리 안 된 아이 미탑승 확인, 아이마다 기관 인계, 실내 확인이 모두 있어야 운행 종료`() {
         val e = atForest()
         board(e, "child-a")
         assertTrue(e.confirmNotBoardedAtStop("child-b", notifyGuardian = false, now))
         assertTrue(e.completeCurrentStop(now))
         // 박물관·올림픽공원 정차 없이 지나쳤다고 보고 기관까지 간다.
         repeat(2) { assertTrue(e.arriveAtPickupStop(now)); assertTrue(e.resumeDriving("지나침", now)) }
+        assertEquals("기관 도착 확인 뒤 종료해요", PickupFlow.institutionFinishBlocker(e.state, cabinChecked = true))
         assertTrue(e.beginEndReview(now))
-        assertEquals("end-not-boarded-child-c", nextFlowGuide(e.state).targetTag)
+        assertEquals(PICKUP_INSTITUTION_TAG, nextFlowGuide(e.state).targetTag)
+        assertEquals(listOf("child-c", "child-d"), PickupFlow.unresolvedAtInstitution(e.state).map { it.id }) // 지나친 정류장 아이 포함
+        assertEquals("처리 안 된 어린이 2명 · 미탑승 확인해 주세요", PickupFlow.institutionFinishBlocker(e.state, cabinChecked = true))
         assertTrue(e.confirmNotBoardedAtStop("child-c", notifyGuardian = false, now))
-        assertTrue(e.confirmNotBoardedAtStop("child-d", notifyGuardian = false, now))
-        assertEquals("institution-handover-child-a", nextFlowGuide(e.state).targetTag)
+        assertTrue(e.confirmNotBoardedAtStop("child-d", notifyGuardian = true, now))
+        assertEquals("기관 인계 전 어린이 1명 · 아이마다 인계해 주세요", PickupFlow.institutionFinishBlocker(e.state, cabinChecked = true))
         assertTrue(e.handoverToInstitution("child-a", now))
-        assertEquals("confirm-finish", nextFlowGuide(e.state).targetTag)
+        assertEquals("차 안에 남은 아이가 없는지 직접 확인해 주세요", PickupFlow.institutionFinishBlocker(e.state, cabinChecked = false))
+        assertNull(PickupFlow.institutionFinishBlocker(e.state, cabinChecked = true))
+        assertEquals(PICKUP_INSTITUTION_TAG, nextFlowGuide(e.state).targetTag)
         assertTrue(e.inspectAndFinish(now))
         assertEquals(TripPhase.ENDED, e.state.phase)
         assertEquals("view-history", nextFlowGuide(e.state).targetTag)
         assertEquals("기관 인계 완료", PickupFlow.statusLabel(e.state, e.child("child-a")))
+    }
+
+    @Test fun `VS-19 호출 뒤 지난 시간은 분 단위로 한도 없이 보이고 응답 자리는 비어 있다`() {
+        val e = atForest()
+        assertNull(PickupFlow.callElapsedLabel(e.child("child-a"), now))
+        assertTrue(e.callGuardian("child-a", now))
+        val called = e.child("child-a")
+        assertEquals("방금 호출", PickupFlow.callElapsedLabel(called, now))
+        assertEquals("방금 호출", PickupFlow.callElapsedLabel(called, now + 59_999))
+        assertEquals("호출 1분 전", PickupFlow.callElapsedLabel(called, now + 60_000))
+        assertEquals("호출 3분 전", PickupFlow.callElapsedLabel(called, now + 3 * 60_000 + 30_000))
+        assertEquals("호출 125분 전", PickupFlow.callElapsedLabel(called, now + 125 * 60_000))
+        assertEquals("방금 호출", PickupFlow.callElapsedLabel(called, now - 5_000)) // 시계 역행
+        assertNull(PickupFlow.guardianResponseLabel(called)) // 서버 응답 미제공
+        assertFalse(e.callGuardian("child-a", now + 60_000)) // 재호출 없음(D30)
+    }
+
+    @Test fun `등원 단계 칩과 출발지 행`() {
+        val e = atForest()
+        assertEquals("정류장 탑승", phaseLabel(e.state))
+        assertEquals("하차", phaseLabel(SampleTrip.create().copy(phase = TripPhase.ALIGHTING))) // 하원 그대로
+        assertEquals("기관 인계", phaseLabel(e.state.copy(phase = TripPhase.END_REVIEW)))
+        assertEquals("운행", phaseLabel(e.state.copy(phase = TripPhase.DRIVING)))
+        board(e, "child-a")
+        assertEquals("출발함", timelineStops(e.state).first().detail) // 출발지에서 탄 아이로 세지 않음
     }
 
     @Test fun `등원 표시 - 타임라인, 경로 인원, 위치 공유 출발`() {

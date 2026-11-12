@@ -69,7 +69,7 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
     val manual = !trip.routeIsExample && trip.routeObjective == RouteObjective.FIXED
     Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
         StatusChip(if (manual) "직접 바꾼 순서" else if (trip.routeIsExample) "자동 계산한 순서 · 직선거리 기준" else "적용한 순서", tone = if (manual) ChipTone.ACCENT else ChipTone.NEUTRAL)
-        Text("복귀 ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
+        Text("${if (trip.isPickup) "기관 도착" else "복귀"} ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
     }
     RouteStrip(vm, order, timeline)
     StopExclusionSuggestions(vm)
@@ -103,7 +103,8 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
                 StripItem("${index + 1}", stop.shortName, "${timeline.arrivalOf(id)?.let(::clockText) ?: "-"} · ${ridersAt(trip, id).size}명")
             }
             StripArrow()
-            StripItem("복", "복귀", clockText(timeline.endMinute))
+            // 등원은 마지막 정류장 뒤 기관으로 간다(출발지 복귀가 아님).
+            if (trip.isPickup) StripItem("기", "기관 도착", clockText(timeline.endMinute)) else StripItem("복", "복귀", clockText(timeline.endMinute))
         }
         Text(SYNTHETIC_NOTE, style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
     }
@@ -254,7 +255,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
     val blockers = vm.engine.manualRouteBlockers(vm.now)
     Column(Modifier.fillMaxWidth().testTag("reorder"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         Text(if (locked == 0) "순서 바꾸기" else "남은 순서 바꾸기", style = AppTheme.typography.head3Bold)
-        Text(if (locked == 0) "위·아래 버튼으로 한 칸씩 옮겨요. 출발과 복귀는 고정이에요." else "지나온 정류장과 지금 정류장은 고정이에요. 다음 정류장부터 바뀌어요.", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
+        Text(if (locked == 0) "위·아래 버튼으로 한 칸씩 옮겨요. 출발과 ${if (trip.isPickup) "기관 도착" else "복귀"}은 고정이에요." else "지나온 정류장과 지금 정류장은 고정이에요. 다음 정류장부터 바뀌어요.", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
         LockedRow("출", "${trip.origin.shortName} 출발", clockText(timeline.startMinute))
         draft.order.forEachIndexed { index, id ->
             val stop = trip.stops.first { it.id == id }
@@ -274,7 +275,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
                 onMove = { delta -> onChange(draft.copy(order = RouteTimelines.move(draft.order, index, delta), lastMoved = id)) },
             )
         }
-        LockedRow("복", "${trip.origin.shortName} 복귀", clockText(timeline.endMinute))
+        if (trip.isPickup) LockedRow("기", "기관 도착", clockText(timeline.endMinute)) else LockedRow("복", "${trip.origin.shortName} 복귀", clockText(timeline.endMinute))
         RouteWarnings(warnings)
         if (blockers.isNotEmpty()) Text(blockers.joinToString(" · "), style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.primaryContent)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
@@ -372,7 +373,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
     val timeline = routeTimeline(vm.trip, draft.order)
     val warnings = routeWarnings(timeline)
     Column(modifier.testTag("reorder-side"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
-        SideTitle("복귀 예정")
+        SideTitle(if (vm.trip.isPickup) "기관 도착 예정" else "복귀 예정")
         CompareRow(clockText(base.endMinute), clockText(timeline.endMinute), timeline.endMinute - base.endMinute)
         SideTitle("총 소요")
         CompareRow("${base.totalMinutes}분", "${timeline.totalMinutes}분", timeline.totalMinutes - base.totalMinutes)

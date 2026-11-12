@@ -48,7 +48,8 @@ import com.hanhyo.pleosshuttle.ui.component.guideAnchor
             simulation = vm.trip.integrationMode == IntegrationMode.SIMULATION,
             onEnabled = vm::changeTrackingEnabled, onDemo = vm::sendDemoTrackingLocation,
             demoPhase = vm.movingDemoPhase, demoProgress = vm.movingDemoProgress,
-            onStart = vm::startMovingDemo, onPause = vm::pauseMovingDemo, onResume = vm::resumeMovingDemo, onStop = vm::stopMovingDemo)
+            onStart = vm::startMovingDemo, onPause = vm::pauseMovingDemo, onResume = vm::resumeMovingDemo, onStop = vm::stopMovingDemo,
+            directionLabel = vm.tripDirectionLabel)
     }
     val items = listOf(
         Triple("trials", "상황 바꾸기", "정차·이동·연결 끊김을 모의로 재현"),

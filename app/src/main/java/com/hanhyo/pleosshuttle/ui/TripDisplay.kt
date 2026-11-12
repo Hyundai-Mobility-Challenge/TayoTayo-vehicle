@@ -22,6 +22,16 @@ internal fun <T> valueLabel(value: Observation<T>, now: Long): String = if (valu
 /** '가상 정류장 A · 서울숲' → '서울숲'. 화면에는 짧은 이름만 쓴다. */
 internal val Stop.shortName: String get() = com.hanhyo.pleosshuttle.domain.stopLabel(this)
 
+/**
+ * 헤더·탭의 단계 칩 문구. 하원은 TripPhase.label 그대로. 등원은 정류장 정차(ALIGHTING)가 "하차"가 아니라
+ * 인계받음·탑승 단계이므로 "정류장 탑승", 종료 확인(END_REVIEW)은 기관 도착 뒤라 "기관 인계"로 보인다.
+ */
+internal fun phaseLabel(trip: TripState): String = if (!trip.isPickup) trip.phase.label else when (trip.phase) {
+    TripPhase.ALIGHTING -> "정류장 탑승"
+    TripPhase.END_REVIEW -> "기관 인계"
+    else -> trip.phase.label
+}
+
 /** 운행 화면 제목: 준비·완료 단계 이름 또는 지금 처리할 지점. */
 internal fun flowTitle(trip: TripState): String = when (trip.phase) {
     TripPhase.PREPARING -> "탑승 준비"
@@ -53,7 +63,9 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         marker = "출",
         name = "${trip.origin.shortName} 출발",
         // 분모는 오늘 탈 아이(미탑승 예정·미탑승 확인 제외, 실제 탑승 기록은 포함).
+        // 등원은 출발지에서 타는 아이가 없다(정류장에서 탑승). 준비 중엔 탈 어린이 수, 출발 뒤엔 "출발함"만.
         detail = if (preparing && trip.isPickup) "탈 어린이 ${trip.children.count { it.ridesToday }}명"
+            else if (trip.isPickup) "출발함"
             else if (preparing) "탑승 기록 ${trip.onboardChildren.size}/${trip.children.count { it.ridesToday }}" else "탑승 ${boarded}명",
         progress = if (preparing) StopProgress.CURRENT else StopProgress.DONE,
     )
