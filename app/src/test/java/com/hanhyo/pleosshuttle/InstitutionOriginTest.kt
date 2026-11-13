@@ -26,4 +26,26 @@ class InstitutionOriginTest {
             assertEquals(fallback, InstitutionTrips.institutionOrigin(null, null, null, bad, fallback))
         assertNull(InstitutionTrips.parseDevOrigin("a|1"))
     }
+
+    @Test fun readsBackendFlatOrgFields() {
+        val top = mapOf("orgName" to "햇살어린이집", "orgLatitude" to 35.8714, "orgLongitude" to 128.6014)
+        val o = InstitutionTrips.institutionOriginFrom({ top[it] }, null, null, fallback)
+        assertEquals("햇살어린이집", o.name); assertEquals(35.8714, o.latitude, 1e-9); assertEquals(128.6014, o.longitude, 1e-9)
+        // MySQL DECIMAL이 문자열로 와도 읽는다
+        val asText = mapOf("orgLatitude" to "35.87", "orgLongitude" to "128.60")
+        assertEquals(35.87, InstitutionTrips.institutionOriginFrom({ asText[it] }, null, null, fallback).latitude, 1e-9)
+    }
+
+    @Test fun readsNestedOrgObjectAndPrefersFlatWhenBoth() {
+        val nested = mapOf("name" to "묶음 기관", "latitude" to 36.0, "longitude" to 127.0)
+        assertEquals("묶음 기관", InstitutionTrips.institutionOriginFrom({ null }, { nested[it] }, null, fallback).name)
+        val top = mapOf("orgName" to "최상위", "orgLatitude" to 35.0, "orgLongitude" to 128.0)
+        assertEquals("최상위", InstitutionTrips.institutionOriginFrom({ top[it] }, { nested[it] }, null, fallback).name)
+    }
+
+    @Test fun missingOrNullOrgCoordinatesFallBackToDevThenSample() {
+        val onlyName = mapOf("orgName" to "기관", "orgLatitude" to null, "orgLongitude" to null)
+        assertEquals("대구시청 · 임시 기관 위치", InstitutionTrips.institutionOriginFrom({ onlyName[it] }, null, daegu, fallback).name)
+        assertEquals(fallback, InstitutionTrips.institutionOriginFrom({ onlyName[it] }, null, null, fallback))
+    }
 }

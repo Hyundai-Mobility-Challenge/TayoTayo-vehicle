@@ -87,7 +87,7 @@ class InstitutionConnection(context: Context) {
         if (stops.isEmpty()) error("운행에 등록된 정류장이 없습니다.")
         check(prefs.edit().putString("pendingTrip", tripId).commit())
         // 기관 위치: 서버 응답 org(백엔드 요청 A2) → 개발용 임시 기관 위치(디버그 빌드) → 샘플(서울시청).
-        val origin = InstitutionTrips.institutionOrigin(value.optJSONObject("org"),
+        val origin = InstitutionTrips.institutionOrigin(value,
             if (BuildConfig.DEBUG) prefs.getString(DEV_ORIGIN_KEY, null) else null, sample.origin)
         val trip = TripState(tripId = tripId, integrationMode = IntegrationMode.SDK, origin = origin,
             stops = stops, routeOrder = stops.map { it.id }, routeIsExample = false, children = children,
@@ -220,10 +220,24 @@ internal object InstitutionTrips {
      * 운행의 기관(하원 출발·복귀지, 등원 도착지) 위치. 서버가 `org {name, latitude, longitude}`를 주면 그 값,
      * 없으면 개발용 임시 위치 "이름|위도|경도", 그것도 없으면 [fallback]. 잘못된 값은 건너뛴다.
      */
-    fun institutionOrigin(org: JSONObject?, devOverride: String?, fallback: Stop): Stop = institutionOrigin(
-        org?.optString("name"),
-        org?.takeUnless { it.isNull("latitude") }?.optDouble("latitude"),
-        org?.takeUnless { it.isNull("longitude") }?.optDouble("longitude"), devOverride, fallback)
+    /**
+     * 운행 응답에서 기관 위치를 읽는다. 백엔드 현재 형식은 최상위 `orgName`·`orgLatitude`·`orgLongitude`(TripController.getTrip),
+     * 이전에 제안했던 `org { name, latitude, longitude }` 묶음도 읽는다(서버 형식이 바뀌어도 깨지지 않게). 둘 다 있으면 최상위 값 우선.
+     */
+    fun institutionOrigin(trip: JSONObject, devOverride: String?, fallback: Stop): Stop {
+        val org = trip.optJSONObject("org")
+        return institutionOriginFrom({ k -> trip.opt(k).takeUnless { it == JSONObject.NULL } },
+            org?.let { o -> { k: String -> o.opt(k).takeUnless { it == JSONObject.NULL } } }, devOverride, fallback)
+    }
+    /** JSON 없이 시험할 수 있게 값 조회만 받는다. [top]은 운행 응답 최상위, [nested]는 `org` 묶음(없으면 null). */
+    fun institutionOriginFrom(top: (String) -> Any?, nested: ((String) -> Any?)?, devOverride: String?, fallback: Stop): Stop {
+        fun num(v: Any?) = when (v) { is Number -> v.toDouble(); is String -> v.trim().toDoubleOrNull(); else -> null }?.takeIf { !it.isNaN() }
+        fun str(v: Any?) = (v as? String)?.takeIf { it.isNotBlank() }
+        val flatLat = num(top("orgLatitude")); val flatLng = num(top("orgLongitude"))
+        return if (flatLat != null && flatLng != null) institutionOrigin(str(top("orgName")), flatLat, flatLng, devOverride, fallback)
+            else institutionOrigin(nested?.let { str(it("name")) } ?: str(top("orgName")), nested?.let { num(it("latitude")) },
+                nested?.let { num(it("longitude")) }, devOverride, fallback)
+    }
     fun institutionOrigin(orgName: String?, latitude: Double?, longitude: Double?, devOverride: String?, fallback: Stop): Stop {
         if (latitude != null && longitude != null && validCoordinate(latitude, longitude))
             return Stop("origin", orgName?.takeIf { it.isNotBlank() } ?: "기관", latitude, longitude)
