@@ -46,6 +46,7 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppRadius
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSize
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
+import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
 import com.hanhyo.pleosshuttle.domain.SurroundingKind
 import com.hanhyo.pleosshuttle.domain.TripPhase
@@ -204,7 +205,14 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
     // 탑승 기록 단계는 [명단]이 기본, 경로 확인(출발 직전)은 [출발 전 확인]이 기본이다.
     val rosterTabs = !compact && !reordering && vm.trip.phase == TripPhase.PREPARING && vm.trip.children.isNotEmpty()
     var rosterSelected by rememberSaveable(vm.trip.tripId, routeCheck) { mutableStateOf(!routeCheck) }
-    val boardOnSide = rosterTabs && rosterSelected
+    // 세로 분할(좁은 화면)도 같은 이유로 운행 준비 중엔 [지금 할 일 | 명단] 탭을 둔다. 명단은 따로 스크롤되어
+    // 행을 누를 때 흐름 카드 높이 변화·다음 할 일로의 자동 스크롤(bringIntoView)에 밀리지 않는다.
+    // 하원 탑승 기록이 남았으면 [명단]이 기본, 다 기록되면(또는 등원 준비) [지금 할 일]로 돌아온다.
+    val compactTabs = compact && !reordering && vm.trip.phase == TripPhase.PREPARING && vm.trip.children.isNotEmpty()
+    val boardingLeft = compactTabs && !vm.trip.isPickup && !vm.trip.noTripToday &&
+        vm.trip.children.any { it.status == Attendance.NOT_BOARDED }
+    var compactRosterSelected by rememberSaveable(vm.trip.tripId, routeCheck, boardingLeft) { mutableStateOf(boardingLeft && !routeCheck) }
+    val boardOnSide = (rosterTabs && rosterSelected) || (compactTabs && compactRosterSelected)
     val side = @Composable { sideModifier: Modifier ->
         when {
             reordering -> ReorderSide(vm, draft!!, { draft = it }, sideModifier)
@@ -224,7 +232,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
             if (reordering) ReorderBody(vm, draft!!, { draft = it }, onClose = { draft = null })
             else TeacherFlow(vm, guide, onBoardingReviewed, onOpenReorder = openReorder)
             // V-03 탑승 명단 보드: 흐름 카드(지금 할 일) 아래에 모든 아이 행을 늘 보인다. 순서 바꾸기 중에는 그 작업만 보인다.
-            if (!reordering && !boardOnSide) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
+            if (!reordering && !boardOnSide && !compactTabs) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
             // 세로 분할에는 왼쪽 패널이 없으므로 같은 보조 정보를 본문 아래에 둔다.
             if (compact && (reordering || routeCheck)) side(Modifier.fillMaxWidth())
         }
@@ -232,7 +240,15 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
     if (compact) {
         Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
             if (!reordering && !routeCheck) CompactTimeline(stops)
-            body(Modifier.weight(1f).fillMaxWidth())
+            if (compactTabs) SidePaneTabs(routeLabel = "지금 할 일", rosterSelected = boardOnSide) { compactRosterSelected = it }
+            if (compactTabs && boardOnSide) Column(
+                Modifier.weight(1f).fillMaxWidth()
+                    .background(AppTheme.colors.surface, RoundedCornerShape(AppRadius.panel))
+                    .verticalScroll(rememberScrollState())
+                    .padding(AppSpacing.md)
+                    .testTag("side-roster"),
+            ) { RiderBoardSection(vm, stableRows = true) }
+            else body(Modifier.weight(1f).fillMaxWidth())
         }
     } else {
         Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.xl)) {
