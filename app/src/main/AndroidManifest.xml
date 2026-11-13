@@ -28,6 +28,7 @@
         <service android:name=".TripTrackingService" android:exported="false" android:foregroundServiceType="location" />
         <uses-library android:name="android.car" android:required="false" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop">
+            <meta-data android:name="distractionOptimized" android:value="true" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
