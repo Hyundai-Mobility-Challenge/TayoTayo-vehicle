@@ -298,8 +298,9 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         if (TripTrackingService.running && !ConsoleDriveRunner.running) trackingStatus = trialPrefs.getString("trackingServiceStatus", "Pleos 위치 수신 대기")!!
     }
 
-    private fun canReplaceInstitutionTrip(): Boolean = storageError == null && !syncing &&
-        institution.pending(trip) == 0 && (trip.phase == TripPhase.ENDED ||
+    /** [ignoreSync]: 지금 도는 동기화와 그 동기화가 보낼 미전송 기록은 없는 것으로 보고 판단(동기화 뒤 이어서 준비할지 정할 때). */
+    private fun canReplaceInstitutionTrip(ignoreSync: Boolean = false): Boolean = storageError == null &&
+        (ignoreSync || (!syncing && institution.pending(trip) == 0)) && (trip.phase == TripPhase.ENDED ||
         (trip.phase == TripPhase.PREPARING && trip.ledger.isEmpty() && trip.onboardChildren.isEmpty()))
 
     fun pairInstitution(address: String, code: String) {
@@ -316,27 +317,30 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    val canPrepareConnectedDemo get() = canArchiveLocalTrackingDemo(BuildConfig.DEBUG,
+    val canPrepareConnectedDemo get() = canPrepareConnectedDemo(ignoreSync = false)
+    private fun canPrepareConnectedDemo(ignoreSync: Boolean) = canArchiveLocalTrackingDemo(BuildConfig.DEBUG,
         institutionConnected, trip.tripId == institution.boundTrip, trip.integrationMode, trip.tripId,
-        storageError == null, syncing || institutionBusy)
+        storageError == null, (syncing && !ignoreSync) || institutionBusy)
     fun prepareConnectedDemo() = loadInstitutionTrip(true)
     fun loadInstitutionTrip() = loadInstitutionTrip(false)
     fun chooseInstitutionDirection(direction: String) {
         if (institutionBusy || direction !in setOf(TripDirections.PICK_UP, TripDirections.DROP_OFF)) return
         institution.setDirection(direction)
         institutionDirection = direction
-        tripChoices = emptyList()
+        tripChoices = emptyList(); pendingPrepare = null
     }
     /** 오늘 운행이 둘 이상일 때 고를 목록. 비어 있으면 목록을 보이지 않는다. 방향을 바꾸면 지운다. */
     var tripChoices by mutableStateOf<List<TripOption>>(emptyList()); private set
     /** V-28 서버가 내려준 보호자 호출 상태(tripChildId → 정보). 정차 중 5초마다 동기화로 갱신. */
     var guardianCalls by mutableStateOf<Map<String, GuardianCallInfo>>(emptyMap()); private set
     private var choicesForDemo = false
+    /** 동기화 중에 누른 운행 준비(데모 여부, 고른 운행). 동기화가 끝나면 이어서 한 번 실행한다. */
+    private var pendingPrepare: Pair<Boolean, String?>? = null
     fun chooseInstitutionTrip(tripId: String) {
         if (tripChoices.none { it.id == tripId }) return
         loadInstitutionTrip(choicesForDemo, tripId)
     }
-    fun dismissTripChoices() { tripChoices = emptyList() }
+    fun dismissTripChoices() { tripChoices = emptyList(); pendingPrepare = null }
     /**
      * [tripId]가 없으면 오늘 이 차량의 운행 목록부터 받는다. 하나뿐이면 바로 준비하고, 둘 이상이면 [tripChoices]로 고르게 한다.
      * 고르는 사람은 선생님·기사님 누구나(정차 중, 운행 준비 전이나 운행 종료 뒤에만 가능).
@@ -344,7 +348,17 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     private fun loadInstitutionTrip(archiveLocalDemo: Boolean, tripId: String? = null) {
         if (institutionBusy) return
         institutionDirection = institution.direction // 고른 적 없으면 지금 시간대 기본값(VS-02)
-        if (!(if (archiveLocalDemo) canPrepareConnectedDemo else canReplaceInstitutionTrip())) { institutionStatus = "진행 중인 운행 또는 미전송 기록이 있습니다. 완료 후 다시 시도해 주세요."; return }
+        val allowedNow = if (archiveLocalDemo) canPrepareConnectedDemo(false) else canReplaceInstitutionTrip()
+        val allowedAfterSync = if (archiveLocalDemo) canPrepareConnectedDemo(true) else canReplaceInstitutionTrip(ignoreSync = true)
+        when (InstitutionTrips.prepareStart(allowedNow, allowedAfterSync, syncing)) {
+            InstitutionTrips.PrepareStart.AFTER_SYNC -> {
+                pendingPrepare = archiveLocalDemo to tripId
+                institutionStatus = "기록 전송을 마치는 중이에요 · 끝나면 바로 운행을 준비해요"
+                return
+            }
+            InstitutionTrips.PrepareStart.BLOCKED -> { pendingPrepare = null; institutionStatus = "진행 중인 운행 또는 미전송 기록이 있습니다. 완료 후 다시 시도해 주세요."; return }
+            InstitutionTrips.PrepareStart.NOW -> pendingPrepare = null
+        }
         institutionBusy = true
         viewModelScope.launch {
             try {
@@ -413,6 +427,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             finally {
                 syncing = false
                 nextSyncAt = if (generation != demoGeneration) 0 else System.currentTimeMillis() + 5000
+                // 동기화 중에 눌린 운행 준비를 이어서 한다(미전송이 남았으면 그때 거절 안내).
+                pendingPrepare?.let { (demo, id) -> pendingPrepare = null; loadInstitutionTrip(demo, id) }
                 if (generation != demoGeneration) syncInstitution(true)
             }
         }

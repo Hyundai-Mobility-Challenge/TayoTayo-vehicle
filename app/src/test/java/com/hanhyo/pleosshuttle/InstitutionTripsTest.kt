@@ -115,4 +115,14 @@ class InstitutionTripsTest {
         assertEquals("A → B · 정류장 2곳 · 탈 어린이 0명 · 복귀 중", InstitutionTrips.optionSummary(TripOption("1", "RETURNING", listOf("A", "B"), 0, 0)))
         assertTrue(InstitutionTrips.optionSummary(TripOption("1", "IN_PROGRESS", emptyList(), 0, 0)).startsWith("정류장 정보 없음"))
     }
+
+    @Test fun prepareTapDuringSyncWaitsInsteadOfRejecting() {
+        assertEquals(InstitutionTrips.PrepareStart.NOW, InstitutionTrips.prepareStart(allowedNow = true, allowedAfterSync = true, syncing = false))
+        // 5초 동기화와 겹친 탭: 거절하지 않고 동기화 뒤 이어서 준비
+        assertEquals(InstitutionTrips.PrepareStart.AFTER_SYNC, InstitutionTrips.prepareStart(allowedNow = false, allowedAfterSync = true, syncing = true))
+        // 진행 중인 운행처럼 동기화와 무관한 이유면 거절
+        assertEquals(InstitutionTrips.PrepareStart.BLOCKED, InstitutionTrips.prepareStart(allowedNow = false, allowedAfterSync = false, syncing = true))
+        // 동기화 중이 아닌데 막혀 있으면(미전송 기록 남음 등) 거절
+        assertEquals(InstitutionTrips.PrepareStart.BLOCKED, InstitutionTrips.prepareStart(allowedNow = false, allowedAfterSync = true, syncing = false))
+    }
 }

@@ -269,6 +269,19 @@ internal object InstitutionTrips {
     fun effectiveDirection(stored: String?, hourOfDay: Int): String =
         if (stored.isNullOrBlank()) TripDirections.defaultFor(hourOfDay) else TripDirections.of(stored)
 
+    /** 운행 준비 버튼을 눌렀을 때: 바로 진행 / 5초 동기화가 끝난 뒤 이어서 진행 / 거절. */
+    enum class PrepareStart { NOW, AFTER_SYNC, BLOCKED }
+
+    /**
+     * [allowedNow]: 지금 조건으로 준비 가능. [allowedAfterSync]: 동기화 중이라는 것(과 그 동기화로 보낼 미전송 기록)만 빼면 가능.
+     * 동기화 중에 누른 것만으로 거절하면 안내가 목록 아래에 떠서 "눌러도 반응 없음"처럼 보였다. 이때는 기다렸다가 이어서 한다.
+     */
+    fun prepareStart(allowedNow: Boolean, allowedAfterSync: Boolean, syncing: Boolean): PrepareStart = when {
+        allowedNow -> PrepareStart.NOW
+        syncing && allowedAfterSync -> PrepareStart.AFTER_SYNC
+        else -> PrepareStart.BLOCKED
+    }
+
     fun noTripMessage(direction: String) =
         "오늘 차량에 배정된 ${directionLabel(direction)} 운행이 없습니다. 기관에서 운행을 먼저 생성해 주세요."
 
