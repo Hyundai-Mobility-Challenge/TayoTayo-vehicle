@@ -11,6 +11,8 @@ import java.util.UUID
 /** Connects the prototype's local trip state to the current TayoTayo vehicle API. */
 class InstitutionConnection(context: Context) {
     private val prefs = context.getSharedPreferences("institution", 0)
+    /** 디버그 전용. null이면 지운다. 다음 [배정 명단으로 운행 준비]부터 적용. */
+    fun setDevOrigin(value: String?) { prefs.edit().apply { if (value == null) remove(DEV_ORIGIN_KEY) else putString(DEV_ORIGIN_KEY, value) }.apply() }
     val base get() = prefs.getString("base", "http://10.0.2.2:8080")!!
     val name get() = prefs.getString("name", "연결된 차량 없음")!!
     val connected get() = prefs.contains("credential")
@@ -61,7 +63,10 @@ class InstitutionConnection(context: Context) {
         }
         if (stops.isEmpty()) error("운행에 등록된 정류장이 없습니다.")
         check(prefs.edit().putString("pendingTrip", tripId).commit())
-        val trip = TripState(tripId = tripId, integrationMode = IntegrationMode.SDK, origin = sample.origin,
+        // 기관 위치: 서버 응답 org(백엔드 요청 A2) → 개발용 임시 기관 위치(디버그 빌드) → 샘플(서울시청).
+        val origin = InstitutionTrips.institutionOrigin(value.optJSONObject("org"),
+            if (BuildConfig.DEBUG) prefs.getString(DEV_ORIGIN_KEY, null) else null, sample.origin)
+        val trip = TripState(tripId = tripId, integrationMode = IntegrationMode.SDK, origin = origin,
             stops = stops, routeOrder = stops.map { it.id }, routeIsExample = false, children = children,
             direction = TripDirections.of(direction))
         bind(trip)
@@ -80,7 +85,11 @@ class InstitutionConnection(context: Context) {
     private fun sentEventIds(tripId: String) = InstitutionTrips.sentEventIds(tripId, prefs.all)
     fun pending(trip: TripState): Int = if (trip.tripId != boundTrip) 0 else InstitutionTrips.pendingCount(trip.ledger, sentEventIds(trip.tripId))
 
-    companion object { private val reportingLock = Any() }
+    companion object {
+        private val reportingLock = Any()
+        /** 디버그 빌드 전용 임시 기관 위치 "이름|위도|경도". 서버가 기관 좌표를 주기 전 시험용. */
+        const val DEV_ORIGIN_KEY = "devOrigin"
+    }
     fun reportTracking(trip: TripState, enabled: Boolean, fix: TrackingLocation?, navigation: TrackingNavigation? = null,
                        stillCurrent: () -> Boolean = { true }) = synchronized(reportingLock) {
         if (!connected || trip.tripId != boundTrip || !stillCurrent() || fix == null) return@synchronized
@@ -165,6 +174,30 @@ class InstitutionConnection(context: Context) {
 
 /** Pure mapping of the vehicle trip API responses (TripController.vehicleTrips / getTrip), kept JSON-free for unit tests. */
 internal object InstitutionTrips {
+    /**
+     * 운행의 기관(하원 출발·복귀지, 등원 도착지) 위치. 서버가 `org {name, latitude, longitude}`를 주면 그 값,
+     * 없으면 개발용 임시 위치 "이름|위도|경도", 그것도 없으면 [fallback]. 잘못된 값은 건너뛴다.
+     */
+    fun institutionOrigin(org: JSONObject?, devOverride: String?, fallback: Stop): Stop = institutionOrigin(
+        org?.optString("name"),
+        org?.takeUnless { it.isNull("latitude") }?.optDouble("latitude"),
+        org?.takeUnless { it.isNull("longitude") }?.optDouble("longitude"), devOverride, fallback)
+    fun institutionOrigin(orgName: String?, latitude: Double?, longitude: Double?, devOverride: String?, fallback: Stop): Stop {
+        if (latitude != null && longitude != null && validCoordinate(latitude, longitude))
+            return Stop("origin", orgName?.takeIf { it.isNotBlank() } ?: "기관", latitude, longitude)
+        parseDevOrigin(devOverride)?.let { return it }
+        return fallback
+    }
+    fun parseDevOrigin(raw: String?): Stop? {
+        val parts = raw?.split("|") ?: return null
+        if (parts.size != 3) return null
+        val lat = parts[1].trim().toDoubleOrNull() ?: return null
+        val lng = parts[2].trim().toDoubleOrNull() ?: return null
+        if (!validCoordinate(lat, lng) || parts[0].isBlank()) return null
+        return Stop("origin", "${parts[0].trim()} · 임시 기관 위치", lat, lng)
+    }
+    private fun validCoordinate(lat: Double, lng: Double) = lat.isFinite() && lng.isFinite() && lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)
+
     /** Server trip statuses that are still operable: PREPARING / IN_PROGRESS / RETURNING. COMPLETED·CANCELLED are finished. */
     val ACTIVE_TRIP_STATUSES = setOf("PREPARING", "IN_PROGRESS", "RETURNING")
 

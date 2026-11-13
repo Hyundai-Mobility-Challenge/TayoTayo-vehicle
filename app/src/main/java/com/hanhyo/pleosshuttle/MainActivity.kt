@@ -63,6 +63,7 @@ class MainActivity : ComponentActivity() {
         pendingIntent=null
         if (value.action == TripTrackingService.OPEN_ARRIVAL)
             model.openArrival(value.getStringExtra("tripId"),value.getStringExtra("stopId"),value.getLongExtra("routeVersion",-1))
+        else if (value.action == "SET_DEV_ORIGIN") model.setDevOrigin(value.getStringExtra("origin"))
         else model.handleIntent(value.action)
     }
     override fun onStart() { super.onStart(); model.foreground(); handlePending() }

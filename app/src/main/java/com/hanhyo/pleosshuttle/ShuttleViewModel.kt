@@ -603,6 +603,12 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             "PLAY_TEST_MUSIC" -> audio.play()
         }
     }
+    /** 디버그 전용(adb): 서버가 기관 좌표를 주기 전 임시 기관 위치를 정한다. 다음 [배정 명단으로 운행 준비]부터 적용. */
+    fun setDevOrigin(value: String?) {
+        if (!BuildConfig.DEBUG) return
+        institution.setDevOrigin(value?.takeIf { InstitutionTrips.parseDevOrigin(it) != null })
+        message = InstitutionTrips.parseDevOrigin(value)?.let { "임시 기관 위치: ${it.name} · 다음 운행 준비부터 적용" } ?: "임시 기관 위치를 지웠습니다"
+    }
     fun startNewSimulationTrip() {
         if (institutionBusy || syncing || institution.pending(trip) > 0) { actionError = "기관 기록 전송을 먼저 완료해 주세요."; return }
         if (trip.phase != TripPhase.ENDED || storageError != null) return
