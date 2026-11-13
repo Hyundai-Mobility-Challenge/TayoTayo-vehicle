@@ -17,6 +17,13 @@ class TripNavigationPolicyTest {
         assertFalse(p.evaluate(trip,fix(),nav(),motion(Gear.DRIVE),now+1).showNavigation)
         assertEquals(TripPhase.DRIVING,trip.phase)
     }
+    @Test fun pickupOpensNativeForStopWhereChildrenAreNotYetOnboard() {
+        val pickup=SampleTrip.createPickup().copy(phase=TripPhase.DRIVING,integrationMode=IntegrationMode.SDK)
+        assertTrue(pickup.currentStopChildren.none {it.status==Attendance.ONBOARD})
+        assertTrue(TripNavigationPolicy().evaluate(pickup,null,null,motion(Gear.DRIVE),now).showNavigation)
+        val dropOffNobodyOnboard=SampleTrip.create().copy(phase=TripPhase.DRIVING,integrationMode=IntegrationMode.SDK)
+        assertFalse(TripNavigationPolicy().evaluate(dropOffNobodyOnboard,null,null,motion(Gear.DRIVE),now).showNavigation)
+    }
     @Test fun arrivalNeedsSustainedProximityAndFreshParkedState() {
         val p=TripNavigationPolicy()
         assertFalse(p.evaluate(trip,fix(),nav(),motion(),now).arrivalReady)
