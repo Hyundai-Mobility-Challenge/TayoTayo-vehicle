@@ -325,15 +325,41 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         if (institutionBusy || direction !in setOf(TripDirections.PICK_UP, TripDirections.DROP_OFF)) return
         institution.setDirection(direction)
         institutionDirection = direction
+        tripChoices = emptyList()
     }
-    private fun loadInstitutionTrip(archiveLocalDemo: Boolean) {
+    /** 오늘 운행이 둘 이상일 때 고를 목록. 비어 있으면 목록을 보이지 않는다. 방향을 바꾸면 지운다. */
+    var tripChoices by mutableStateOf<List<TripOption>>(emptyList()); private set
+    private var choicesForDemo = false
+    fun chooseInstitutionTrip(tripId: String) {
+        if (tripChoices.none { it.id == tripId }) return
+        loadInstitutionTrip(choicesForDemo, tripId)
+    }
+    fun dismissTripChoices() { tripChoices = emptyList() }
+    /**
+     * [tripId]가 없으면 오늘 이 차량의 운행 목록부터 받는다. 하나뿐이면 바로 준비하고, 둘 이상이면 [tripChoices]로 고르게 한다.
+     * 고르는 사람은 선생님·기사님 누구나(정차 중, 운행 준비 전이나 운행 종료 뒤에만 가능).
+     */
+    private fun loadInstitutionTrip(archiveLocalDemo: Boolean, tripId: String? = null) {
         if (institutionBusy) return
         institutionDirection = institution.direction // 고른 적 없으면 지금 시간대 기본값(VS-02)
         if (!(if (archiveLocalDemo) canPrepareConnectedDemo else canReplaceInstitutionTrip())) { institutionStatus = "진행 중인 운행 또는 미전송 기록이 있습니다. 완료 후 다시 시도해 주세요."; return }
         institutionBusy = true
         viewModelScope.launch {
             try {
-                val prepared = withContext(Dispatchers.IO) { institution.createTrip() }
+                val chosen = tripId ?: run {
+                    val options = withContext(Dispatchers.IO) { institution.listTrips() }
+                    when {
+                        options.isEmpty() -> error(InstitutionTrips.noTripMessage(institution.direction))
+                        options.size == 1 -> options.first().id
+                        else -> {
+                            tripChoices = options; choicesForDemo = archiveLocalDemo
+                            institutionStatus = "오늘 ${InstitutionTrips.directionLabel(institution.direction)} 운행 ${options.size}개 · 준비할 운행을 골라 주세요"
+                            return@launch
+                        }
+                    }
+                }
+                tripChoices = emptyList()
+                val prepared = withContext(Dispatchers.IO) { institution.createTrip(chosen) }
                 store.archiveSnapshot(trip)
                 store.save(prepared)
                 institution.bind(prepared)

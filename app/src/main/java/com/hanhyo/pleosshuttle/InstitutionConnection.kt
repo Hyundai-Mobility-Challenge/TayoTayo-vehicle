@@ -39,11 +39,34 @@ class InstitutionConnection(context: Context) {
         prefs.edit().putString("direction", value).apply()
     }
 
-    fun createTrip(): TripState {
+    /**
+     * 오늘 이 차량에 배정된 [direction] 운행 중 끝나지 않은 것(준비·운행 중·복귀 중). 목록 응답에는 노선 이름·인원이 없어
+     * 운행마다 `prepare`(서버에서 읽기만 함)로 정류장·인원을 채운다. 진행 중인 운행이 앞.
+     */
+    fun listTrips(): List<TripOption> {
         val result = call("/api/v1/vehicle/trips?direction=$direction")
         val rows = result.optJSONArray("items") ?: JSONArray()
-        val candidates = (0 until rows.length()).map { rows.getJSONObject(it) }.map { it.optString("id") to it.optString("status") }
-        val tripId = InstitutionTrips.selectActiveTripId(candidates) ?: error(InstitutionTrips.noTripMessage(direction))
+        val active = (0 until rows.length()).map { rows.getJSONObject(it) }
+            .filter { it.optString("id").isNotBlank() && it.optString("status") in InstitutionTrips.ACTIVE_TRIP_STATUSES }
+        return InstitutionTrips.orderOptions(active.map { row ->
+            val id = row.optString("id")
+            val detail = runCatching { call("/api/v1/trips/$id/prepare", method = "POST") }.getOrNull()
+            val stopRows = detail?.optJSONArray("stops") ?: JSONArray()
+            val childRows = detail?.optJSONArray("children") ?: JSONArray()
+            val names = (0 until stopRows.length()).map { stopRows.getJSONObject(it).optString("stopName") }.filter { it.isNotBlank() }
+            val expected = (0 until childRows.length()).count { InstitutionTrips.boardingExpected(childRows.getJSONObject(it).opt("boardingExpected")) }
+            TripOption(id, row.optString("status"), names, childRows.length(), expected)
+        })
+    }
+
+    /** [chosenTripId]가 없으면 예전처럼 가장 최근의 끝나지 않은 운행. */
+    fun createTrip(chosenTripId: String? = null): TripState {
+        val tripId = chosenTripId ?: run {
+            val result = call("/api/v1/vehicle/trips?direction=$direction")
+            val rows = result.optJSONArray("items") ?: JSONArray()
+            val candidates = (0 until rows.length()).map { rows.getJSONObject(it) }.map { it.optString("id") to it.optString("status") }
+            InstitutionTrips.selectActiveTripId(candidates) ?: error(InstitutionTrips.noTripMessage(direction))
+        }
         val value = call("/api/v1/trips/$tripId/prepare", method = "POST")
         val stopRows = value.optJSONArray("stops") ?: JSONArray()
         val sample = SampleTrip.create()
@@ -173,7 +196,26 @@ class InstitutionConnection(context: Context) {
 }
 
 /** Pure mapping of the vehicle trip API responses (TripController.vehicleTrips / getTrip), kept JSON-free for unit tests. */
+/** 운행 고르기 목록 한 줄. 서버 목록에 노선 이름·출발 시각이 없어 정류장 이름으로 구분한다. */
+data class TripOption(val id: String, val status: String, val stopNames: List<String>, val childCount: Int, val expectedCount: Int) {
+    val inProgress get() = status == "IN_PROGRESS" || status == "RETURNING"
+}
+
 internal object InstitutionTrips {
+    /** 진행 중(운행 중·복귀 중) 먼저, 그다음 최근에 만든 운행(id 큰 것) 먼저. */
+    fun orderOptions(options: List<TripOption>): List<TripOption> =
+        options.sortedWith(compareBy<TripOption>({ !it.inProgress }, { -(it.id.toLongOrNull() ?: 0L) }))
+    /** 예: "중앙로역 → … → 동대구역 · 정류장 4곳 · 탈 어린이 5명 · 준비" */
+    fun optionSummary(o: TripOption): String {
+        val route = when (o.stopNames.size) {
+            0 -> "정류장 정보 없음"
+            1 -> o.stopNames.first()
+            2 -> o.stopNames.joinToString(" → ")
+            else -> "${o.stopNames.first()} → … → ${o.stopNames.last()}"
+        }
+        val state = when (o.status) { "IN_PROGRESS" -> "운행 중"; "RETURNING" -> "복귀 중"; else -> "준비" }
+        return "$route · 정류장 ${o.stopNames.size}곳 · 탈 어린이 ${o.expectedCount}명 · $state"
+    }
     /**
      * 운행의 기관(하원 출발·복귀지, 등원 도착지) 위치. 서버가 `org {name, latitude, longitude}`를 주면 그 값,
      * 없으면 개발용 임시 위치 "이름|위도|경도", 그것도 없으면 [fallback]. 잘못된 값은 건너뛴다.

@@ -103,4 +103,16 @@ class InstitutionTripsTest {
         val broken = mapOf("sentEvents" to "oops", "sent" to 3, InstitutionTrips.sentEventsKey("1") to true)
         assertEquals(emptySet<String>(), InstitutionTrips.sentEventIds("1", broken))
     }
+    @Test fun tripOptionsPutInProgressFirstThenNewest() {
+        val ordered = InstitutionTrips.orderOptions(listOf(
+            TripOption("9", "PREPARING", listOf("a"), 1, 1), TripOption("12", "PREPARING", listOf("b"), 1, 1),
+            TripOption("4", "IN_PROGRESS", listOf("c"), 1, 1), TripOption("x", "PREPARING", emptyList(), 0, 0)))
+        assertEquals(listOf("4", "12", "9", "x"), ordered.map { it.id })
+    }
+    @Test fun tripOptionSummaryShowsEndsCountAndState() {
+        val s = InstitutionTrips.optionSummary(TripOption("11", "PREPARING", listOf("중앙로역", "반월당역", "경대병원역", "동대구역"), 5, 4))
+        assertEquals("중앙로역 → … → 동대구역 · 정류장 4곳 · 탈 어린이 4명 · 준비", s)
+        assertEquals("A → B · 정류장 2곳 · 탈 어린이 0명 · 복귀 중", InstitutionTrips.optionSummary(TripOption("1", "RETURNING", listOf("A", "B"), 0, 0)))
+        assertTrue(InstitutionTrips.optionSummary(TripOption("1", "IN_PROGRESS", emptyList(), 0, 0)).startsWith("정류장 정보 없음"))
+    }
 }
