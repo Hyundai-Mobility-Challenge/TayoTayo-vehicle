@@ -7,7 +7,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.hanhyo.pleosshuttle.InstitutionTrips
 import com.hanhyo.pleosshuttle.ShuttleViewModel
+import com.hanhyo.pleosshuttle.domain.TripDirections
 
 @Composable fun InstitutionPanel(vm: ShuttleViewModel) {
     var base by rememberSaveable { mutableStateOf(vm.institutionBase) }
@@ -26,17 +28,41 @@ import com.hanhyo.pleosshuttle.ShuttleViewModel
     }
     Text("운행 방향")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected = vm.institutionDirection == "PICK_UP", onClick = { vm.chooseInstitutionDirection("PICK_UP") },
-            label = { Text("등원 · PICK_UP") }, enabled = !vm.institutionBusy)
-        FilterChip(selected = vm.institutionDirection == "DROP_OFF", onClick = { vm.chooseInstitutionDirection("DROP_OFF") },
-            label = { Text("하원 · DROP_OFF") }, enabled = !vm.institutionBusy)
+        listOf(TripDirections.PICK_UP, TripDirections.DROP_OFF).forEach { direction ->
+            FilterChip(selected = vm.institutionDirection == direction, onClick = { vm.chooseInstitutionDirection(direction) },
+                label = { Text(TripDirections.label(direction)) }, enabled = !vm.institutionBusy,
+                modifier = Modifier.testTag("institution-direction-$direction"))
+        }
     }
+    Text("처음에는 시간대로 정해요(정오 전 등원, 그 뒤 하원). 고른 방향은 다음에도 유지돼요.")
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = vm::loadInstitutionTrip, enabled = !vm.institutionBusy && vm.institutionConnected, modifier = Modifier.testTag("institution-load")) { Text("배정 명단으로 운행 준비") }
         OutlinedButton(onClick = { vm.syncInstitution(true) }, enabled = !vm.institutionBusy && vm.institutionConnected) { Text("기록 전송 재시도") }
     }
+    if (vm.tripChoices.isNotEmpty()) TripChoiceList(vm)
     HorizontalDivider()
     Text("배정 명단을 준비하면 Pleos에 자동 연결됩니다. 운행 시작 시 보호자에게 위치·예상 시간을 공유하고, D로 전환하면 내비 화면이 열립니다.")
     Text(vm.institutionStatus, modifier = Modifier.testTag("institution-status"))
     Text("명단 불러오기는 기록 전 준비 상태 또는 운행 종료 후에 가능합니다. 기존 운행은 보관됩니다. 서버 연결이 끊기면 기기에 기록하고, 이 앱이 열려 있을 때 다시 전송합니다.")
+}
+
+/** 오늘 운행이 둘 이상일 때. 누가 골라도 되므로(선생님·기사님) 문구에 사람을 넣지 않는다. */
+@Composable private fun TripChoiceList(vm: ShuttleViewModel) {
+    Column(Modifier.fillMaxWidth().testTag("trip-choices"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("오늘 ${TripDirections.label(vm.institutionDirection)} 운행을 골라 주세요", style = MaterialTheme.typography.titleMedium)
+        vm.tripChoices.forEach { option ->
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("운행 ${option.id}" + if (option.inProgress) " · 이어서 진행" else "", style = MaterialTheme.typography.titleSmall)
+                        Text(InstitutionTrips.optionSummary(option), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Button(onClick = { vm.chooseInstitutionTrip(option.id) }, enabled = !vm.institutionBusy,
+                        modifier = Modifier.testTag("trip-choice-${option.id}")) { Text("이 운행 준비") }
+                }
+            }
+        }
+        TextButton(onClick = vm::dismissTripChoices, enabled = !vm.institutionBusy) { Text("닫기") }
+    }
 }

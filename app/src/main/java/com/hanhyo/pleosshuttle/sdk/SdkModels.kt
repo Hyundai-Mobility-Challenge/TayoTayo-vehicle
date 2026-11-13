@@ -16,19 +16,25 @@ data class SdkObservation<T>(
             outcome == SdkOutcome.TARGET_OBSERVED
 }
 
+/**
+ * V-06 차량 벨트 경고등(Seat Belt telltale) 상태. 좌석 구분이 없는 차량 전체 신호 하나다(OQ-06).
+ * 화면 안내·음성 판단에만 쓰고 운행 파일·원장·서버에는 넣지 않는다(D27).
+ */
+enum class BeltTelltaleState { OFF, ON, BLINK }
+
 data class VehicleSnapshot(
     val speedMetersPerSecond: SdkObservation<Float> = SdkObservation(),
     val gear: SdkObservation<Int> = SdkObservation(),
     val parkingBrake: SdkObservation<Boolean> = SdkObservation(),
     val parkingBrakeSupported: Boolean = false,
     val doorLocked: SdkObservation<Boolean> = SdkObservation(),
-    val seatOccupancy: Map<String, SdkObservation<Boolean>> = emptyMap(),
     val seatBelts: Map<String, SdkObservation<Boolean>> = emptyMap(),
+    /** V-06 차량 벨트 경고등. 메모리 관측값만(저장·전송 안 함). */
+    val seatBeltTelltale: SdkObservation<BeltTelltaleState> = SdkObservation(),
     val uxRestricted: SdkObservation<Boolean> = SdkObservation(),
     val activeUxRestrictions: Int? = null,
     val supportedDoorAreas: List<String> = emptyList(),
     val selectedDoorArea: String? = null,
-    val supportedSeatAreas: List<String> = emptyList(),
     val supportedBeltAreas: List<String> = emptyList(),
     val diagnostics: List<String> = emptyList(),
     val versions: Map<String, String> = emptyMap(),

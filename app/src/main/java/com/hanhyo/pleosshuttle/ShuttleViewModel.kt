@@ -11,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hanhyo.pleosshuttle.audio.AudioSnapshot
 import com.hanhyo.pleosshuttle.audio.LocalAudioAdapter
+import com.hanhyo.pleosshuttle.audio.SpeechStatus
 import com.hanhyo.pleosshuttle.domain.*
 import com.hanhyo.pleosshuttle.domain.VehicleSnapshot
 import com.hanhyo.pleosshuttle.sdk.RealVehicleAdapter
@@ -28,7 +29,7 @@ import java.io.File
 enum class TrialScenario(val label: String) {
     PARKED("정차 · P"), MOVING("이동 중"), SIGNAL("신호 정차 · D"), UNKNOWN("속도·기어 미확인"),
     STALE("관측 갱신 중단"), WARNING("접근 물체 경고"), DISCONNECTED("센서 연결 끊김"),
-    OCCUPIED("좌석 점유 불일치"), ACCEPT_ONLY("문 수락 후 잠금 유지")
+    ACCEPT_ONLY("문 수락 후 잠금 유지")
 }
 
 class ShuttleViewModel(application: Application) : AndroidViewModel(application) {
@@ -68,6 +69,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     private val institution = InstitutionConnection(application)
     val institutionBase get() = institution.base
     var institutionDirection by mutableStateOf(institution.direction); private set
+    /** 화면 표시용 운행 방향(등원/하원). 운행에 저장된 방향(TripState.direction, 이전 저장 파일은 하원)을 읽는다. */
+    val tripDirectionLabel get() = TripDirections.label(trip.direction)
     var institutionName by mutableStateOf(institution.name); private set
     var institutionConnected by mutableStateOf(institution.connected); private set
     var institutionStatus by mutableStateOf("기관 서버를 연결하면 보호자에게 하차 기록을 전달합니다."); private set
@@ -113,11 +116,59 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             else TrackingNavigation("READY", demoNavigationEpoch, movingDemo.routeId, stop.latitude, stop.longitude, frame.seconds, frame.meters, at)
         movingDemoPhase = movingDemo.phase; movingDemoProgress = frame.progress
     }
+    // 개발용 Virtual Console 운전: 실제 SDK 속도·기어를 적분해 앱 안에서만 모의 위치를 움직인다(SIMULATED로만 전송).
+    // 위치 적분·전송은 프로세스 범위 ConsoleDriveRunner가 한다(주행 중 Pleos가 앱을 가려도 계속).
+    var consoleDriveRunning by mutableStateOf(ConsoleDriveRunner.running); private set
+    var consoleDriveFrame by mutableStateOf(ConsoleDriveRunner.frame); private set
+    private fun consoleSpeedMps(at: Long): Double? = sdkVehicle.speedMetersPerSecond.takeIf { sdkVehicle.connected && it.value != null && at - it.receivedAtMillis in 0..5_000 }
+        ?.value?.toDouble()?.takeIf { it.isFinite() }
+    private fun consoleGear(at: Long): Int? = sdkVehicle.gear.takeIf { sdkVehicle.connected && at - it.receivedAtMillis in 0..5_000 }?.value
+    private fun Int?.toGear() = when (this) { 4 -> Gear.PARK; 2 -> Gear.REVERSE; 1 -> Gear.NEUTRAL; 8 -> Gear.DRIVE; else -> Gear.UNKNOWN }
+    private fun consoleDriveContext() = ConsoleDriveContext(BuildConfig.DEBUG, trip.integrationMode == IntegrationMode.SDK,
+        institutionConnected && trip.tripId == institution.boundTrip, trip.phase, storageError == null,
+        foreground, sdkVehicle.uxRestricted.value == true)
+    /** 시작할 수 없는 이유(없으면 null). 화면에 그대로 보여 준다. */
+    val consoleDriveBlocker: String? get() = when {
+        !BuildConfig.DEBUG -> "개발용 빌드에서만 쓸 수 있습니다."
+        storageError != null -> "운행 저장 오류를 먼저 확인해 주세요."
+        trip.integrationMode != IntegrationMode.SDK -> "Pleos SDK 연결 운행에서만 쓸 수 있습니다."
+        !institutionConnected || trip.tripId != institution.boundTrip -> "기관 서버에 연결된 운행에서만 쓸 수 있습니다."
+        trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING) -> "운행을 시작한 뒤 쓸 수 있습니다."
+        consoleSpeedMps(now) == null -> "차량 속도 미수신 · ${sdkVehicle.speedMetersPerSecond.error ?: if (!sdkVehicle.connected) "SDK 차량 연결을 확인해 주세요." else "속도 갱신을 기다리는 중입니다."}"
+        else -> null
+    }
+    val consoleDriveSpeedKph: Double? get() = (if (consoleDriveRunning) ConsoleDriveRunner.speedMps else consoleSpeedMps(now))?.times(3.6)
+    val consoleDriveGearLabel: String get() = ConsoleDriveText.gearLabel(if (consoleDriveRunning) ConsoleDriveRunner.gear else consoleGear(now).toGear())
+    val consoleDriveUploadStatus: String get() = ConsoleDriveRunner.uploadStatus
+    /** 운행 카드에 보이는 한 줄. Virtual Console 운전 중일 때만. */
+    val consoleDriveLine: String? get() = consoleDriveFrame?.takeIf { consoleDriveRunning }?.let { ConsoleDriveText.cardLine(it) }
+    fun startConsoleDrive() {
+        if (!BuildConfig.DEBUG || !foreground || ConsoleDriveRunner.running) return
+        consoleDriveBlocker?.let { trackingStatus = it; return }
+        val at = System.currentTimeMillis()
+        ConsoleDriveRunner.hint(consoleSpeedMps(at), consoleGear(at).toGear(), at)
+        if (!ConsoleDriveRunner.start(getApplication(), trip, consoleDriveContext())) return
+        demoGeneration++
+        refreshConsoleDrive(); nextSyncAt = 0; syncInstitution(true)
+    }
+    fun stopConsoleDrive() { ConsoleDriveRunner.stop(); refreshConsoleDrive(); syncInstitution(true) }
+    /** 화면 쪽 동기화만 한다. 앱이 가려지거나 백그라운드여도 Runner는 멈추지 않는다. */
+    private fun refreshConsoleDrive() {
+        if (ConsoleDriveRunner.running) {
+            ConsoleDriveRunner.update(trip, consoleDriveContext())
+            if (foreground) { val at = System.currentTimeMillis(); ConsoleDriveRunner.hint(consoleSpeedMps(at), consoleGear(at).toGear(), at) }
+        }
+        val running = ConsoleDriveRunner.running
+        if (consoleDriveRunning && !running) { demoGeneration++; nextSyncAt = 0 }
+        consoleDriveRunning = running
+        consoleDriveFrame = if (running) ConsoleDriveRunner.frame else null
+    }
     val trackingControls get() = vehicleTrackingControls(
         institutionConnected, trip.tripId == institution.boundTrip, trip.phase,
-        trip.onboardChildren.isNotEmpty(), trip.currentStop != null, trip.integrationMode,
-        trackingEnabled, storageError == null)
+        trip.onboardChildren.isNotEmpty() || trip.isPickup, trip.currentStop != null, trip.integrationMode,
+        trackingEnabled, storageError == null, trip.isPickup)
     var trackingPermissionRequested by mutableStateOf(false); private set
+
     private var trackingServiceRequested = false
     var locationPermissionGranted by mutableStateOf(TripTrackingService.hasPermission(getApplication())); private set
     fun requestTrackingPermission() { trackingPermissionRequested = true }
@@ -160,6 +211,16 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     private val automaticGuidance = AutomaticTripGuidance()
     internal var automaticAnnouncementKeys: List<String> = emptyList(); private set
     internal var automaticNavigationStops: List<String> = emptyList(); private set
+    // V-06 벨트 경고등: 메모리에서만 판단(TripState·원장·서버에 넣지 않음, D27).
+    private val beltTelltaleGuidance = BeltTelltaleGuidance()
+    private var beltTelltaleSpeechId: Long? = null
+    internal var beltTelltaleAnnouncements = 0; private set
+    /** 실제 차량 연결(SDK) 운행에서만 경고등을 쓴다. 모의 체험은 실제 어댑터를 멈추므로 항상 UNKNOWN. */
+    private fun beltTelltaleSignal(): BeltTelltaleSignal =
+        if (trip.integrationMode != IntegrationMode.SDK) BeltTelltaleSignal.UNKNOWN
+        else beltTelltaleSignal(sdkVehicle.seatBeltTelltale, now)
+    /** V-06 차량 전체 배너 한 줄(좌석·아이에 붙이지 않음). 없으면 null. */
+    val beltTelltaleBanner: String? get() = beltTelltaleBanner(trip, beltTelltaleSignal())
 
     init {
         try { store.load()?.let { engine.restore(it, now) } }
@@ -171,6 +232,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     fun foreground() {
         if (foreground) return
         foreground = true
+        institutionDirection = institution.direction
         locationPermissionGranted = TripTrackingService.hasPermission(getApplication())
         trackingServiceRequested = TripTrackingService.running
         trackingEnabled = trialPrefs.getBoolean("trackingEnabled", false)
@@ -195,6 +257,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         realToken = null
         realVehicle?.onStop(); realNavi?.onStop()
         clearMovingDemo()
+        // Virtual Console 운전은 여기서 멈추지 않는다(주행 중 UX 제한으로 앱이 가려져도 계속).
         audio.onBackground()
         engine.background(System.currentTimeMillis())
         publish()
@@ -212,6 +275,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         realNavi?.trackLocations = false // A separate read-only foreground service owns telemetry.
         updateTrackingService()
         refreshMovingDemo()
+        refreshConsoleDrive()
+        DriveFocusController.update(getApplication(), trip)
         if (foreground && storageError == null) syncInstitution()
     }
 
@@ -230,11 +295,12 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         } else if (!TripTrackingService.hasPermission(app)) {
             trackingStatus = "위치 권한 필요 · 운행 권한 확인에서 허용해 주세요."
         }
-        if (TripTrackingService.running) trackingStatus = trialPrefs.getString("trackingServiceStatus", "Pleos 위치 수신 대기")!!
+        if (TripTrackingService.running && !ConsoleDriveRunner.running) trackingStatus = trialPrefs.getString("trackingServiceStatus", "Pleos 위치 수신 대기")!!
     }
 
-    private fun canReplaceInstitutionTrip(): Boolean = storageError == null && !syncing &&
-        institution.pending(trip) == 0 && (trip.phase == TripPhase.ENDED ||
+    /** [ignoreSync]: 지금 도는 동기화와 그 동기화가 보낼 미전송 기록은 없는 것으로 보고 판단(동기화 뒤 이어서 준비할지 정할 때). */
+    private fun canReplaceInstitutionTrip(ignoreSync: Boolean = false): Boolean = storageError == null &&
+        (ignoreSync || (!syncing && institution.pending(trip) == 0)) && (trip.phase == TripPhase.ENDED ||
         (trip.phase == TripPhase.PREPARING && trip.ledger.isEmpty() && trip.onboardChildren.isEmpty()))
 
     fun pairInstitution(address: String, code: String) {
@@ -251,23 +317,65 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    val canPrepareConnectedDemo get() = canArchiveLocalTrackingDemo(BuildConfig.DEBUG,
+    val canPrepareConnectedDemo get() = canPrepareConnectedDemo(ignoreSync = false)
+    private fun canPrepareConnectedDemo(ignoreSync: Boolean) = canArchiveLocalTrackingDemo(BuildConfig.DEBUG,
         institutionConnected, trip.tripId == institution.boundTrip, trip.integrationMode, trip.tripId,
-        storageError == null, syncing || institutionBusy)
+        storageError == null, (syncing && !ignoreSync) || institutionBusy)
     fun prepareConnectedDemo() = loadInstitutionTrip(true)
     fun loadInstitutionTrip() = loadInstitutionTrip(false)
     fun chooseInstitutionDirection(direction: String) {
-        if (institutionBusy || direction !in setOf("PICK_UP", "DROP_OFF")) return
+        if (institutionBusy || direction !in setOf(TripDirections.PICK_UP, TripDirections.DROP_OFF)) return
         institution.setDirection(direction)
         institutionDirection = direction
+        tripChoices = emptyList(); pendingPrepare = null
     }
-    private fun loadInstitutionTrip(archiveLocalDemo: Boolean) {
+    /** 오늘 운행이 둘 이상일 때 고를 목록. 비어 있으면 목록을 보이지 않는다. 방향을 바꾸면 지운다. */
+    var tripChoices by mutableStateOf<List<TripOption>>(emptyList()); private set
+    /** V-28 서버가 내려준 보호자 호출 상태(tripChildId → 정보). 정차 중 5초마다 동기화로 갱신. */
+    var guardianCalls by mutableStateOf<Map<String, GuardianCallInfo>>(emptyMap()); private set
+    private var choicesForDemo = false
+    /** 동기화 중에 누른 운행 준비(데모 여부, 고른 운행). 동기화가 끝나면 이어서 한 번 실행한다. */
+    private var pendingPrepare: Pair<Boolean, String?>? = null
+    fun chooseInstitutionTrip(tripId: String) {
+        if (tripChoices.none { it.id == tripId }) return
+        loadInstitutionTrip(choicesForDemo, tripId)
+    }
+    fun dismissTripChoices() { tripChoices = emptyList(); pendingPrepare = null }
+    /**
+     * [tripId]가 없으면 오늘 이 차량의 운행 목록부터 받는다. 하나뿐이면 바로 준비하고, 둘 이상이면 [tripChoices]로 고르게 한다.
+     * 고르는 사람은 선생님·기사님 누구나(정차 중, 운행 준비 전이나 운행 종료 뒤에만 가능).
+     */
+    private fun loadInstitutionTrip(archiveLocalDemo: Boolean, tripId: String? = null) {
         if (institutionBusy) return
-        if (!(if (archiveLocalDemo) canPrepareConnectedDemo else canReplaceInstitutionTrip())) { institutionStatus = "진행 중인 운행 또는 미전송 기록이 있습니다. 완료 후 다시 시도해 주세요."; return }
+        institutionDirection = institution.direction // 고른 적 없으면 지금 시간대 기본값(VS-02)
+        val allowedNow = if (archiveLocalDemo) canPrepareConnectedDemo(false) else canReplaceInstitutionTrip()
+        val allowedAfterSync = if (archiveLocalDemo) canPrepareConnectedDemo(true) else canReplaceInstitutionTrip(ignoreSync = true)
+        when (InstitutionTrips.prepareStart(allowedNow, allowedAfterSync, syncing)) {
+            InstitutionTrips.PrepareStart.AFTER_SYNC -> {
+                pendingPrepare = archiveLocalDemo to tripId
+                institutionStatus = "기록 전송을 마치는 중이에요 · 끝나면 바로 운행을 준비해요"
+                return
+            }
+            InstitutionTrips.PrepareStart.BLOCKED -> { pendingPrepare = null; institutionStatus = "진행 중인 운행 또는 미전송 기록이 있습니다. 완료 후 다시 시도해 주세요."; return }
+            InstitutionTrips.PrepareStart.NOW -> pendingPrepare = null
+        }
         institutionBusy = true
         viewModelScope.launch {
             try {
-                val prepared = withContext(Dispatchers.IO) { institution.createTrip() }
+                val chosen = tripId ?: run {
+                    val options = withContext(Dispatchers.IO) { institution.listTrips() }
+                    when {
+                        options.isEmpty() -> error(InstitutionTrips.noTripMessage(institution.direction))
+                        options.size == 1 -> options.first().id
+                        else -> {
+                            tripChoices = options; choicesForDemo = archiveLocalDemo
+                            institutionStatus = "오늘 ${InstitutionTrips.directionLabel(institution.direction)} 운행 ${options.size}개 · 준비할 운행을 골라 주세요"
+                            return@launch
+                        }
+                    }
+                }
+                tripChoices = emptyList(); guardianCalls = emptyMap()
+                val prepared = withContext(Dispatchers.IO) { institution.createTrip(chosen) }
                 store.archiveSnapshot(trip)
                 store.save(prepared)
                 institution.bind(prepared)
@@ -279,7 +387,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                 clearMovingDemo()
                 publish()
                 if (foreground) startSdk()
-                institutionStatus = "${prepared.children.size}명 명단 준비 완료 · Pleos 자동 연결 중. 탑승 기록 후 운행을 시작하세요."
+                institutionStatus = if (prepared.noTripToday) "탈 어린이 0명 · 오늘 ${InstitutionTrips.directionLabel(institution.direction)} 운행 없음"
+                    else "${prepared.children.size}명 명단 준비 완료 · Pleos 자동 연결 중. 탑승 기록 후 운행을 시작하세요."
                 panel = "flow"
             } catch (e: Exception) { institutionStatus = e.message ?: "명단 불러오기 실패" }
             finally { institutionBusy = false }
@@ -295,36 +404,53 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         val enabled = trackingEnabled
         val generation = demoGeneration
         val navigation = demoTrackingNavigation
-        val fix = if (!enabled || !foreground || trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING)) null
+        // Virtual Console 운전 중에는 ConsoleDriveRunner가 모의 위치를 직접 보낸다. 여기서는 위치를 보내지 않는다.
+        val console = ConsoleDriveRunner.running
+        val fix = if (console || !enabled || !foreground || trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING)) null
             else (if (trip.integrationMode == IntegrationMode.SDK) realNavi?.trackingLocation else demoTrackingLocation)
                 ?.takeIf { it.valid(System.currentTimeMillis()) }
         viewModelScope.launch {
             try {
                 val count = withContext(Dispatchers.IO) {
                     val sent = institution.sync(snapshot)
-                    if (!(snapshot.integrationMode == IntegrationMode.SDK && enabled && TripTrackingService.running &&
+                    if (!console && !(snapshot.integrationMode == IntegrationMode.SDK && enabled && TripTrackingService.running &&
                         snapshot.phase in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING))) {
                         institution.reportTracking(snapshot, enabled, fix, navigation, stillCurrent = { generation == demoGeneration })
                     }
                     sent
                 }
-                if (snapshot.integrationMode != IntegrationMode.SDK || !enabled) trackingStatus = if (!enabled) "위치 공유 중지 · 기존 공유 링크 종료" else if (fix == null) "위치 미수신 · 보호자 화면에 갱신 대기로 표시" else if (fix.simulated) "모의 위치 전송 · 실제 차량 위치 아님" else "Pleos 내비 위치 전송 · SDK 수신 시각 기준"
+                if (console) trackingStatus = ConsoleDriveRunner.uploadStatus
+                else if (snapshot.integrationMode != IntegrationMode.SDK || !enabled) trackingStatus = if (!enabled) "위치 공유 중지 · 기존 공유 링크 종료" else if (fix == null) "위치 미수신 · 보호자 화면에 갱신 대기로 표시" else if (fix.simulated) "모의 위치 전송 · 실제 차량 위치 아님" else "Pleos 내비 위치 전송 · SDK 수신 시각 기준"
+                guardianCalls = institution.lastGuardianCalls
                 institutionStatus = "서버 기록 동기화 완료 · 이번 전송 ${count}건. 보호자 푸시는 서버에서 별도 처리합니다."
             } catch (e: Exception) { trackingStatus = "위치 전송 실패 · 보호자 화면은 갱신 지연으로 전환"; institutionStatus = "기기 기록 유지 · 전송 대기 ${institution.pending(snapshot)}건: ${e.message ?: "연결 실패"}" }
             finally {
                 syncing = false
                 nextSyncAt = if (generation != demoGeneration) 0 else System.currentTimeMillis() + 5000
+                // 동기화 중에 눌린 운행 준비를 이어서 한다(미전송이 남았으면 그때 거절 안내).
+                pendingPrepare?.let { (demo, id) -> pendingPrepare = null; loadInstitutionTrip(demo, id) }
                 if (generation != demoGeneration) syncInstitution(true)
             }
         }
     }
     private fun dispatchAutomaticGuidance() {
         if (storageError != null) return
-        automaticGuidance.takeSpeech(trip, foreground)?.let { cue ->
+        // V-08 출발 전 요약은 흐름 카드가 [운행 시작] 단계를 보일 때와 같은 조건(정차 확인 · 차량 UX 제한 없음)에서만 읽는다.
+        val departureReady = engine.stationaryBlockers(now).isEmpty() &&
+            !(trip.integrationMode == IntegrationMode.SDK && sdkVehicle.uxRestricted.value == true)
+        automaticGuidance.takeSpeech(trip, foreground, departureReady)?.let { cue ->
+            // V-06: 운행 안내가 읽던 벨트 경고 음성을 끊으면, 경고가 계속 켜져 있을 때 안내가 끝난 뒤 다시 읽게 한다.
+            if (beltTelltaleSpeechId != null && audio.snapshot.speechRequestId == beltTelltaleSpeechId && audioBusy()) beltTelltaleGuidance.rearm()
             // Cancel stale destination speech before the new cue; the adapter rejects late callbacks.
             audio.stopSpeech()
             automaticAnnouncementKeys = (automaticAnnouncementKeys + cue.key).takeLast(100)
             audio.speak(cue.text)
+        }
+        // V-06: 경고등 음성은 다른 안내를 끊지 않는다. 말하는 중이면 기다렸다가 끝난 뒤 한 번 읽는다.
+        beltTelltaleGuidance.take(trip, beltTelltaleSignal(), foreground, audioBusy())?.let { cue ->
+            beltTelltaleAnnouncements++
+            audio.speak(cue.text)
+            beltTelltaleSpeechId = audio.snapshot.speechRequestId
         }
         val ready = trip.integrationMode == IntegrationMode.SIMULATION ||
             (!navi.busy && navi.routeState.isFresh(now, 6_000))
@@ -335,6 +461,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             navigateNext()
         }
     }
+
+    private fun audioBusy() = audio.snapshot.speechStatus in setOf(SpeechStatus.INITIALIZING, SpeechStatus.SPEAKING)
 
     fun markRouteCriteriaSeen() {
         if (routeCriteriaSeen) return
@@ -404,8 +532,9 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         speedKph = s.speedMetersPerSecond.map { it.toDouble() * 3.6 },
         gear = s.gear.map { when(it) { 4 -> Gear.PARK; 2 -> Gear.REVERSE; 1 -> Gear.NEUTRAL; 8 -> Gear.DRIVE; else -> Gear.UNKNOWN } },
         parkingBrake = s.parkingBrake.map { it }, doorLocked = s.doorLocked.map { it },
-        seats = (s.seatOccupancy.keys + s.seatBelts.keys).distinct().mapIndexed { index, area ->
-            SeatObservation(index + 1, s.seatOccupancy[area]?.map { it } ?: Observation(), s.seatBelts[area]?.map { it } ?: Observation(), areaLabel = area)
+        // V-07 삭제(D39): 좌석 점유는 받지 않는다. 좌석별 벨트 관측만 진단용으로 옮긴다.
+        seats = s.seatBelts.keys.mapIndexed { index, area ->
+            SeatObservation(index + 1, beltFastened = s.seatBelts[area]?.map { it } ?: Observation(), areaLabel = area)
         },
         connectionGeneration = sdkGeneration,
         parkingBrakeSupported = s.parkingBrakeSupported,
@@ -432,7 +561,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             gear = observed(if(unknown) null else if(scenario in listOf(TrialScenario.MOVING,TrialScenario.SIGNAL)) Gear.DRIVE else Gear.PARK),
             parkingBrake = observed(if(unknown) null else scenario !in listOf(TrialScenario.MOVING,TrialScenario.SIGNAL)),
             doorLocked = observed(if(connected) simLocked else null),
-            seats = listOf(SeatObservation(101, observed(if(connected) scenario == TrialScenario.OCCUPIED else null), observed(if(connected) false else null))),
+            seats = listOf(SeatObservation(101, beltFastened = observed(if(connected) false else null))),
             connectionGeneration = simGeneration, parkingBrakeSupported = true
         ), at)
         val nextKind = if (scenario == TrialScenario.WARNING) SurroundingKind.WARNING else SurroundingKind.UNKNOWN
@@ -499,24 +628,31 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         val next = trip.currentStop ?: trip.origin
         if (trip.integrationMode == IntegrationMode.SIMULATION) simulatedNavigation = "모의 안내 · ${next.name} (${next.latitude}, ${next.longitude})"
         else {
-            val upcoming = trip.routeOrder.drop(trip.currentStopIndex).take(3).mapNotNull { id -> trip.stops.find { it.id==id } }.ifEmpty { listOf(trip.origin) }
+            val upcoming = navigationWaypoints(trip).ifEmpty { listOf(trip.origin) }
             realNavi?.requestStops(upcoming.map { com.hanhyo.pleosshuttle.sdk.NaviDestination(it.name,it.latitude,it.longitude) })
         }
     }
     fun openArrival(tripId: String?, stopId: String?, version: Long) {
         if (trip.tripId == tripId && trip.currentStop?.id == stopId && trip.routeVersion == version && trip.phase == TripPhase.DRIVING) {
             panel = "flow"
-            message = "하차 지점 근처입니다. 정차 후 도착·정차 확인을 눌러 주세요."
+            message = if (trip.isPickup) "정류장 근처입니다. 정차 후 도착·정차 확인을 눌러 주세요." else "하차 지점 근처입니다. 정차 후 도착·정차 확인을 눌러 주세요."
         }
     }
     fun showNativeNavigation() { realNavi?.showNavigation() }
     fun cancelOwnNavigation() { realNavi?.cancelOwnRoute() }
     fun handleIntent(action: String?) {
         when(action) {
-            "OPEN_DROPOFF_PREPARATION" -> { panel = "flow"; message = "현재 운행 흐름을 열었습니다. 도착·정차를 확인한 뒤 선생님이 인계와 하차를 기록합니다." }
+            "OPEN_DROPOFF_PREPARATION" -> { panel = "flow"; message = if (trip.isPickup) "현재 운행 흐름을 열었습니다. 도착·정차를 확인한 뒤 선생님이 인계받음과 탑승을 기록합니다."
+                else "현재 운행 흐름을 열었습니다. 도착·정차를 확인한 뒤 선생님이 인계와 하차를 기록합니다." }
             "SHOW_NEXT_STOP" -> { panel = "flow"; message = "다음 지점: ${(trip.currentStop ?: trip.origin).name} · 로컬 Intent 실행, Gleo 음성은 미검증" }
             "PLAY_TEST_MUSIC" -> audio.play()
         }
+    }
+    /** 디버그 전용(adb): 서버가 기관 좌표를 주기 전 임시 기관 위치를 정한다. 다음 [배정 명단으로 운행 준비]부터 적용. */
+    fun setDevOrigin(value: String?) {
+        if (!BuildConfig.DEBUG) return
+        institution.setDevOrigin(value?.takeIf { InstitutionTrips.parseDevOrigin(it) != null })
+        message = InstitutionTrips.parseDevOrigin(value)?.let { "임시 기관 위치: ${it.name} · 다음 운행 준비부터 적용" } ?: "임시 기관 위치를 지웠습니다"
     }
     fun startNewSimulationTrip() {
         if (institutionBusy || syncing || institution.pending(trip) > 0) { actionError = "기관 기록 전송을 먼저 완료해 주세요."; return }
@@ -524,19 +660,32 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         try { store.archiveEnded(trip) }
         catch (error: Exception) { storageError = "완료 운행 보관 실패. 기존 운행을 유지합니다: ${error.javaClass.simpleName}"; return }
         realVehicle?.onStop(); realNavi?.onStop(); realToken = null
-        engine = ShuttleEngine(SampleTrip.create().copy(tripId = "fictional-afternoon-${System.currentTimeMillis()}"))
+        // 끝난 운행과 같은 방향으로 새 모의 운행을 만든다(하원이면 그대로 하원).
+        val pickup = trip.isPickup
+        engine = ShuttleEngine(if (pickup) SampleTrip.createPickup().copy(tripId = "fictional-morning-${System.currentTimeMillis()}")
+            else SampleTrip.create().copy(tripId = "fictional-afternoon-${System.currentTimeMillis()}"))
         scenario = TrialScenario.PARKED
         trialPrefs.edit().putString("scenario", scenario.name).commit()
         feedSimulation(); publish(); panel = "flow"
     }
     fun restartSimulation(stage: Int) {
         if (institutionBusy || syncing || institution.pending(trip) > 0) { actionError = "기관 기록 전송을 먼저 완료해 주세요."; return }
-        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..2) return
+        if (storageError != null || trip.integrationMode != IntegrationMode.SIMULATION || stage !in 0..5) return
         val fresh = SampleTrip.create().copy(tripId = "fictional-demo-${java.util.UUID.randomUUID()}")
         val prepared = when(stage) {
             1 -> fresh.copy(phase = TripPhase.ALIGHTING, children = fresh.children.map { it.copy(status = Attendance.ONBOARD) })
             2 -> fresh.copy(phase = TripPhase.END_REVIEW, currentStopIndex = fresh.routeOrder.size,
                 children = fresh.children.map { it.copy(status = Attendance.ALIGHTED) })
+            // 테스트 도구 전용: 전원 미탑승 예정(결석) 명단 → D34 "오늘 운행 없음" 화면 확인.
+            3 -> fresh.copy(children = fresh.children.map { it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT") })
+            // 테스트 도구 전용: 일부 미탑승 예정(나 결석, 라 직접 픽업) → V-02 배지·미탑승 확인 화면 확인.
+            4 -> fresh.copy(children = fresh.children.map { when (it.id) {
+                "child-b" -> it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT")
+                "child-d" -> it.copy(notExpectedToBoard = true, notBoardingReason = "SELF_PICKUP")
+                else -> it
+            } })
+            // 테스트 도구 전용: 등원(PICK_UP) 모의 운행(VS-17~VS-18). 나 결석 알림 → 출발 전 미탑승 확인 가능.
+            5 -> SampleTrip.createPickup().copy(tripId = "fictional-morning-${java.util.UUID.randomUUID()}")
             else -> fresh
         }.let { it.copy(diagnostics = listOf(DiagnosticEntry(System.currentTimeMillis(), "체험 시작", ResultStatus.UNVERIFIED,
             "가상 단계 $stage 사전 설정. 실제 탑승·인계·하차 기록이 아닙니다."))) }
@@ -567,7 +716,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             appendLine("trip=${trip.tripId} phase=${trip.phase} current=${trip.currentStop?.name}")
             appendLine("local fictional data only; source/time/status are independent")
             appendLine("SDK: ${sdkVehicle.versions}; Navi: ${navi.versions}")
-            appendLine("areas=${sdkVehicle.supportedDoorAreas}/${sdkVehicle.supportedSeatAreas}/${sdkVehicle.supportedBeltAreas}")
+            appendLine("areas=${sdkVehicle.supportedDoorAreas}/${sdkVehicle.supportedBeltAreas}")
             sdkVehicle.diagnostics.forEach(::appendLine); navi.diagnostics.forEach(::appendLine)
             trip.diagnostics.forEach { appendLine(it.toString()) }; trip.ledger.forEach { appendLine(it.toString()) }
             audioState.events.forEach(::appendLine)

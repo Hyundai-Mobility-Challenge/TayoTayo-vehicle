@@ -51,10 +51,11 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 }
 
 /** 아이 한 명의 기록 행. 이름·상태와 보조 정보 아래에 그 아이에게만 해당하는 버튼을 둔다. */
-@Composable internal fun ChildCard(title: String, detail: String, actions: @Composable RowScope.() -> Unit) {
+@Composable internal fun ChildCard(title: String, detail: String, badge: String? = null, actions: @Composable RowScope.() -> Unit) {
     Surface(color = AppTheme.colors.surface, contentColor = AppTheme.colors.textPrimary, shape = RoundedCornerShape(AppRadius.row)) {
         Column(Modifier.fillMaxWidth().padding(AppSpacing.lg), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Text(title, style = AppTheme.typography.body1SemiBold)
+            badge?.let { StatusChip(it, tone = ChipTone.ACCENT) }
             Text(detail, style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
             Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically, content = actions)
         }

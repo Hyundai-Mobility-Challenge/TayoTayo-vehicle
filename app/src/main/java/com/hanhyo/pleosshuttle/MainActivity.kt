@@ -19,6 +19,11 @@ class MainActivity : ComponentActivity() {
     private var pendingIntent: Intent? = null
     private val setup by lazy { getSharedPreferences("permission-onboarding",0) }
     private var explainPermissions by mutableStateOf(false)
+    /**
+     * 주행 시작(D·이동) 때 내비만 보이게: 내비를 앞으로 요청하고 앱 작업을 뒤로 보낸다(전체 화면 기준).
+     * Pleos 분할 화면은 앱이 풀 수 없다(moveTaskToBack·작업 종료 모두 반쪽이 다른 앱으로 채워질 뿐, 내비 SDK에도 전체·분할 요청 없음).
+     */
+    private val hideForDriving: () -> Unit = { model.showNativeNavigation(); moveTaskToBack(true) }
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         model.trackingPermissionResult()
     }
@@ -50,12 +55,15 @@ class MainActivity : ComponentActivity() {
                 dismissButton = { TextButton(onClick={ explainPermissions=false; setup.edit().putBoolean("explained",true).apply() }) { Text("나중에") } })
         }
         pendingIntent = intent
+        DriveFocusController.registerHideHandler(hideForDriving)
     }
+    override fun onDestroy() { DriveFocusController.clearHideHandler(hideForDriving); super.onDestroy() }
     private fun handlePending() {
         val value=pendingIntent ?: return
         pendingIntent=null
         if (value.action == TripTrackingService.OPEN_ARRIVAL)
             model.openArrival(value.getStringExtra("tripId"),value.getStringExtra("stopId"),value.getLongExtra("routeVersion",-1))
+        else if (value.action == "SET_DEV_ORIGIN") model.setDevOrigin(value.getStringExtra("origin"))
         else model.handleIntent(value.action)
     }
     override fun onStart() { super.onStart(); model.foreground(); handlePending() }

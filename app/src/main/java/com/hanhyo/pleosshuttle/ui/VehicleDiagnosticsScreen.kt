@@ -37,13 +37,12 @@ import com.hanhyo.pleosshuttle.ui.component.Section
 
 @Composable internal fun Sensors(vm: ShuttleViewModel) {
     Text("좌석·벨트 관측", style = AppTheme.typography.body1SemiBold)
-    if (vm.vehicle.seats.isEmpty()) Notice("지원 Area 또는 센서 관측 미수신. 빈 좌석으로 판정하지 않습니다.")
+    if (vm.vehicle.seats.isEmpty()) Notice("벨트 지원 Area 또는 센서 관측 미수신.")
     if (vm.trip.integrationMode == IntegrationMode.SDK) {
-        Text("점유 지원 Area: ${vm.sdkVehicle.supportedSeatAreas}\n벨트 지원 Area: ${vm.sdkVehicle.supportedBeltAreas}")
-        vm.sdkVehicle.seatOccupancy.forEach { (area, v) -> Text("$area 점유 ${if (v.isFresh(vm.now)) boolText(v.value, "점유", "비어 있음 관측") else "미확인/오래됨 (마지막값 ${v.value})"} · ${v.outcome} · ${timeText(v.observedAtMillis)}") }
+        Text("벨트 지원 Area: ${vm.sdkVehicle.supportedBeltAreas}")
         vm.sdkVehicle.seatBelts.forEach { (area, v) -> Text("$area 벨트 ${if (v.isFresh(vm.now)) boolText(v.value, "체결", "미체결") else "미확인/오래됨 (마지막값 ${v.value})"} · ${v.outcome} · ${timeText(v.observedAtMillis)}") }
     } else vm.vehicle.seats.forEach { seat ->
-        Text("모의 Area ${seat.areaId} · ${if (seat.occupancy.isFresh(vm.now)) boolText(seat.occupancy.value, "점유", "비어 있음 관측") else "미확인/오래됨"} · 벨트 ${if (seat.beltFastened.isFresh(vm.now)) boolText(seat.beltFastened.value, "체결", "미체결") else "미확인/오래됨"}\n${seat.occupancy.source.label} · ${timeText(seat.occupancy.observedAtMillis)} · ${if (seat.occupancy.isFresh(vm.now)) "최신 관측" else "미확인/오래됨"}")
+        Text("모의 Area ${seat.areaId} · 벨트 ${if (seat.beltFastened.isFresh(vm.now)) boolText(seat.beltFastened.value, "체결", "미체결") else "미확인/오래됨"}\n${seat.beltFastened.source.label} · ${timeText(seat.beltFastened.observedAtMillis)} · ${if (seat.beltFastened.isFresh(vm.now)) "최신 관측" else "미확인/오래됨"}")
     }
 }
 
@@ -73,7 +72,9 @@ import com.hanhyo.pleosshuttle.ui.component.Section
     Foldout("탑승·하차 변경 이력", "${vm.trip.ledger.size}건 · 정정 전 기록 유지", "ledger-log") {
         if (vm.trip.ledger.isEmpty()) Text("아직 기록이 없습니다.")
         vm.trip.ledger.reversed().forEach { entry ->
-            Text("${timeText(entry.recordedAtMillis)} · ${entry.childId} · ${entry.before.label} → ${entry.after.label}")
+            Text(if (entry.isDriverCheckRecord) "${timeText(entry.recordedAtMillis)} · 기사 확인 ${if (entry.driverCheck == true) "체크" else "없음·해제"}"
+                else if (entry.isStopExclusionRecord) "${timeText(entry.recordedAtMillis)} · 정류장 ${entry.stopId} ${if (entry.stopExcluded == true) "제외" else "다시 넣기"}"
+                else "${timeText(entry.recordedAtMillis)} · ${entry.childId} · ${entry.before.label} → ${entry.after.label}")
             Text(entry.reason, color = AppTheme.colors.textSecondary)
             HorizontalDivider(color = AppTheme.colors.outline)
         }

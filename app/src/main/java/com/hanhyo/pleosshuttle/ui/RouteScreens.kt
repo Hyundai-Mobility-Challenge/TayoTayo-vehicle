@@ -21,6 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -41,13 +44,18 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppSize
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.designsystem.theme.canvasDp
+import com.hanhyo.pleosshuttle.domain.DepartureSummary
 import com.hanhyo.pleosshuttle.domain.RouteObjective
+import com.hanhyo.pleosshuttle.domain.departureSummary
 import com.hanhyo.pleosshuttle.domain.RouteTimeline
 import com.hanhyo.pleosshuttle.domain.RouteWarning
 import com.hanhyo.pleosshuttle.domain.RouteTimelines
+import com.hanhyo.pleosshuttle.domain.StopExclusions
+import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.ui.component.Action
 import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
+import com.hanhyo.pleosshuttle.ui.component.Foldout
 
 private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직선거리로 만든 합성 이동 시간과 정차 3분을 더한 예시예요. 실제 도로 시간이 아니에요."
 
@@ -61,14 +69,18 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
     val manual = !trip.routeIsExample && trip.routeObjective == RouteObjective.FIXED
     Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
         StatusChip(if (manual) "직접 바꾼 순서" else if (trip.routeIsExample) "자동 계산한 순서 · 직선거리 기준" else "적용한 순서", tone = if (manual) ChipTone.ACCENT else ChipTone.NEUTRAL)
-        Text("복귀 ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
+        Text("${if (trip.isPickup) "기관 도착" else "복귀"} ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
     }
     RouteStrip(vm, order, timeline)
-    StopMemos(vm, order)
+    StopExclusionSuggestions(vm)
+    // V-08: 차량 화면(2560x1440)에서 [운행 시작]이 스크롤 없이 보이도록 정류장 메모는 접어 둔다(펼치면 그대로 보임).
+    Foldout("정류장 메모", "${order.size}곳 · 필요할 때 펼쳐 보기", "stop-memos") { StopMemoLines(vm, order) }
     Text(if (trip.integrationMode == com.hanhyo.pleosshuttle.domain.IntegrationMode.SIMULATION)
-        "출발하면 모의 이동과 보호자 공유가 자동으로 시작돼요. 도착·인계·하차는 직접 확인해 주세요."
-        else "출발하면 위치와 내비 예상 도착 시간을 보호자에게 공유해요. 처음에는 위치 권한 허용이 필요해요.",
-        style = AppTheme.typography.body2Regular, color = AppTheme.colors.textSecondary)
+        (if (trip.isPickup) "출발하면 모의 이동·보호자 공유 시작 · 도착·인계받음·탑승은 직접 확인" else "출발하면 모의 이동·보호자 공유 시작 · 도착·인계·하차는 직접 확인")
+        else "출발하면 위치·예상 도착 시간을 보호자에게 공유(처음엔 위치 권한 필요)",
+        style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
+    // V-08 출발 전 확인 요약 + 기사 확인 체크: [운행 시작] 바로 위(flow VS-06). 출발은 막지 않는다(D15).
+    DepartureCheckBlock(vm, departureSummary(trip, order))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
         Action("순서 바꾸기", "open-reorder", secondary = true, enabled = vm.engine.manualRouteBlockers(vm.now).isEmpty(), action = onOpenReorder)
         Box(Modifier.weight(1f)) {
@@ -91,7 +103,8 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
                 StripItem("${index + 1}", stop.shortName, "${timeline.arrivalOf(id)?.let(::clockText) ?: "-"} · ${ridersAt(trip, id).size}명")
             }
             StripArrow()
-            StripItem("복", "복귀", clockText(timeline.endMinute))
+            // 등원은 마지막 정류장 뒤 기관으로 간다(출발지 복귀가 아님).
+            if (trip.isPickup) StripItem("기", "기관 도착", clockText(timeline.endMinute)) else StripItem("복", "복귀", clockText(timeline.endMinute))
         }
         Text(SYNTHETIC_NOTE, style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
     }
@@ -120,16 +133,44 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
     ) { Text(marker, style = AppTheme.typography.caption2Bold, color = if (highlighted) AppTheme.colors.onPrimary else AppTheme.colors.textSecondary) }
 }
 
-@Composable private fun StopMemos(vm: ShuttleViewModel, order: List<String>) {
+@Composable private fun StopMemoLines(vm: ShuttleViewModel, order: List<String>) {
+    order.forEachIndexed { index, id ->
+        val stop = vm.trip.stops.first { it.id == id }
+        Text("${index + 1}  ${stop.shortName} · ${stopMemo(id) ?: "메모 없음"}", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/**
+ * V-08 출발 전 확인 블록. 숫자 칩(경고 톤은 [departureChips]), 첫 정류장·경로, 기사 확인 체크, 요약 다시 듣기.
+ * 기사 확인은 기사가 음성 요약을 듣고 말로 답하면 선생님이 체크한다(D37). 체크 전이면 경고 줄만 보이고 출발은 막지 않는다.
+ */
+@Composable private fun DepartureCheckBlock(vm: ShuttleViewModel, summary: DepartureSummary) {
+    val type = AppTheme.typography
+    val checked = vm.trip.driverCheckedAtMillis != null
     Column(
-        Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card)).padding(AppSpacing.xl).testTag("stop-memos"),
+        Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card)).padding(AppSpacing.lg).testTag("departure-summary"),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
     ) {
-        Text("정류장 메모", style = AppTheme.typography.body1SemiBold)
-        order.forEachIndexed { index, id ->
-            val stop = vm.trip.stops.first { it.id == id }
-            Text("${index + 1}  ${stop.shortName} · ${stopMemo(id) ?: "메모 없음"}", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
+            Text("출발 전 확인", style = type.body1SemiBold, modifier = Modifier.padding(top = AppSpacing.xs))
+            departureChips(summary).forEach { chip ->
+                StatusChip(chip.text, tone = if (chip.warn) ChipTone.DANGER else ChipTone.NEUTRAL, modifier = Modifier.testTag(chip.tag))
+            }
         }
+        Text(departureRouteText(summary), style = type.body2SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("departure-route"))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.weight(1f).heightIn(min = AppSize.touchMin)
+                    .toggleable(value = checked, role = Role.Checkbox) { vm.perform { toggleDriverCheck(it) } }
+                    .testTag("driver-check"),
+                horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(checked = checked, onCheckedChange = null)
+                Text(if (checked) "기사 확인 ${timeText(vm.trip.driverCheckedAtMillis)} (기사님 답을 듣고 체크함)" else "기사 확인 (기사님께 읽어 드리고 답을 들은 뒤 체크)", style = type.body2SemiBold)
+            }
+            Action("요약 다시 듣기", "replay-departure-summary", secondary = true) { vm.replayGuidance() }
+        }
+        if (!checked) Text("기사 확인 필요 · 확인 없이도 출발할 수 있어요(기록에 \"기사 확인 없음\")", style = type.body2SemiBold, color = AppTheme.colors.primaryContent, modifier = Modifier.testTag("driver-check-warning"))
     }
 }
 
@@ -146,14 +187,15 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
             }
         }
         SideTitle("보호자 자동 알림")
-        Text("하원 출발 · 내 아이 도착 약 2분 전 · 도착 확인 · 하차 완료를 알려요.", style = AppTheme.typography.body3Regular)
+        Text(if (vm.trip.isPickup) "등원 출발 · 정류장 도착 · 탑승 완료 · 기관 인계 완료를 알려요."
+            else "하원 출발 · 내 아이 도착 약 2분 전 · 도착 확인 · 하차 완료를 알려요.", style = AppTheme.typography.body3Regular)
         Text("도착 전 알림은 최신 예상 시간이 확인될 때 한 번 전송해요.", style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
         Action(if (showCriteria) "기준 접기" else "순서를 정하는 기준 보기", "route-criteria", secondary = true, action = onToggleCriteria)
         if (showCriteria) Column(
             Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card)).padding(AppSpacing.lg).testTag("route-criteria-list"),
             verticalArrangement = Arrangement.spacedBy(AppSpacing.sm),
         ) {
-            routeCriteria.forEach { Text("• $it", style = AppTheme.typography.body3Regular) }
+            routeCriteriaFor(vm.trip).forEach { Text("• $it", style = AppTheme.typography.body3Regular) }
             Text("순서를 바꿔 기준에 어긋나면 순서 바꾸기 화면에서 경고로 알려줘요.", style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
         }
     }
@@ -161,6 +203,42 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
 
 @Composable private fun SideTitle(text: String) {
     Text(text, style = AppTheme.typography.body3SemiBold, color = AppTheme.colors.textSecondary)
+}
+
+/**
+ * V-09·D17 빈 정류장 제외 제안. 아직 들르지 않은 정류장 중 내릴 어린이가 0명(선생님 미탑승 확인만 남음)이면 한 줄씩
+ * [이 정류장 빼기]를 보인다. 기본값은 순서에 남음 — 선생님이 눌러야 빠진다. 뺀 정류장은 [다시 넣기]로 되돌린다.
+ * 운행 준비와 정차 중(V-11)에만 보이고, 정차 확인이 안 되면 버튼이 꺼진다. 아무것도 없으면 그리지 않는다.
+ */
+@Composable internal fun StopExclusionSuggestions(vm: ShuttleViewModel) {
+    val trip = vm.trip
+    val suggestions = StopExclusions.suggestions(trip)
+    val excluded = if (trip.phase == TripPhase.PREPARING || trip.phase == TripPhase.ALIGHTING)
+        trip.excludedStops.mapNotNull { id -> trip.stops.find { it.id == id } } else emptyList()
+    if (suggestions.isEmpty() && excluded.isEmpty()) return
+    val enabled = vm.engine.manualRouteBlockers(vm.now).isEmpty()
+    Column(
+        Modifier.fillMaxWidth().background(AppTheme.colors.surfaceRaised, RoundedCornerShape(AppRadius.card))
+            .padding(horizontal = AppSpacing.lg, vertical = AppSpacing.sm).testTag("stop-exclusion"),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.xs),
+    ) {
+        suggestions.forEach { stop ->
+            Row(Modifier.fillMaxWidth().testTag("exclusion-suggestion-${stop.id}"), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                StatusChip("제외 제안", tone = ChipTone.ACCENT)
+                Text("${stop.shortName} · ${if (trip.isPickup) "탈" else "내릴"} 어린이 없음", Modifier.weight(1f), style = AppTheme.typography.body2SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Action("이 정류장 빼기", "exclude-stop-${stop.id}", secondary = true, enabled = enabled) { vm.perform { excludeStop(stop.id, it) } }
+            }
+        }
+        excluded.forEach { stop ->
+            Row(Modifier.fillMaxWidth().testTag("excluded-stop-${stop.id}"), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+                StatusChip("뺀 정류장")
+                Text("${stop.shortName} · 방문 순서·길 안내에서 빠짐", Modifier.weight(1f), style = AppTheme.typography.body2Regular, color = AppTheme.colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Action("다시 넣기", "include-stop-${stop.id}", secondary = true, enabled = enabled) { vm.perform { includeStop(stop.id, it) } }
+            }
+        }
+        if (suggestions.isNotEmpty()) Text("빼지 않으면 순서에 그대로 남아요 · 다시 탈 어린이가 생기면 자동으로 다시 넣어요",
+            style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
+    }
 }
 
 // ---- L9 순서 바꾸기 -----------------------------------------------------------
@@ -177,7 +255,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
     val blockers = vm.engine.manualRouteBlockers(vm.now)
     Column(Modifier.fillMaxWidth().testTag("reorder"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         Text(if (locked == 0) "순서 바꾸기" else "남은 순서 바꾸기", style = AppTheme.typography.head3Bold)
-        Text(if (locked == 0) "위·아래 버튼으로 한 칸씩 옮겨요. 출발과 복귀는 고정이에요." else "지나온 정류장과 지금 정류장은 고정이에요. 다음 정류장부터 바뀌어요.", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
+        Text(if (locked == 0) "위·아래 버튼으로 한 칸씩 옮겨요. 출발과 ${if (trip.isPickup) "기관 도착" else "복귀"}은 고정이에요." else "지나온 정류장과 지금 정류장은 고정이에요. 다음 정류장부터 바뀌어요.", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
         LockedRow("출", "${trip.origin.shortName} 출발", clockText(timeline.startMinute))
         draft.order.forEachIndexed { index, id ->
             val stop = trip.stops.first { it.id == id }
@@ -185,7 +263,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
             ReorderRow(
                 number = "${index + 1}",
                 name = stop.shortName,
-                riders = ridersAt(trip, id).joinToString().ifBlank { "내릴 친구 없음" },
+                riders = ridersAt(trip, id).joinToString().ifBlank { if (trip.isPickup) "탈 친구 없음" else "내릴 친구 없음" },
                 arrival = timeline.arrivalOf(id),
                 original = base.arrivalOf(id),
                 highlighted = draft.lastMoved == id,
@@ -197,7 +275,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
                 onMove = { delta -> onChange(draft.copy(order = RouteTimelines.move(draft.order, index, delta), lastMoved = id)) },
             )
         }
-        LockedRow("복", "${trip.origin.shortName} 복귀", clockText(timeline.endMinute))
+        if (trip.isPickup) LockedRow("기", "기관 도착", clockText(timeline.endMinute)) else LockedRow("복", "${trip.origin.shortName} 복귀", clockText(timeline.endMinute))
         RouteWarnings(warnings)
         if (blockers.isNotEmpty()) Text(blockers.joinToString(" · "), style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.primaryContent)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
@@ -295,7 +373,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
     val timeline = routeTimeline(vm.trip, draft.order)
     val warnings = routeWarnings(timeline)
     Column(modifier.testTag("reorder-side"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
-        SideTitle("복귀 예정")
+        SideTitle(if (vm.trip.isPickup) "기관 도착 예정" else "복귀 예정")
         CompareRow(clockText(base.endMinute), clockText(timeline.endMinute), timeline.endMinute - base.endMinute)
         SideTitle("총 소요")
         CompareRow("${base.totalMinutes}분", "${timeline.totalMinutes}분", timeline.totalMinutes - base.totalMinutes)

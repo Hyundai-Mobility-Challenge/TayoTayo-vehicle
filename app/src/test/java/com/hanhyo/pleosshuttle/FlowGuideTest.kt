@@ -16,16 +16,20 @@ class FlowGuideTest {
         completedAtMillis = if (completed) now else null, invalidated = invalidated,
     )
 
-    @Test fun `일부 어린이만 탑승해도 명시적으로 검토를 마치면 방문 순서를 안내한다`() {
+    @Test fun `일부 어린이만 탑승하면 탑승 마침 뒤 남은 아이의 미탑승 확인을 받고 방문 순서를 안내한다`() {
         val trip = withOnePassenger()
         assertEquals("board-child-b", nextFlowGuide(trip).targetTag)
-        assertEquals("start-trip", nextFlowGuide(trip, boardingReviewed = true).targetTag)
+        // V-02: 탑승 마침 시 탑승 기록이 없는 아이마다 선생님이 미탑승을 확인한다.
+        assertEquals("not-boarded-child-b", nextFlowGuide(trip, boardingReviewed = true).targetTag)
+        val decided = trip.copy(children = trip.children.map { if (it.status == Attendance.NOT_BOARDED) it.copy(status = Attendance.CONFIRMED_NOT_BOARDED) else it })
+        assertEquals("start-trip", nextFlowGuide(decided, boardingReviewed = true).targetTag)
+        assertEquals("start-trip", nextFlowGuide(decided).targetTag)
         assertEquals(1, trip.onboardChildren.size)
         assertEquals(TripPhase.PREPARING, trip.phase)
     }
 
     @Test fun `운행 시작 하나로 자동 계산과 기존 순서를 모두 사용할 수 있다`() {
-        val trip = withOnePassenger()
+        val trip = withOnePassenger().let { t -> t.copy(children = t.children.map { if (it.status == Attendance.NOT_BOARDED) it.copy(status = Attendance.CONFIRMED_NOT_BOARDED) else it }) }
         val proposal = RouteProposal(trip.routeOrder, 10.0, "km", "합성", RouteObjective.DISTANCE, true, 0, 6)
         assertEquals("start-trip", nextFlowGuide(trip.copy(routeProposal = proposal), boardingReviewed = true).targetTag)
         assertEquals("start-trip", nextFlowGuide(trip.copy(routeIsExample = false), boardingReviewed = true).targetTag)
@@ -83,5 +87,15 @@ class FlowGuideTest {
         val trip = alighting().copy(unlockAttempt = attempt(ResultStatus.TARGET_OBSERVED))
         assertEquals("stationary-status", nextFlowGuide(trip, stationaryReady = false).targetTag)
         assertNull(nextFlowGuide(trip, uxRestricted = true).targetTag)
+    }
+
+    @Test fun `탈 어린이 0명이면 탑승 단계 대신 오늘 운행 없음을 안내한다`() {
+        val absent = SampleTrip.create().let { t -> t.copy(children = t.children.map { it.copy(notExpectedToBoard = true) }) }
+        assertEquals(NO_TRIP_TODAY_TAG, nextFlowGuide(absent).targetTag)
+        assertEquals(NO_TRIP_TODAY_TAG, nextFlowGuide(absent, boardingReviewed = true, stationaryReady = false).targetTag)
+        assertEquals(NO_TRIP_TODAY_TAG, nextFlowGuide(SampleTrip.create().copy(children = emptyList())).targetTag)
+        val mixed = absent.copy(children = absent.children.map { if (it.id == "child-b") it.copy(notExpectedToBoard = false) else it })
+        // 미탑승 예정 아이(가)는 명단에 남아 [미탑승 확인]을 먼저 묻는다(V-02). [탑승 기록]도 함께 보인다.
+        assertEquals("not-boarded-child-a", nextFlowGuide(mixed).targetTag)
     }
 }

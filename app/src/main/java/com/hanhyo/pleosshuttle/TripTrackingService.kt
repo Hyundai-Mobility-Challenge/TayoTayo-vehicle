@@ -45,8 +45,8 @@ class TripTrackingService : Service() {
             .putExtra("tripId",trip.tripId).putExtra("stopId",trip.currentStop?.id).putExtra("routeVersion",trip.routeVersion)
         val pending=PendingIntent.getActivity(this,key.hashCode(),intent,PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         manager.notify(92,NotificationCompat.Builder(this,"trip_arrival").setSmallIcon(R.drawable.ic_shuttle)
-            .setCategory(NotificationCompat.CATEGORY_NAVIGATION).setContentTitle("하차 지점 근처 · 정차 확인")
-            .setContentText("${trip.currentStop?.name} · 눌러서 도착·인계를 확인해 주세요.")
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION).setContentTitle(if (trip.isPickup) "정류장 근처 · 정차 확인" else "하차 지점 근처 · 정차 확인")
+            .setContentText(if (trip.isPickup) "${trip.currentStop?.name} · 눌러서 도착·인계받음을 확인해 주세요." else "${trip.currentStop?.name} · 눌러서 도착·인계를 확인해 주세요.")
             .setContentIntent(pending).addAction(0,"도착·정차 확인",pending).setOnlyAlertOnce(true).setAutoCancel(true).build())
         arrivalNoticeKey=key
     }
@@ -94,7 +94,7 @@ class TripTrackingService : Service() {
                 val key = "${current.tripId}/${current.routeVersion}/${current.currentStopIndex}"
                 if (key != routeKey) {
                     navi?.invalidateTracking()
-                    val upcoming=current.routeOrder.drop(current.currentStopIndex).take(3).mapNotNull { id -> current.stops.find { it.id==id } }
+                    val upcoming=com.hanhyo.pleosshuttle.domain.navigationWaypoints(current)
                     navi?.expectTrackingStops(upcoming.map { it.latitude to it.longitude },upcoming.map { it.name })
                     routeKey = key; navi?.refresh()
                 }
@@ -103,6 +103,11 @@ class TripTrackingService : Service() {
                 val decision=navigationPolicy.evaluate(current,fix,navigation,drive?.current ?: DriveObservation(),System.currentTimeMillis())
                 if (decision.showNavigation) navi?.showNavigation()
                 arrivalNotice(current,decision.arrivalReady)
+                // 개발용 Virtual Console 운전 중에는 앱이 모의 위치(SIMULATED)를 보내므로 Pleos 위치 보고를 쉰다.
+                if (ConsoleDriveBridge.activeTripId == current.tripId) {
+                    prefs.edit().putString("trackingServiceStatus", "Virtual Console 운전 중 · 앱이 모의 위치를 전송").apply()
+                    delay(5000); continue
+                }
                 runCatching {
                     withContext(Dispatchers.IO) {
                         connection.reportTracking(current, true, fix, navigation) {

@@ -20,8 +20,9 @@ class TripNavigationPolicy {
         val currentKey="${trip.tripId}/${trip.routeVersion}/${trip.currentStopIndex}/${nav?.routeId}/${nav?.epoch}"
         if (key!=currentKey) { key=currentKey;nearSince=null }
         val stop=trip.currentStop
+        // 하원: 이 정류장에서 내릴 아이(ONBOARD)가 있을 때. 등원: 정류장에서 태울 아이는 아직 탑승 전이므로 정류장으로 가는 구간이면 항상.
         val active = trip.integrationMode==IntegrationMode.SDK && trip.phase==TripPhase.DRIVING && stop!=null &&
-            trip.currentStopChildren.any {it.status==Attendance.ONBOARD}
+            (trip.isPickup || trip.currentStopChildren.any {it.status==Attendance.ONBOARD})
         val leg="${trip.tripId}/${trip.routeVersion}/${trip.currentStopIndex}"
         // Opening the installed navigator does not need a GPS fix. Arrival confirmation does.
         val show = active && shownLeg!=leg && motion.fresh(now) && motion.gear==Gear.DRIVE
