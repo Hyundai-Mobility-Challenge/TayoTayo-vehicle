@@ -55,9 +55,6 @@ object DriveFocusController {
     private val policy = DriveFocusPolicy()
     private var hideHandler: WeakReference<() -> Unit>? = null
     @Volatile var lastAction: String = "없음"; private set
-    /** 정차로 운행 화면을 다시 연 뒤 "내비와 나눠 보기" 안내를 보일지. 다시 주행하거나 닫거나 이미 분할이면 내린다. */
-    @Volatile var splitHintPending: Boolean = false; private set
-    fun dismissSplitHint() { splitHintPending = false }
 
     /** MainActivity가 살아 있는 동안 등록한다. */
     fun registerHideHandler(handler: () -> Unit) { hideHandler = WeakReference(handler) }
@@ -81,21 +78,18 @@ object DriveFocusController {
         scope?.cancel(); scope = null
         observer?.close(); observer = null
         policy.evaluate(null, DriveObservation(), 0)
-        splitHintPending = false
     }
 
     private fun tick() {
         val motion = observer?.current ?: return
         when (policy.evaluate(trip, motion, System.currentTimeMillis())) {
             DriveFocusAction.HIDE_APP -> {
-                splitHintPending = false
                 val handler = hideHandler?.get()
                 lastAction = if (handler != null) { handler(); "주행 · 내비만 표시" } else "주행 · 앱이 이미 뒤에 있음"
                 log("hide app (handler=${handler != null})")
             }
             DriveFocusAction.SHOW_APP -> {
                 val context = app ?: return
-                splitHintPending = true
                 runCatching {
                     context.startActivity(Intent(context, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))

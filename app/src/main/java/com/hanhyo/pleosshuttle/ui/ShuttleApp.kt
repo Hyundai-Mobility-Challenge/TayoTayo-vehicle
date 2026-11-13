@@ -140,15 +140,6 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
             if (vm.panel != "flow") DetailTabs(vm)
             // V-06 차량 벨트 경고등: 모든 단계·화면의 상태 줄 한 줄(주행 중에도 팝업 없이 띠만). 좌석·아이에 붙이지 않는다.
             vm.beltTelltaleBanner?.let { Notice(it, Modifier.testTag("belt-telltale-banner"), error = true) }
-            // 정차 후 운행 화면이 전체로 돌아왔을 때만. 분할은 Pleos에서 사람이 손잡이로만 만들 수 있어 안내만 한다. 이미 분할(좁은 창)이면 내린다.
-            LaunchedEffect(compact, vm.splitHint) { if (compact && vm.splitHint) vm.dismissSplitHint() }
-            if (vm.splitHint && !compact) Row(
-                Modifier.fillMaxWidth().testTag("split-hint"),
-                horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Notice("정차했어요. 내비와 나눠 보려면 화면 오른쪽 끝 손잡이(⋮)를 왼쪽으로 끌어 주세요. 나눈 채로 출발하면 이 화면은 조회 전용으로 남아요.", Modifier.weight(1f))
-                Action("닫기", "split-hint-close", secondary = true) { vm.dismissSplitHint() }
-            }
             vm.storageError?.let { Notice(it, error = true) }
             vm.actionError?.let { Notice(it, error = true) }
             if (vm.panel == "flow") {

@@ -168,9 +168,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         trip.onboardChildren.isNotEmpty() || trip.isPickup, trip.currentStop != null, trip.integrationMode,
         trackingEnabled, storageError == null, trip.isPickup)
     var trackingPermissionRequested by mutableStateOf(false); private set
-    /** 주행 뒤 정차로 운행 화면이 다시 열렸을 때 "내비와 나눠 보기" 안내(앱은 분할을 직접 만들 수 없음). */
-    var splitHint by mutableStateOf(false); private set
-    fun dismissSplitHint() { DriveFocusController.dismissSplitHint(); splitHint = false }
+
     private var trackingServiceRequested = false
     var locationPermissionGranted by mutableStateOf(TripTrackingService.hasPermission(getApplication())); private set
     fun requestTrackingPermission() { trackingPermissionRequested = true }
@@ -279,7 +277,6 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         refreshMovingDemo()
         refreshConsoleDrive()
         DriveFocusController.update(getApplication(), trip)
-        splitHint = DriveFocusController.splitHintPending
         if (foreground && storageError == null) syncInstitution()
     }
 
