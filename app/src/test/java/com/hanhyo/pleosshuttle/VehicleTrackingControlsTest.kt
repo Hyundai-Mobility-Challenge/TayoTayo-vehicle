@@ -45,4 +45,10 @@ class VehicleTrackingControlsTest {
             assertFalse(state(phase = phase).canSendDemo)
         }
     }
+    @Test fun pickupInstitutionLegDoesNotShowDropOffPointWording() {
+        val c = vehicleTrackingControls(true, true, TripPhase.DRIVING, true, false, IntegrationMode.SDK, true, true, pickup = true)
+        assertTrue(c.guidance.startsWith("기관으로 가는 중"))
+        assertFalse(c.guidance.contains("하차 지점"))
+        assertTrue(state(stop = false).guidance.contains("하차 지점"))
+    }
 }

@@ -166,7 +166,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     val trackingControls get() = vehicleTrackingControls(
         institutionConnected, trip.tripId == institution.boundTrip, trip.phase,
         trip.onboardChildren.isNotEmpty() || trip.isPickup, trip.currentStop != null, trip.integrationMode,
-        trackingEnabled, storageError == null)
+        trackingEnabled, storageError == null, trip.isPickup)
     var trackingPermissionRequested by mutableStateOf(false); private set
     private var trackingServiceRequested = false
     var locationPermissionGranted by mutableStateOf(TripTrackingService.hasPermission(getApplication())); private set
