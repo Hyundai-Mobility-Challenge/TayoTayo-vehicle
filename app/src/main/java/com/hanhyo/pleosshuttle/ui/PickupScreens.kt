@@ -121,8 +121,8 @@ private fun shortName(child: ChildRecord) = child.name.removePrefix("가상 ")
                     } else child.guardianCalledAtMillis?.let {
                         Text("호출함 ${hourMinuteText(it)}", style = type.body2Regular, color = AppTheme.colors.textSecondary, modifier = Modifier.testTag("pickup-call-${child.id}"))
                     }
-                    // VS-19 / P-21 응답 자리: 서버 응답이 아직 없어 항상 null(표시 없음).
-                    PickupFlow.guardianResponseLabel(child)?.let { Text(it, style = type.body2Regular, modifier = Modifier.testTag("pickup-call-response-${child.id}")) }
+                    // VS-19 / P-21 보호자 응답: 서버 guardianCall(5초마다 동기화). 참고용, 미탑승 확정은 선생님.
+                    if (child.status == Attendance.NOT_BOARDED && !child.receivedAtStop) PickupFlow.guardianResponseLabel(child, vm.guardianCalls[child.id], vm.now)?.let { Text(it, style = type.body2Regular, modifier = Modifier.testTag("pickup-call-response-${child.id}")) }
                     PickupFlow.notBoardingBadge(child)?.let { StatusChip(it, tone = ChipTone.ACCENT) }
                 }
                 StatusChip(PickupFlow.statusLabel(trip, child), tone = riderTone(child), modifier = Modifier.testTag("pickup-status-${child.id}"))

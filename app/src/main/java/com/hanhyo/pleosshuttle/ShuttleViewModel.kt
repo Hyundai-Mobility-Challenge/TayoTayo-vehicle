@@ -329,6 +329,8 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     }
     /** 오늘 운행이 둘 이상일 때 고를 목록. 비어 있으면 목록을 보이지 않는다. 방향을 바꾸면 지운다. */
     var tripChoices by mutableStateOf<List<TripOption>>(emptyList()); private set
+    /** V-28 서버가 내려준 보호자 호출 상태(tripChildId → 정보). 정차 중 5초마다 동기화로 갱신. */
+    var guardianCalls by mutableStateOf<Map<String, GuardianCallInfo>>(emptyMap()); private set
     private var choicesForDemo = false
     fun chooseInstitutionTrip(tripId: String) {
         if (tripChoices.none { it.id == tripId }) return
@@ -358,7 +360,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
                 }
-                tripChoices = emptyList()
+                tripChoices = emptyList(); guardianCalls = emptyMap()
                 val prepared = withContext(Dispatchers.IO) { institution.createTrip(chosen) }
                 store.archiveSnapshot(trip)
                 store.save(prepared)
@@ -405,6 +407,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                 }
                 if (console) trackingStatus = ConsoleDriveRunner.uploadStatus
                 else if (snapshot.integrationMode != IntegrationMode.SDK || !enabled) trackingStatus = if (!enabled) "위치 공유 중지 · 기존 공유 링크 종료" else if (fix == null) "위치 미수신 · 보호자 화면에 갱신 대기로 표시" else if (fix.simulated) "모의 위치 전송 · 실제 차량 위치 아님" else "Pleos 내비 위치 전송 · SDK 수신 시각 기준"
+                guardianCalls = institution.lastGuardianCalls
                 institutionStatus = "서버 기록 동기화 완료 · 이번 전송 ${count}건. 보호자 푸시는 서버에서 별도 처리합니다."
             } catch (e: Exception) { trackingStatus = "위치 전송 실패 · 보호자 화면은 갱신 지연으로 전환"; institutionStatus = "기기 기록 유지 · 전송 대기 ${institution.pending(snapshot)}건: ${e.message ?: "연결 실패"}" }
             finally {

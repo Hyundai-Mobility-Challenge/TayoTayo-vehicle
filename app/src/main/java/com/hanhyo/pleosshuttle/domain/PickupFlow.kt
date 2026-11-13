@@ -161,12 +161,24 @@ object PickupFlow {
     }
 
     /**
-     * VS-19 / P-21 보호자 응답(곧 나가요 / 오늘 안 타요 / 응답 없음) 표시 자리. 서버(S-20)가 아직 응답을 내려주지 않으므로
-     * 지금은 항상 null(화면에 응답 줄 없음). 응답이 들어오면 여기서 문구를 돌려주면 정류장 행이 그대로 보여 준다.
-     * 응답은 참고용이며 "오늘 안 타요"도 미탑승을 확정하지 않는다(7절).
+     * VS-19 / P-21 보호자 응답 줄. 서버 운행 응답의 children[].guardianCall(가장 최근 호출)을 그대로 보여 준다.
+     * - 응답 있음: "보호자 응답: 곧 나가요 · 2분 전" / "보호자 응답: 오늘 안 타요 · 미탑승은 직접 확인해 주세요"
+     * - 응답 없음: 열림 "보호자 응답 기다리는 중", 만료 "보호자 응답 없음(10분 지남)", 닫힘 null
+     * 응답은 참고용이며 "오늘 안 타요"도 미탑승을 확정하지 않는다(7절). 호출하지 않은 아이·정보가 없으면 null.
      */
-    @Suppress("UNUSED_PARAMETER")
-    fun guardianResponseLabel(child: ChildRecord): String? = null
+    fun guardianResponseLabel(child: ChildRecord, call: GuardianCallInfo?, now: Long): String? {
+        if (!child.guardianCalled || call == null) return null
+        val ago = call.respondedAtMillis?.let { at -> ((now - at).coerceAtLeast(0L) / 60_000L).let { if (it < 1) "방금" else "${it}분 전" } }
+        return when (call.response) {
+            "ON_THE_WAY" -> "보호자 응답: 곧 나가요" + (ago?.let { " · $it" } ?: "")
+            "NOT_RIDING" -> "보호자 응답: 오늘 안 타요" + (ago?.let { " · $it" } ?: "") + " · 미탑승은 직접 확인해 주세요"
+            else -> when (call.status) {
+                "OPEN" -> "보호자 응답 기다리는 중"
+                "EXPIRED" -> "보호자 응답 없음(10분 지남)"
+                else -> null
+            }
+        }
+    }
 
     // ---------------- VS-20 기관 도착·기관 인계·종료(S-19). ----------------
 
@@ -190,5 +202,18 @@ object PickupFlow {
         DROPPED -> "기관 인계 완료"
         NOT_BOARDED -> "미탑승 확인"
         else -> "탑승 전"
+    }
+}
+
+/** 서버 children[].guardianCall 한 건(V-28). status: OPEN / RESPONDED / CLOSED / EXPIRED, response: ON_THE_WAY / NOT_RIDING / null. */
+data class GuardianCallInfo(val callId: String, val status: String, val response: String?, val openedAtMillis: Long?, val respondedAtMillis: Long?)
+
+/** 서버 시각 문자열 → epoch ms. 시간대가 없으면(예: "2026-11-13T14:10:30.281") 서버 기준 한국 시간으로 본다. 잘못된 값은 null. */
+object ServerTime {
+    private val SERVER_ZONE: java.time.ZoneId = java.time.ZoneId.of("Asia/Seoul")
+    fun parseMillis(raw: String?): Long? {
+        val text = raw?.trim()?.takeIf { it.isNotEmpty() && it != "null" } ?: return null
+        return runCatching { java.time.OffsetDateTime.parse(text).toInstant().toEpochMilli() }.getOrNull()
+            ?: runCatching { java.time.LocalDateTime.parse(text.replace(' ', 'T')).atZone(SERVER_ZONE).toInstant().toEpochMilli() }.getOrNull()
     }
 }

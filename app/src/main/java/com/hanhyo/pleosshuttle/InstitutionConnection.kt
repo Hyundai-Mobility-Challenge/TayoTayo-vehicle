@@ -12,6 +12,8 @@ import java.util.UUID
 class InstitutionConnection(context: Context) {
     private val prefs = context.getSharedPreferences("institution", 0)
     /** 디버그 전용. null이면 지운다. 다음 [배정 명단으로 운행 준비]부터 적용. */
+    /** 마지막 동기화 때 받은 보호자 호출 상태(tripChildId → 정보). 운행이 바뀌면 [bind]에서 비운다. */
+    @Volatile var lastGuardianCalls: Map<String, GuardianCallInfo> = emptyMap(); private set
     fun setDevOrigin(value: String?) { prefs.edit().apply { if (value == null) remove(DEV_ORIGIN_KEY) else putString(DEV_ORIGIN_KEY, value) }.apply() }
     val base get() = prefs.getString("base", "http://10.0.2.2:8080")!!
     val name get() = prefs.getString("name", "연결된 차량 없음")!!
@@ -97,6 +99,7 @@ class InstitutionConnection(context: Context) {
     }
 
     fun bind(trip: TripState) {
+        lastGuardianCalls = emptyMap()
         val stored = prefs.all
         // 같은 운행을 다시 묶을 때만 기존(구버전 전역 키 포함) 전송 기록을 유지하고, 다른 운행 기록은 지운다.
         val keep = if (boundTrip == trip.tripId) InstitutionTrips.sentEventIds(trip.tripId, stored) else emptySet()
@@ -131,12 +134,15 @@ class InstitutionConnection(context: Context) {
             if (sent(key)) return
             call("$prefix$path", body, method); mark(key)
         }
-        val status = runCatching { call("$prefix/prepare", method = "POST").optString("status") }.getOrNull()
+        val prepared = runCatching { call("$prefix/prepare", method = "POST") }.getOrNull()
+        prepared?.let { lastGuardianCalls = InstitutionTrips.guardianCalls(it) }
+        val status = prepared?.optString("status")
         if (status == "PREPARING") {
             // V-08: 출발 전 기사 확인은 출발할 때 한 번만 보낸다(체크 뒤 변경으로 해제될 수 있으므로 출발 전에는 보내지 않음).
             // 서버 TripController.checklist: driverConfirmed=true면 trips.driver_checked_at 기록, false면 비워 둔 채 "NG" 항목만.
             if (trip.phase != TripPhase.PREPARING) {
-                lifecycle("checklist", "/checklist", JSONObject().put(InstitutionTrips.DRIVER_CONFIRMED_FIELD, InstitutionTrips.driverConfirmed(trip)), "PUT")
+                lifecycle("checklist", "/checklist", JSONObject().put(InstitutionTrips.DRIVER_CONFIRMED_FIELD, InstitutionTrips.driverConfirmed(trip))
+                    .apply { InstitutionTrips.checkedAt(trip)?.let { put("checkedAt", it) } }, "PUT")
                 lifecycle("start", "/start")
             }
         } else if (status != null && status != "COMPLETED" && trip.phase != TripPhase.PREPARING) {
@@ -319,6 +325,19 @@ internal object InstitutionTrips {
 
     /** V-08: 출발 시점에 기사 확인 체크가 있으면 true(서버가 driver_checked_at 기록), 없으면 false("기사 확인 없음"). */
     fun driverConfirmed(trip: TripState): Boolean = trip.driverCheckedAtMillis != null
+    /** 기사 확인을 실제로 체크한 시각(ISO-8601 UTC). 서버는 이 값을 driver_checked_at으로 저장(A6). 체크 안 했으면 null. */
+    fun checkedAt(trip: TripState): String? = trip.driverCheckedAtMillis?.let { java.time.Instant.ofEpochMilli(it).toString() }
+    /** 운행 응답 children[].guardianCall → tripChildId별 정보. 호출이 없는 아이는 빠진다. */
+    fun guardianCalls(trip: JSONObject): Map<String, GuardianCallInfo> {
+        val rows = trip.optJSONArray("children") ?: return emptyMap()
+        return (0 until rows.length()).mapNotNull { i ->
+            val row = rows.getJSONObject(i)
+            val c = row.optJSONObject("guardianCall") ?: return@mapNotNull null
+            fun s(k: String) = if (c.isNull(k)) null else c.optString(k).takeIf { it.isNotBlank() }
+            row.optString("tripChildId") to GuardianCallInfo(s("callId") ?: "", s("status") ?: "OPEN", s("response"),
+                ServerTime.parseMillis(s("openedAt")), ServerTime.parseMillis(s("respondedAt")))
+        }.toMap()
+    }
 
     /**
      * V-21 동승 유지 기록을 포함한 원장 항목 → 서버 이벤트 유형. 서버 TripController.updateChildFromEvent 기준:

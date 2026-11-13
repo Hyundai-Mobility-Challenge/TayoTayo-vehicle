@@ -225,7 +225,15 @@ class PickupScreenRulesTest {
         assertEquals("호출 3분 전", PickupFlow.callElapsedLabel(called, now + 3 * 60_000 + 30_000))
         assertEquals("호출 125분 전", PickupFlow.callElapsedLabel(called, now + 125 * 60_000))
         assertEquals("방금 호출", PickupFlow.callElapsedLabel(called, now - 5_000)) // 시계 역행
-        assertNull(PickupFlow.guardianResponseLabel(called)) // 서버 응답 미제공
+        assertNull(PickupFlow.guardianResponseLabel(called, null, now)) // 서버 정보 없음
+        assertEquals("보호자 응답 기다리는 중", PickupFlow.guardianResponseLabel(called, GuardianCallInfo("1", "OPEN", null, now, null), now))
+        assertEquals("보호자 응답 없음(10분 지남)", PickupFlow.guardianResponseLabel(called, GuardianCallInfo("1", "EXPIRED", null, now, null), now))
+        assertEquals("보호자 응답: 곧 나가요 · 방금", PickupFlow.guardianResponseLabel(called, GuardianCallInfo("1", "RESPONDED", "ON_THE_WAY", now, now + 10_000), now + 30_000))
+        assertEquals("보호자 응답: 곧 나가요 · 2분 전", PickupFlow.guardianResponseLabel(called, GuardianCallInfo("1", "RESPONDED", "ON_THE_WAY", now, now), now + 2 * 60_000))
+        assertEquals("보호자 응답: 오늘 안 타요 · 방금 · 미탑승은 직접 확인해 주세요",
+            PickupFlow.guardianResponseLabel(called, GuardianCallInfo("1", "RESPONDED", "NOT_RIDING", now, now), now))
+        assertNull(PickupFlow.guardianResponseLabel(called, GuardianCallInfo("1", "CLOSED", null, now, null), now))
+        assertNull(PickupFlow.guardianResponseLabel(e.child("child-c"), GuardianCallInfo("1", "OPEN", null, now, null), now)) // 호출 안 한 아이
         assertFalse(e.callGuardian("child-a", now + 60_000)) // 재호출 없음(D30)
     }
 
