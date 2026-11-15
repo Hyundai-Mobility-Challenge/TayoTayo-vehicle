@@ -14,7 +14,7 @@ class InstitutionConnection(context: Context) {
     /** 마지막 동기화 때 받은 보호자 호출 상태(tripChildId → 정보). 운행이 바뀌면 [bind]에서 비운다. */
     @Volatile var lastGuardianCalls: Map<String, GuardianCallInfo> = emptyMap(); private set
     val base get() = prefs.getString("base", "http://10.0.2.2:8080")!!
-    val name get() = prefs.getString("name", "연결된 차량 없음")!!
+    val name get() = InstitutionTrips.connectionLabel(connected, prefs.getString("name", null))
     val connected get() = prefs.contains("credential")
     /** VS-02: 선생님이 고른 방향. 한 번도 고르지 않았으면 시간대 기본값(TripDirections.defaultFor). */
     val direction get() = InstitutionTrips.effectiveDirection(prefs.getString("direction", null), java.time.LocalTime.now().hour)
@@ -30,7 +30,7 @@ class InstitutionConnection(context: Context) {
             .put("installId", installId).put("appVersion", BuildConfig.VERSION_NAME).put("pleosSdkVersion", "unknown"))
         check(prefs.edit().putString("base", server).putString("credential", value.getString("vehicleCredential"))
             .putString("vehicleId", value.optString("vehicleId")).putString("orgId", value.optString("orgId"))
-            .putString("name", "연결된 차량 ${value.optString("vehicleId")}").remove("token").commit())
+            .putString("name", value.optString("vehicleName").trim()).remove("token").commit())
     }
 
     /** Trips are created by the organization web/API. The vehicle app selects today's prepared trip. */
@@ -232,6 +232,15 @@ data class EtaSnapshot(val routeRevisionNo: Int, val navRouteKey: String?, val s
     val simulated: Boolean, val entries: List<EtaEntry>)
 
 internal object InstitutionTrips {
+    /**
+     * 기관·차량 연결 화면의 연결 상태 문구. 서버가 차량 이름(vehicleName)을 주면 "연결된 차량 · 타요 1호차",
+     * 없으면 차량 번호(ID) 대신 "차량 연결됨". 예전 빌드가 저장한 "연결된 차량 3" 같은 ID 표기도 숨긴다.
+     */
+    fun connectionLabel(connected: Boolean, storedName: String?): String {
+        if (!connected) return "연결된 차량 없음"
+        val name = storedName?.trim().orEmpty()
+        return if (name.isEmpty() || Regex("연결된 차량 \\d+").matches(name)) "차량 연결됨" else "연결된 차량 · $name"
+    }
     /**
      * 내비 관측([TrackingNavigation]) → 서버 eta-snapshots 본문 재료. READY(검증 통과)일 때만 만든다.
      * - 경유지 묶음(stops)이 있으면 순서대로, 없으면 단일 목적지 값 하나.
