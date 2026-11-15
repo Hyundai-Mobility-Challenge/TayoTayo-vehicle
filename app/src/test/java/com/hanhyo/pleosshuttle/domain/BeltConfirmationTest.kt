@@ -14,7 +14,7 @@ import java.io.ObjectOutputStream
 /** V-05 벨트 수동 확인: 탑승 중인 아이만, 정차 중(V-11) 운행 준비·하차 단계에서만, 서버로 보내지 않음(D27). */
 class BeltConfirmationTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun moving() = parked().copy(speedKph = observed(20.0), gear = observed(Gear.DRIVE))

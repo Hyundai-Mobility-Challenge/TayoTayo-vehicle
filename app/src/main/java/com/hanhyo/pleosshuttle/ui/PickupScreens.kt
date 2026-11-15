@@ -54,7 +54,7 @@ import com.hanhyo.pleosshuttle.ui.component.guideAnchor
  * - VS-20 기관 도착·기관 인계·종료: PickupInstitutionBody
  */
 
-private fun shortName(child: ChildRecord) = child.name.removePrefix("가상 ")
+private fun shortName(child: ChildRecord) = child.name
 
 /** VS-17: 명단은 탑승 명단 보드(왼쪽 [명단] 탭 또는 아래)에 있고, 여기서는 요약·안내와 [준비 마침]만 둔다. */
 @Composable internal fun PickupPrepareBody(vm: ShuttleViewModel, onPrepared: () -> Unit) {

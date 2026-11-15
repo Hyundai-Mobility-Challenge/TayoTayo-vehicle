@@ -11,10 +11,8 @@ import java.util.UUID
 /** Connects the prototype's local trip state to the current TayoTayo vehicle API. */
 class InstitutionConnection(context: Context) {
     private val prefs = context.getSharedPreferences("institution", 0)
-    /** 디버그 전용. null이면 지운다. 다음 [배정 명단으로 운행 준비]부터 적용. */
     /** 마지막 동기화 때 받은 보호자 호출 상태(tripChildId → 정보). 운행이 바뀌면 [bind]에서 비운다. */
     @Volatile var lastGuardianCalls: Map<String, GuardianCallInfo> = emptyMap(); private set
-    fun setDevOrigin(value: String?) { prefs.edit().apply { if (value == null) remove(DEV_ORIGIN_KEY) else putString(DEV_ORIGIN_KEY, value) }.apply() }
     val base get() = prefs.getString("base", "http://10.0.2.2:8080")!!
     val name get() = prefs.getString("name", "연결된 차량 없음")!!
     val connected get() = prefs.contains("credential")
@@ -71,12 +69,13 @@ class InstitutionConnection(context: Context) {
         }
         val value = call("/api/v1/trips/$tripId/prepare", method = "POST")
         val stopRows = value.optJSONArray("stops") ?: JSONArray()
-        val sample = SampleTrip.create()
+        // 정류장 좌표가 없으면 임의 좌표로 채우지 않는다(내비·보호자 공유가 엉뚱한 곳을 가리키지 않게). 운행 준비를 멈추고 알린다.
         val stops = (0 until stopRows.length()).mapIndexed { i, index ->
             val row = stopRows.getJSONObject(index)
-            val fallback = sample.stops.getOrNull(i % sample.stops.size) ?: sample.origin
-            Stop(row.optString("id"), row.optString("stopName", "정류장 ${i + 1}"),
-                row.optDouble("latitude", fallback.latitude), row.optDouble("longitude", fallback.longitude))
+            val name = row.optString("stopName", "정류장 ${i + 1}")
+            val lat = row.optDouble("latitude", Double.NaN); val lng = row.optDouble("longitude", Double.NaN)
+            if (!InstitutionTrips.validCoordinate(lat, lng)) error("정류장 위치(좌표)가 없습니다: $name · 기관 관리 화면에서 정류장 주소를 확인해 주세요.")
+            Stop(row.optString("id"), name, lat, lng)
         }
         val childrenRows = value.optJSONArray("children") ?: JSONArray()
         val children = (0 until childrenRows.length()).mapIndexed { i, index ->
@@ -87,10 +86,10 @@ class InstitutionConnection(context: Context) {
                 if (row.isNull("notBoardedReason")) null else row.optString("notBoardedReason"))
         }
         if (stops.isEmpty()) error("운행에 등록된 정류장이 없습니다.")
+        // 기관 위치: 서버 응답 orgName·orgLatitude·orgLongitude(또는 org 묶음). 없으면 임의 위치로 대신하지 않고 운행 준비를 멈춘다.
+        val origin = InstitutionTrips.institutionOrigin(value)
+            ?: error("기관 위치(좌표)를 받지 못했습니다. 기관 관리 화면에서 기관 주소를 확인해 주세요.")
         check(prefs.edit().putString("pendingTrip", tripId).commit())
-        // 기관 위치: 서버 응답 org(백엔드 요청 A2) → 개발용 임시 기관 위치(디버그 빌드) → 샘플(서울시청).
-        val origin = InstitutionTrips.institutionOrigin(value,
-            if (BuildConfig.DEBUG) prefs.getString(DEV_ORIGIN_KEY, null) else null, sample.origin)
         val trip = TripState(tripId = tripId, integrationMode = IntegrationMode.SDK, origin = origin,
             stops = stops, routeOrder = stops.map { it.id }, routeIsExample = false, children = children,
             direction = TripDirections.of(direction))
@@ -113,16 +112,30 @@ class InstitutionConnection(context: Context) {
 
     companion object {
         private val reportingLock = Any()
-        /** 디버그 빌드 전용 임시 기관 위치 "이름|위도|경도". 서버가 기관 좌표를 주기 전 시험용. */
-        const val DEV_ORIGIN_KEY = "devOrigin"
     }
+    /**
+     * 위치 한 건을 보내고, 내비 관측이 있으면 예상 시간(eta-snapshots)을 따로 보낸다.
+     * 위치 전송 실패는 예외로 알린다(호출부가 "전송 연결 끊김"으로 표시). 예상 시간 전송 실패는 위치 전송을 실패로 만들지 않고
+     * [TrackingReport.eta] = [EtaReport.FAILED]로만 알린다. 같은 예상 시간 관측은 다시 보내지 않으며, 보낸 키는 성공했을 때만 기억한다.
+     */
     fun reportTracking(trip: TripState, enabled: Boolean, fix: TrackingLocation?, navigation: TrackingNavigation? = null,
-                       stillCurrent: () -> Boolean = { true }) = synchronized(reportingLock) {
-        if (!connected || trip.tripId != boundTrip || !stillCurrent() || fix == null) return@synchronized
+                       stillCurrent: () -> Boolean = { true }): TrackingReport = synchronized(reportingLock) {
+        if (!connected || trip.tripId != boundTrip || !stillCurrent() || fix == null) return@synchronized TrackingReport(locationSent = false)
         val body = JSONObject().put("samples", JSONArray().put(JSONObject().put("recordedAt", Instant.ofEpochMilli(fix.receivedAt).toString())
             .put("latitude", fix.latitude).put("longitude", fix.longitude).put("source", if (fix.simulated) "SIMULATED" else "PLEOS")))
         call("/api/v1/vehicle/trips/${trip.tripId}/locations", body)
+        // 내비 남은 시간 → 서버 eta-snapshots(VehicleTelemetryController.eta). 서버는 tripStopId가 있는 항목으로
+        // trip_stops.eta_remaining_sec/m를 갱신하고, 보호자 앱·공유 링크가 그 값을 읽는다.
+        val eta = InstitutionTrips.etaSnapshot(trip, navigation, fix.simulated)
+            ?: return@synchronized TrackingReport(locationSent = true, eta = EtaReport.NOT_AVAILABLE)
+        val key = "${trip.tripId}/${eta.sourceTime}/${eta.entries}"
+        if (!InstitutionTrips.shouldSendEta(key, lastEtaKey)) return@synchronized TrackingReport(locationSent = true, eta = EtaReport.UNCHANGED)
+        val outcome = if (runCatching { call("/api/v1/vehicle/trips/${trip.tripId}/eta-snapshots", InstitutionTrips.etaBody(eta)) }.isSuccess)
+            EtaReport.SENT else EtaReport.FAILED
+        lastEtaKey = InstitutionTrips.nextEtaKey(lastEtaKey, key, outcome)
+        TrackingReport(locationSent = true, eta = outcome)
     }
+    @Volatile private var lastEtaKey: String? = null
 
     fun sync(trip: TripState): Int {
         if (!connected || trip.tripId != boundTrip) return 0
@@ -207,7 +220,69 @@ data class TripOption(val id: String, val status: String, val stopNames: List<St
     val inProgress get() = status == "IN_PROGRESS" || status == "RETURNING"
 }
 
+/** 예상 시간(eta-snapshots) 전송 결과. NOT_AVAILABLE = 보낼 내비 관측 없음, UNCHANGED = 이미 보낸 관측과 같아 보내지 않음. */
+enum class EtaReport { NOT_AVAILABLE, SENT, UNCHANGED, FAILED }
+/** [InstitutionConnection.reportTracking] 결과. 위치 전송 실패는 예외로 알리므로 여기에는 담지 않는다. */
+data class TrackingReport(val locationSent: Boolean, val eta: EtaReport = EtaReport.NOT_AVAILABLE)
+
+/** 서버 eta-snapshots 항목 하나. [tripStopId]는 서버 trip_stops.id(숫자), 정류장과 짝이 없으면(기관·출발지) null. */
+data class EtaEntry(val bundleIndex: Int, val pointType: String, val tripStopId: Long?,
+    val latitude: Double, val longitude: Double, val remainingSec: Int, val remainingM: Int)
+data class EtaSnapshot(val routeRevisionNo: Int, val navRouteKey: String?, val sourceTime: Long,
+    val simulated: Boolean, val entries: List<EtaEntry>)
+
 internal object InstitutionTrips {
+    /**
+     * 내비 관측([TrackingNavigation]) → 서버 eta-snapshots 본문 재료. READY(검증 통과)일 때만 만든다.
+     * - 경유지 묶음(stops)이 있으면 순서대로, 없으면 단일 목적지 값 하나.
+     * - 각 항목은 남은 방문 순서의 정류장([navigationWaypoints])과 좌표가 일치할 때만 tripStopId를 단다.
+     *   (NavigationTracking.snapshot이 정규화한 좌표는 등록 정류장 좌표와 같다.) 일치가 없으면 null.
+     * - routeRevisionNo: 서버 운행 응답에 서버 노선 개정 번호가 없어 차량의 [TripState.routeVersion]을 보낸다(서버는 저장만 함).
+     */
+    fun etaSnapshot(trip: TripState, nav: TrackingNavigation?, simulated: Boolean): EtaSnapshot? {
+        if (nav == null || nav.state != "READY") return null
+        val points = nav.stops.ifEmpty {
+            val lat = nav.latitude; val lng = nav.longitude; val sec = nav.remainSeconds; val m = nav.remainMeters; val at = nav.receivedAt
+            if (lat != null && lng != null && sec != null && m != null && at != null) listOf(NavigationStopEta(lat, lng, sec, m, at)) else emptyList()
+        }
+        if (points.isEmpty()) return null
+        val candidates = navigationWaypoints(trip)
+        val entries = points.mapIndexed { i, p ->
+            val stop = candidates.firstOrNull { kotlin.math.abs(it.latitude - p.latitude) < 0.00001 && kotlin.math.abs(it.longitude - p.longitude) < 0.00001 }
+            EtaEntry(i, if (i == points.lastIndex) "DESTINATION" else "WAYPOINT", stop?.id?.toLongOrNull(),
+                p.latitude, p.longitude, p.seconds, p.meters)
+        }
+        return EtaSnapshot(trip.routeVersion.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(), nav.routeId?.take(100),
+            points.first().receivedAt, simulated, entries)
+    }
+
+    /** 같은 예상 시간 관측(운행·관측 시각·항목이 같은 키)은 다시 보내지 않는다. */
+    fun shouldSendEta(key: String, lastSentKey: String?): Boolean = key != lastSentKey
+    /** 보낸 키는 전송이 성공했을 때만 바꾼다(실패하면 다음 주기에 같은 관측을 다시 보낸다). */
+    fun nextEtaKey(lastSentKey: String?, key: String, outcome: EtaReport): String? = if (outcome == EtaReport.SENT) key else lastSentKey
+    /** 위치 서비스(TripTrackingService) 상태 문구. 위치를 보냈는데 예상 시간만 실패했으면 연결 끊김이 아니라 그 사실만 알린다. */
+    fun trackingServiceStatus(fixPresent: Boolean, report: TrackingReport): String = when {
+        !fixPresent || !report.locationSent -> "Pleos 위치 수신 대기"
+        report.eta == EtaReport.FAILED -> "Pleos 내비 위치 전송 중 · 예상 시간 전송 실패(다음 주기에 다시 보냄)"
+        else -> "Pleos 내비 위치 전송 중 · 내비 화면에서도 유지"
+    }
+
+    /** POST /api/v1/vehicle/trips/{id}/eta-snapshots 본문(VehicleTelemetryController.eta가 읽는 키). */
+    fun etaBody(eta: EtaSnapshot): JSONObject = JSONObject()
+        .put("routeRevisionNo", eta.routeRevisionNo)
+        .apply { eta.navRouteKey?.let { put("navRouteKey", it) } }
+        .put("sourceTime", Instant.ofEpochMilli(eta.sourceTime).toString())
+        .put("validationStatus", "VALID")
+        .apply { if (eta.simulated) put("validationNote", "SIMULATED") }
+        .put("entries", JSONArray().apply {
+            eta.entries.forEach { e ->
+                put(JSONObject().put("bundleIndex", e.bundleIndex).put("pointType", e.pointType)
+                    .apply { e.tripStopId?.let { put("tripStopId", it) } }
+                    .put("latitude", e.latitude).put("longitude", e.longitude)
+                    .put("remainingSec", e.remainingSec).put("remainingM", e.remainingM))
+            }
+        })
+
     /** 진행 중(운행 중·복귀 중) 먼저, 그다음 최근에 만든 운행(id 큰 것) 먼저. */
     fun orderOptions(options: List<TripOption>): List<TripOption> =
         options.sortedWith(compareBy<TripOption>({ !it.inProgress }, { -(it.id.toLongOrNull() ?: 0L) }))
@@ -223,42 +298,29 @@ internal object InstitutionTrips {
         return "$route · 정류장 ${o.stopNames.size}곳 · 탈 어린이 ${o.expectedCount}명 · $state"
     }
     /**
-     * 운행의 기관(하원 출발·복귀지, 등원 도착지) 위치. 서버가 `org {name, latitude, longitude}`를 주면 그 값,
-     * 없으면 개발용 임시 위치 "이름|위도|경도", 그것도 없으면 [fallback]. 잘못된 값은 건너뛴다.
-     */
-    /**
-     * 운행 응답에서 기관 위치를 읽는다. 백엔드 현재 형식은 최상위 `orgName`·`orgLatitude`·`orgLongitude`(TripController.getTrip),
+     * 운행의 기관(하원 출발·복귀지, 등원 도착지) 위치. 백엔드 현재 형식은 최상위 `orgName`·`orgLatitude`·`orgLongitude`(TripController.getTrip),
      * 이전에 제안했던 `org { name, latitude, longitude }` 묶음도 읽는다(서버 형식이 바뀌어도 깨지지 않게). 둘 다 있으면 최상위 값 우선.
+     * 좌표가 없거나 잘못되면 null(임의 위치로 대신하지 않는다).
      */
-    fun institutionOrigin(trip: JSONObject, devOverride: String?, fallback: Stop): Stop {
+    fun institutionOrigin(trip: JSONObject): Stop? {
         val org = trip.optJSONObject("org")
         return institutionOriginFrom({ k -> trip.opt(k).takeUnless { it == JSONObject.NULL } },
-            org?.let { o -> { k: String -> o.opt(k).takeUnless { it == JSONObject.NULL } } }, devOverride, fallback)
+            org?.let { o -> { k: String -> o.opt(k).takeUnless { it == JSONObject.NULL } } })
     }
     /** JSON 없이 시험할 수 있게 값 조회만 받는다. [top]은 운행 응답 최상위, [nested]는 `org` 묶음(없으면 null). */
-    fun institutionOriginFrom(top: (String) -> Any?, nested: ((String) -> Any?)?, devOverride: String?, fallback: Stop): Stop {
+    fun institutionOriginFrom(top: (String) -> Any?, nested: ((String) -> Any?)?): Stop? {
         fun num(v: Any?) = when (v) { is Number -> v.toDouble(); is String -> v.trim().toDoubleOrNull(); else -> null }?.takeIf { !it.isNaN() }
         fun str(v: Any?) = (v as? String)?.takeIf { it.isNotBlank() }
         val flatLat = num(top("orgLatitude")); val flatLng = num(top("orgLongitude"))
-        return if (flatLat != null && flatLng != null) institutionOrigin(str(top("orgName")), flatLat, flatLng, devOverride, fallback)
+        return if (flatLat != null && flatLng != null) institutionOrigin(str(top("orgName")), flatLat, flatLng)
             else institutionOrigin(nested?.let { str(it("name")) } ?: str(top("orgName")), nested?.let { num(it("latitude")) },
-                nested?.let { num(it("longitude")) }, devOverride, fallback)
+                nested?.let { num(it("longitude")) })
     }
-    fun institutionOrigin(orgName: String?, latitude: Double?, longitude: Double?, devOverride: String?, fallback: Stop): Stop {
+    fun institutionOrigin(orgName: String?, latitude: Double?, longitude: Double?): Stop? =
         if (latitude != null && longitude != null && validCoordinate(latitude, longitude))
-            return Stop("origin", orgName?.takeIf { it.isNotBlank() } ?: "기관", latitude, longitude)
-        parseDevOrigin(devOverride)?.let { return it }
-        return fallback
-    }
-    fun parseDevOrigin(raw: String?): Stop? {
-        val parts = raw?.split("|") ?: return null
-        if (parts.size != 3) return null
-        val lat = parts[1].trim().toDoubleOrNull() ?: return null
-        val lng = parts[2].trim().toDoubleOrNull() ?: return null
-        if (!validCoordinate(lat, lng) || parts[0].isBlank()) return null
-        return Stop("origin", "${parts[0].trim()} · 임시 기관 위치", lat, lng)
-    }
-    private fun validCoordinate(lat: Double, lng: Double) = lat.isFinite() && lng.isFinite() && lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)
+            Stop("origin", orgName?.takeIf { it.isNotBlank() } ?: "기관", latitude, longitude)
+        else null
+    fun validCoordinate(lat: Double, lng: Double) = lat.isFinite() && lng.isFinite() && lat in -90.0..90.0 && lng in -180.0..180.0 && !(lat == 0.0 && lng == 0.0)
 
     /** Server trip statuses that are still operable: PREPARING / IN_PROGRESS / RETURNING. COMPLETED·CANCELLED are finished. */
     val ACTIVE_TRIP_STATUSES = setOf("PREPARING", "IN_PROGRESS", "RETURNING")

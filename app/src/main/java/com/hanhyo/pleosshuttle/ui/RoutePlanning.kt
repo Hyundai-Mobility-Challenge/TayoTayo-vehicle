@@ -8,7 +8,7 @@ import com.hanhyo.pleosshuttle.domain.RoutePlanner
 import com.hanhyo.pleosshuttle.domain.RouteTimeline
 import com.hanhyo.pleosshuttle.domain.RouteTimelines
 import com.hanhyo.pleosshuttle.domain.RouteWarning
-import com.hanhyo.pleosshuttle.domain.SampleRoutePlan
+import com.hanhyo.pleosshuttle.domain.StopRule
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
 
@@ -74,32 +74,37 @@ internal fun suggestedRouteOrder(trip: TripState, lockedCount: Int): List<String
     ).stopOrder
 }.getOrDefault(trip.routeOrder)
 
-/** 가상 출발 시각과 합성 이동 시간(RoutePlanner TIME 행렬, '모의 분')으로 도착 시각을 계산한다. */
-internal fun routeTimeline(trip: TripState, order: List<String>): RouteTimeline = RouteTimelines.build(
+/** 정류장마다 더하는 정차 시간(분). 서버 운행 응답에 정차 시간이 없어 고정값을 쓴다. */
+internal const val ROUTE_DWELL_MINUTES = 3
+
+/** 지금 시각(하루 중 분). 경로 확인·순서 바꾸기의 예상 도착 시각은 "지금 출발" 기준으로 어림한다. */
+internal fun currentClockMinute(): Int = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
+
+/** [startMinute]에 출발한다고 보고, 직선거리로 어림한 이동 시간(RoutePlanner TIME 행렬)과 정차 시간으로 도착 시각을 계산한다. */
+internal fun routeTimeline(trip: TripState, order: List<String>, startMinute: Int = currentClockMinute()): RouteTimeline = RouteTimelines.build(
     originId = trip.origin.id,
     order = order,
     matrix = RoutePlanner.syntheticMatrix(trip.origin, trip.stops, RouteObjective.TIME),
-    startMinute = SampleRoutePlan.departureMinute,
-    dwellMinutes = SampleRoutePlan.DWELL_MINUTES,
+    startMinute = startMinute,
+    dwellMinutes = ROUTE_DWELL_MINUTES,
     returnToOrigin = trip.returnToOrigin,
 )
 
-internal fun routeWarnings(timeline: RouteTimeline): List<RouteWarning> =
-    RouteTimelines.warnings(timeline, SampleRoutePlan.rules, SampleRoutePlan.returnDeadlineMinute)
-
-internal fun stopMemo(stopId: String): String? = SampleRoutePlan.rules.firstOrNull { it.stopId == stopId }?.memo
+/** 정류장 규칙(약속 시각·진입 방향)으로 확인할 점을 만든다. 서버가 아직 정류장 규칙을 주지 않아 기본은 규칙 없음(확인할 점 없음). */
+internal fun routeWarnings(timeline: RouteTimeline, rules: List<StopRule> = emptyList(), endDeadlineMinute: Int? = null): List<RouteWarning> =
+    RouteTimelines.warnings(timeline, rules, endDeadlineMinute)
 
 /** 정류장에서 내릴(등원은 탈) 아이 이름. 운행 준비에는 오늘 탈 아이(미탑승 예정·미탑승 확인 제외), 출발 뒤에는 탄 아이만. */
 internal fun ridersAt(trip: TripState, stopId: String): List<String> = trip.children
     .filter { it.stopId == stopId && ridesFrom(trip, it) }
-    .map { it.name.removePrefix("가상 ") }
+    .map { it.name }
 
 /** 평소와 달라진 점(L2). 지금은 탑승 기록만으로 알 수 있는 것만 보여준다. 결석·인계자 변경 연동은 4단계. */
 internal data class RouteChange(val kind: String, val text: String)
 
 internal fun routeChanges(trip: TripState): List<RouteChange> = if (trip.isPickup) pickupRouteChanges(trip) else buildList {
     trip.children.filter { it.status == Attendance.NOT_BOARDED || it.status == Attendance.CONFIRMED_NOT_BOARDED }.forEach {
-        add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else "탑승 기록 없음"}"))
+        add(RouteChange("빠짐", "${it.name} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else "탑승 기록 없음"}"))
     }
     trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }
         .filter { stop -> trip.children.none { it.stopId == stop.id && (it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED) } }.forEach {
@@ -114,7 +119,7 @@ internal fun routeChanges(trip: TripState): List<RouteChange> = if (trip.isPicku
 /** 등원 경로 확인의 달라진 점: 미탑승 예정(알림)·출발 전 미탑승 확인 아이, 탈 어린이가 없는 정류장, 뺀 정류장. */
 private fun pickupRouteChanges(trip: TripState): List<RouteChange> = buildList {
     trip.children.filter { it.status == Attendance.CONFIRMED_NOT_BOARDED || !it.expectedToBoard }.forEach {
-        add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else com.hanhyo.pleosshuttle.domain.PickupFlow.notBoardingBadge(it)}"))
+        add(RouteChange("빠짐", "${it.name} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else com.hanhyo.pleosshuttle.domain.PickupFlow.notBoardingBadge(it)}"))
     }
     trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }
         .filter { stop -> ridersAt(trip, stop.id).isEmpty() }.forEach {

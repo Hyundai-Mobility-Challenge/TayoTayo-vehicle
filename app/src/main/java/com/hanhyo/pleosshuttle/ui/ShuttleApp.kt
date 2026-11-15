@@ -47,7 +47,6 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppSize
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
-import com.hanhyo.pleosshuttle.domain.IntegrationMode
 import com.hanhyo.pleosshuttle.domain.SurroundingKind
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.flowProgressKey
@@ -62,12 +61,10 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
 import com.hanhyo.pleosshuttle.ui.component.LocalGuideAction
 import com.hanhyo.pleosshuttle.ui.component.LocalGuideEditing
 import com.hanhyo.pleosshuttle.ui.component.LocalGuideFocus
-import com.hanhyo.pleosshuttle.ui.component.MusicBar
 import com.hanhyo.pleosshuttle.ui.component.Notice
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
 import com.hanhyo.pleosshuttle.ui.component.StopTimelinePanel
-
-private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostics")
+import com.hanhyo.pleosshuttle.ui.component.VoiceGuidanceBar
 
 /**
  * 앱 화면의 뿌리. 창 폭이 AppSize.compactWidthBreakpoint 이상이면 가로(왼쪽 타임라인 + 본문),
@@ -92,7 +89,7 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
     var editingReason by remember { mutableStateOf(false) }
     val mainScroll = rememberScrollState()
     val requester = remember { BringIntoViewRequester() }
-    val uxRestricted = vm.trip.integrationMode == IntegrationMode.SDK && vm.sdkVehicle.uxRestricted.value == true
+    val uxRestricted = vm.sdkVehicle.uxRestricted.value == true
     val guide = nextFlowGuide(
         trip = vm.trip,
         boardingReviewed = boardingReviewed,
@@ -126,14 +123,14 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
             Modifier.fillMaxSize().padding(if (compact) AppSpacing.screenCompact else AppSpacing.screen),
             verticalArrangement = Arrangement.spacedBy(if (compact) AppSpacing.md else AppSpacing.lg),
         ) {
-            AppHeader(runName = "${vm.tripDirectionLabel} 한 바퀴", compact = compact) {
-                if (!compact) {
+            AppHeader(runName = if (vm.trip.hasTrip) "${vm.tripDirectionLabel} 운행" else "운행 없음", compact = compact) {
+                if (!compact && vm.trip.hasTrip) {
                     StatusChip(phaseLabel(vm.trip), tone = ChipTone.INFO)
                     StatusChip("차내 기록 ${vm.trip.onboardChildren.size}명")
                     StatusChip("남은 ${vm.trip.remainingStopCount}곳")
                 }
-                StatusChip(if (vm.trip.integrationMode == IntegrationMode.SIMULATION) "모의 체험" else "차량 연결", tone = ChipTone.ACCENT)
-                Action(if (vm.panel == "flow") "명단 · 상세" else "${vm.tripDirectionLabel}으로", if (vm.panel == "flow") "tab-details" else "tab-flow", secondary = true) {
+                StatusChip(if (vm.institutionConnected) "차량 연결" else "기관 연결 전", tone = ChipTone.ACCENT)
+                Action(if (vm.panel == "flow") "명단 · 상세" else if (vm.trip.hasTrip) "${vm.tripDirectionLabel}으로" else "처음 화면으로", if (vm.panel == "flow") "tab-details" else "tab-flow", secondary = true) {
                     vm.panel = if (vm.panel == "flow") "details" else "flow"
                 }
             }
@@ -153,27 +150,22 @@ private val toolPanels = setOf("door-lab", "observations", "trials", "diagnostic
                         .testTag("main-scroll"),
                     verticalArrangement = Arrangement.spacedBy(AppSpacing.lg),
                 ) {
-                    if (vm.panel in toolPanels) Action("‹ 테스트 도구", "back-tools", secondary = true) { vm.panel = "tools" }
+                    if (devToolsEnabled && vm.panel in devPanels) Action("‹ 개발 도구", "back-dev", secondary = true) { vm.panel = "dev" }
                     if (vm.panel == "controls") Action("‹ 명단", "back-roster", secondary = true) { vm.panel = "details" }
                     MainPanel(vm, requestSpeedPermission, reason) { reason = it }
-                    if (vm.panel in setOf("controls", "door-lab", "diagnostics")) Foldout("최근 처리 내용", "필요할 때 펼쳐보기", "last-message") {
+                    if (vm.panel == "controls" || (devToolsEnabled && vm.panel == "diagnostics")) Foldout("최근 처리 내용", "필요할 때 펼쳐보기", "last-message") {
                         Text(vm.message, modifier = Modifier.testTag("message"))
                     }
                 }
             }
             val speaking = vm.audioState.speechStatus in setOf(SpeechStatus.INITIALIZING, SpeechStatus.SPEAKING)
-            MusicBar(
-                status = if (vm.audioState.speechStatus == SpeechStatus.FAILED) "음성 안내 실패 · 다시 눌러 주세요" else if (speaking) "음성 안내 중" else if (vm.audioState.isPlaying) "시험 멜로디 재생 중" else "음성 자동 안내 · 시험 멜로디",
-                playing = vm.audioState.isPlaying,
+            VoiceGuidanceBar(
+                status = if (vm.audioState.speechStatus == SpeechStatus.FAILED) "음성 안내 실패 · 다시 눌러 주세요" else if (speaking) "음성 안내 중" else "음성 자동 안내",
                 speaking = speaking,
                 compact = compact,
-                onPlay = { vm.audio.play() },
-                onPause = { vm.audio.pause() },
-                onStop = { vm.audio.stop() },
                 onReplay = { vm.replayGuidance() },
                 onStopSpeech = { vm.audio.stopSpeech() },
             )
-            Text("동승 선생님용 · 가상 명단 체험", style = AppTheme.typography.caption2Regular, color = AppTheme.colors.textTertiary)
         }
     }
 }
@@ -232,14 +224,14 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
             if (reordering) ReorderBody(vm, draft!!, { draft = it }, onClose = { draft = null })
             else TeacherFlow(vm, guide, onBoardingReviewed, onOpenReorder = openReorder)
             // V-03 탑승 명단 보드: 흐름 카드(지금 할 일) 아래에 모든 아이 행을 늘 보인다. 순서 바꾸기 중에는 그 작업만 보인다.
-            if (!reordering && !boardOnSide && !compactTabs) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
+            if (!reordering && !boardOnSide && !compactTabs && vm.trip.hasTrip) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
             // 세로 분할에는 왼쪽 패널이 없으므로 같은 보조 정보를 본문 아래에 둔다.
             if (compact && (reordering || routeCheck)) side(Modifier.fillMaxWidth())
         }
     }
     if (compact) {
         Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-            if (!reordering && !routeCheck) CompactTimeline(stops)
+            if (!reordering && !routeCheck && vm.trip.hasTrip) CompactTimeline(stops)
             if (compactTabs) SidePaneTabs(routeLabel = "지금 할 일", rosterSelected = boardOnSide) { compactRosterSelected = it }
             if (compactTabs && boardOnSide) Column(
                 Modifier.weight(1f).fillMaxWidth()
@@ -284,7 +276,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = AppSpacing.xl, vertical = AppSpacing.sidePanelVertical),
                 ) { side(Modifier.fillMaxWidth()) }
-            } else {
+            } else if (vm.trip.hasTrip) {
                 StopTimelinePanel("${vm.tripDirectionLabel} 경로 · 정류장 ${vm.trip.routeOrder.size}곳", stops, sideModifier)
             }
             body(Modifier.weight(1f).fillMaxHeight())
@@ -315,9 +307,12 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
 
 @Composable private fun DetailTabs(vm: ShuttleViewModel) {
     Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-        listOf("details" to "명단", "history" to "운행 기록", "institution" to "기관 연결", "tools" to "테스트 도구").forEach { (id, label) ->
+        // 개발 도구 탭은 디버그 빌드에서만(출시 빌드에는 탭이 없다).
+        val tabs = listOf("details" to "명단", "history" to "운행 기록", "institution" to "기관 연결") +
+            if (devToolsEnabled) listOf("dev" to "개발 도구") else emptyList()
+        tabs.forEach { (id, label) ->
             FilterChip(
-                selected = vm.panel == id || (id == "tools" && vm.panel in toolPanels) || (id == "details" && vm.panel == "controls"),
+                selected = vm.panel == id || (id == "dev" && vm.panel in devPanels) || (id == "details" && vm.panel == "controls"),
                 onClick = { vm.panel = id },
                 label = { Text(label, style = AppTheme.typography.body2SemiBold) },
                 modifier = Modifier.heightIn(min = AppSize.touchMin).testTag("tab-$id"),
@@ -336,7 +331,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
 }
 
 @Composable private fun MainPanel(vm: ShuttleViewModel, requestSpeedPermission: () -> Unit, reason: String, onReasonChange: (String) -> Unit) {
-    val uxLocked = vm.trip.integrationMode == IntegrationMode.SDK && vm.sdkVehicle.uxRestricted.value == true
+    val uxLocked = vm.sdkVehicle.uxRestricted.value == true
     if (uxLocked && (vm.panel != "flow" || vm.trip.phase != TripPhase.DRIVING)) {
         Notice("차량 UX 제한이 활성화되어 상세 조작을 제한합니다. 운행 화면에서 다음 지점과 상태를 확인하세요.")
         return
@@ -344,13 +339,12 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
     when (vm.panel) {
         "details" -> RosterPanel(vm)
         "institution" -> InstitutionPanel(vm)
-        "tools" -> TestTools(vm)
-        "door-lab" -> DoorLab(vm, reason, onReasonChange)
         "history" -> TripHistory(vm)
-        "observations" -> ObservationPanel(vm, requestSpeedPermission)
-        "trials" -> TrialsPanel(vm)
-        "diagnostics" -> DiagnosticsPanel(vm)
-        else -> when (vm.trip.phase) {
+        // 개발 도구 화면은 디버그 빌드에서만 연다(출시 빌드에서 panel 값이 남아 있어도 열리지 않는다).
+        "dev" -> if (devToolsEnabled) DevTools(vm) else RosterPanel(vm)
+        "observations" -> if (devToolsEnabled) ObservationPanel(vm, requestSpeedPermission) else RosterPanel(vm)
+        "diagnostics" -> if (devToolsEnabled) DiagnosticsPanel(vm) else RosterPanel(vm)
+        else -> if (!vm.trip.hasTrip) RosterPanel(vm) else when (vm.trip.phase) {
             TripPhase.PREPARING -> Preparation(vm)
             TripPhase.DRIVING -> Driving(vm)
             TripPhase.ALIGHTING -> Alighting(vm, reason, onReasonChange)

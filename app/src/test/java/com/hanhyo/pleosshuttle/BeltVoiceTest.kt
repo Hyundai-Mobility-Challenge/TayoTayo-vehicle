@@ -7,7 +7,7 @@ import org.junit.Test
 /** V-16 벨트 미확인 음성: 출발 전 요약의 이름, 정류장 뒤 재출발 안내(한 번), 다시 듣기 문구. */
 class BeltVoiceTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun engine() = ShuttleEngine(SampleTrip.create()).also { it.updateVehicle(parked(), now) }

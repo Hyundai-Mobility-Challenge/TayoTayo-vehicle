@@ -8,20 +8,20 @@ class SpeechRequestGateTest {
         val gate = SpeechRequestGate()
         val first = gate.begin(1_000)!!
         assertNull(gate.begin(1_001))
-        assertFalse(gate.finish(first, 0, true, true)!!.resumeMusic)
+        assertTrue(gate.finish(first))
         val retried = gate.begin(1_002)!!
         assertNotEquals(first, retried)
         assertFalse(gate.accepts(first))
         assertTrue(gate.accepts(retried))
     }
 
-    @Test fun `취소한 요청의 늦은 완료는 새 요청이나 음악 의도를 바꾸지 않는다`() {
+    @Test fun `취소한 요청의 늦은 완료는 새 요청을 바꾸지 않는다`() {
         val gate = SpeechRequestGate()
         val cancelled = gate.begin(1_000)!!
-        assertTrue(gate.start(cancelled, 1_100, true, 4))
-        assertFalse(gate.finish(cancelled, 5, true, false)!!.resumeMusic)
+        assertTrue(gate.start(cancelled, 1_100))
+        assertTrue(gate.finish(cancelled))
         val current = gate.begin(1_200)!!
-        assertNull(gate.finish(cancelled, 5, true, true))
+        assertFalse(gate.finish(cancelled))
         assertEquals(current, gate.active?.id)
         assertEquals(SpeechRequestGate.Phase.INITIALIZING, gate.active?.phase)
     }
@@ -31,34 +31,21 @@ class SpeechRequestGateTest {
         val first = gate.begin(1_000)!!
         assertFalse(gate.timedOut(first, 10_999))
         assertTrue(gate.timedOut(first, 11_000))
-        gate.finish(first, 0, true, true)
+        gate.finish(first)
         val next = gate.begin(12_000)!!
         assertFalse(gate.timedOut(first, 50_000))
-        assertTrue(gate.start(next, 12_500, false, 0))
-        assertFalse(gate.start(next, 12_600, true, 1))
+        assertTrue(gate.start(next, 12_500))
+        assertFalse(gate.start(next, 12_600))
         assertFalse(gate.timedOut(next, 32_499))
         assertTrue(gate.timedOut(next, 32_500))
     }
 
-    @Test fun `발화 전 음악이 재생 중이고 사용자 조작이 없을 때만 완료 후 복귀한다`() {
-        val gate = SpeechRequestGate()
-        fun finish(playing: Boolean, revisionAfter: Long, foreground: Boolean): Boolean {
-            val id = gate.begin(1_000)!!
-            gate.start(id, 1_100, playing, 4)
-            return gate.finish(id, revisionAfter, foreground, true)!!.resumeMusic
-        }
-        assertTrue(finish(true, 4, true))
-        assertFalse(finish(false, 4, true))
-        assertFalse(finish(true, 5, true))
-        assertFalse(finish(true, 4, false))
-    }
-
-    @Test fun `사용자 일시정지는 발화가 끝나도 음악을 다시 켜지 않는다`() {
+    @Test fun `같은 요청을 두 번 끝내지 않는다`() {
         val gate = SpeechRequestGate()
         val id = gate.begin(1_000)!!
-        gate.start(id, 1_100, true, 4)
-        gate.clearResumeIntent()
-        assertFalse(gate.finish(id, 4, true, true)!!.resumeMusic)
-        assertNull(gate.finish(id, 4, true, true))
+        gate.start(id, 1_100)
+        assertTrue(gate.finish(id))
+        assertFalse(gate.finish(id))
+        assertNull(gate.active)
     }
 }

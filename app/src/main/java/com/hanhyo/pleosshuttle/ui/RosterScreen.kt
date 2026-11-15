@@ -24,12 +24,19 @@ import com.hanhyo.pleosshuttle.ui.component.Section
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
 
 @Composable internal fun RosterPanel(vm: ShuttleViewModel) {
+    if (!vm.trip.hasTrip) {
+        Section("오늘의 명단", "불러온 운행이 없어요") {
+            Text("기관 연결에서 오늘 운행을 불러오면 명단이 보여요.", color = AppTheme.colors.textSecondary)
+            Action("기관 연결 열기", "roster-open-institution", secondary = true) { vm.panel = "institution" }
+        }
+        return
+    }
     val pickup = vm.trip.isPickup
     Section("오늘의 명단", rosterSummary(vm.trip)) {
         vm.trip.children.forEachIndexed { index, child ->
             Row(Modifier.fillMaxWidth().padding(vertical = AppSpacing.xs), horizontalArrangement = Arrangement.spacedBy(AppSpacing.xl), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(AppSpacing.xs)) {
-                    Text(child.name.removePrefix("가상 "), style = AppTheme.typography.titleBold)
+                    Text(child.name, style = AppTheme.typography.titleBold)
                     Text(vm.trip.stops.first { it.id == child.stopId }.shortName, style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
                     // V-02: 결석·직접 픽업 등은 배지로만 표시하고 명단에서 빼지 않는다.
                     (if (pickup) PickupFlow.notBoardingBadge(child) else notBoardingBadge(child))?.let { StatusChip(it, tone = ChipTone.ACCENT, modifier = Modifier.testTag("roster-badge-${child.id}")) }
@@ -56,13 +63,14 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
         vm.trip.routeOrder.forEachIndexed { index, id ->
             Text("${index + 1}. ${vm.trip.stops.first { it.id == id }.shortName}", style = AppTheme.typography.body1SemiBold)
         }
-        Text(if (vm.trip.isPickup) "마지막 정류장 뒤 기관 도착 · 직선거리 기준의 가상 체험 경로" else "출발지 복귀 · 직선거리 기준의 가상 체험 경로", color = AppTheme.colors.textSecondary)
+        Text(if (vm.trip.isPickup) "마지막 정류장 뒤 기관 도착" else "출발지 복귀", color = AppTheme.colors.textSecondary)
     }
 }
 
 @Composable internal fun TripHistory(vm: ShuttleViewModel) {
+    if (!vm.trip.hasTrip) { Text("불러온 운행이 없어 기록이 없어요.", color = AppTheme.colors.textSecondary); return }
     Section("${vm.tripDirectionLabel} 기록", "선생님이 확인한 기록입니다") {
-        vm.trip.children.forEach { Text("${it.name.removePrefix("가상 ")} · ${childStatusText(vm.trip, it)}", style = AppTheme.typography.body1SemiBold) }
+        vm.trip.children.forEach { Text("${it.name} · ${childStatusText(vm.trip, it)}", style = AppTheme.typography.body1SemiBold) }
         // V-08: 기사 확인은 시각만 기록. 체크 없이 출발했으면 "기사 확인 없음"(D15).
         if (vm.trip.phase != com.hanhyo.pleosshuttle.domain.TripPhase.PREPARING) Text(
             if (vm.trip.departedWithoutDriverCheck) "기사 확인 없음" else "기사 확인 ${timeText(vm.trip.driverCheckedAtMillis)}",

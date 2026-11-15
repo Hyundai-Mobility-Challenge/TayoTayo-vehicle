@@ -30,9 +30,8 @@ data class DepartureSummary(
     val firstStopName: String? get() = stopNames.firstOrNull()
 }
 
-/** 화면·음성에 쓰는 짧은 정류장 이름. "가상 정류장 A · 서울숲" → "서울숲", "OO · 가상" → "OO". */
-fun stopLabel(stop: Stop): String =
-    if (stop.name.endsWith(" · 가상")) stop.name.removeSuffix(" · 가상") else stop.name.substringAfter(" · ")
+/** 화면·음성에 쓰는 짧은 정류장 이름. "정류장 A · 서울숲" → "서울숲"(" · " 앞 구분 이름을 뗀다). */
+fun stopLabel(stop: Stop): String = stop.name.substringAfter(" · ")
 
 /** 출발 때 실제로 쓸 방문 순서. 예시 순서면 [운행 시작]이 자동 계산할 결과(RoutePlanner.plan)를 미리 쓴다. */
 fun departureRouteOrder(trip: TripState): List<String> =
@@ -59,8 +58,8 @@ fun departureSummary(trip: TripState, order: List<String> = departureRouteOrder(
     noticeUnconfirmed = trip.children.count { !it.expectedToBoard && it.status == Attendance.NOT_BOARDED },
 )
 
-/** 음성으로 읽는 이름. 화면 표시와 같이 "가상 " 접두어를 뗀다(V-15·V-16 공통). */
-fun spokenChildName(child: ChildRecord): String = child.name.removePrefix("가상 ")
+/** 음성으로 읽는 이름(V-15·V-16 공통). 화면 표시와 같다. */
+fun spokenChildName(child: ChildRecord): String = child.name
 
 /** V-16 음성 이름 목록 상한. 이보다 많으면 앞 [SPOKEN_NAMES_WHEN_TRUNCATED]명만 읽고 "외 n명"으로 줄인다. */
 const val MAX_SPOKEN_NAMES = 4

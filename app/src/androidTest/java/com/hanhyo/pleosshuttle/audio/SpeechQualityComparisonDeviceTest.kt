@@ -14,7 +14,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.hanhyo.pleosshuttle.MainActivity
 import com.hanhyo.pleosshuttle.TripStore
-import com.hanhyo.pleosshuttle.domain.IntegrationMode
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -41,11 +40,13 @@ class SpeechQualityComparisonDeviceTest {
             Build.HARDWARE == "ranchu" && Build.PRODUCT == "crp_avd_arm64")
         check(context.packageName == "com.hanhyo.pleosshuttle")
         val tripFile = File(context.filesDir, "trip-v1.bin")
-        assumeTrue("An existing, settled simulation checkpoint is required", tripFile.exists() &&
+        assumeTrue("An existing, settled trip checkpoint is required", tripFile.exists() &&
             !File(tripFile.path + ".bak").exists() && !File(tripFile.path + ".new").exists())
         val originalBytes = tripFile.readBytes()
         val originalTrip = checkNotNull(TripStore(context).load())
-        assumeTrue("Do not start vehicle adapters for an audio comparison", originalTrip.integrationMode == IntegrationMode.SIMULATION)
+        // 앱은 이전 빌드의 모의 운행을 버리므로(운행 없음으로 시작) 이어서 쓸 수 있는 운행일 때만 비교한다.
+        // 차량 관측 어댑터는 시작되지만 읽기 전용이다(문 제어 없음).
+        assumeTrue("A restorable (institution) trip checkpoint is required", com.hanhyo.pleosshuttle.domain.StoredTrips.restorable(originalTrip) != null)
         val report = JSONObject().put("startedAtMillis", System.currentTimeMillis())
             .put("fingerprint", Build.FINGERPRINT)
             .put("scope", "Preloaded local sine then Pleos ON_DEVICE through navigation/speech attributes; no microphone capture, volume change, route or vehicle control")
@@ -64,7 +65,6 @@ class SpeechQualityComparisonDeviceTest {
             active.onActivity {
                 audio = it.model.audio
                 it.model.audio.stopSpeech()
-                it.model.audio.pause()
             }
             playSine(report, checkpoints)
             SystemClock.sleep(800)
@@ -87,7 +87,7 @@ class SpeechQualityComparisonDeviceTest {
             report.put("harnessError", failure.toString())
         } finally {
             instrumentation.runOnMainSync {
-                runCatching { audio?.stopSpeech(); audio?.pause() }
+                runCatching { audio?.stopSpeech() }
                     .onFailure { cleanupErrors.put("Audio cleanup: $it") }
             }
             runCatching {
@@ -212,7 +212,7 @@ class SpeechQualityComparisonDeviceTest {
             result = JSONObject().put("checkpoint", label).put("atMillis", System.currentTimeMillis())
                 .put("status", snapshot.speechStatus.name).put("backend", snapshot.ttsBackend)
                 .put("requestId", snapshot.speechRequestId ?: JSONObject.NULL)
-                .put("ttsState", snapshot.ttsState).put("musicPlaying", snapshot.isPlaying)
+                .put("ttsState", snapshot.ttsState)
         }
         return result
     }

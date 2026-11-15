@@ -55,9 +55,8 @@ import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.ui.component.Action
 import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.StatusChip
-import com.hanhyo.pleosshuttle.ui.component.Foldout
 
-private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직선거리로 만든 합성 이동 시간과 정차 3분을 더한 예시예요. 실제 도로 시간이 아니에요."
+private val SYNTHETIC_NOTE = "도착 시각은 지금 출발한다고 보고 직선거리로 어림한 이동 시간과 정차 ${ROUTE_DWELL_MINUTES}분을 더한 예상이에요. 실제 도로 시간과 다를 수 있어요."
 
 // ---- L2 경로 확인 -------------------------------------------------------------
 
@@ -73,11 +72,7 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
     }
     RouteStrip(vm, order, timeline)
     StopExclusionSuggestions(vm)
-    // V-08: 차량 화면(2560x1440)에서 [운행 시작]이 스크롤 없이 보이도록 정류장 메모는 접어 둔다(펼치면 그대로 보임).
-    Foldout("정류장 메모", "${order.size}곳 · 필요할 때 펼쳐 보기", "stop-memos") { StopMemoLines(vm, order) }
-    Text(if (trip.integrationMode == com.hanhyo.pleosshuttle.domain.IntegrationMode.SIMULATION)
-        (if (trip.isPickup) "출발하면 모의 이동·보호자 공유 시작 · 도착·인계받음·탑승은 직접 확인" else "출발하면 모의 이동·보호자 공유 시작 · 도착·인계·하차는 직접 확인")
-        else "출발하면 위치·예상 도착 시간을 보호자에게 공유(처음엔 위치 권한 필요)",
+    Text("출발하면 위치·예상 도착 시간을 보호자에게 공유(처음엔 위치 권한 필요)",
         style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
     // V-08 출발 전 확인 요약 + 기사 확인 체크: [운행 시작] 바로 위(flow VS-06). 출발은 막지 않는다(D15).
     DepartureCheckBlock(vm, departureSummary(trip, order))
@@ -131,13 +126,6 @@ private const val SYNTHETIC_NOTE = "도착 시각은 가상 출발 15:30에 직�
         if (highlighted) modifier.background(AppTheme.colors.primary, CircleShape) else modifier.border(AppSize.currentOutline, semantic.stopUpcomingOutline, CircleShape),
         contentAlignment = Alignment.Center,
     ) { Text(marker, style = AppTheme.typography.caption2Bold, color = if (highlighted) AppTheme.colors.onPrimary else AppTheme.colors.textSecondary) }
-}
-
-@Composable private fun StopMemoLines(vm: ShuttleViewModel, order: List<String>) {
-    order.forEachIndexed { index, id ->
-        val stop = vm.trip.stops.first { it.id == id }
-        Text("${index + 1}  ${stop.shortName} · ${stopMemo(id) ?: "메모 없음"}", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
 }
 
 /**
@@ -249,8 +237,9 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
 @Composable internal fun ReorderBody(vm: ShuttleViewModel, draft: ReorderDraft, onChange: (ReorderDraft) -> Unit, onClose: () -> Unit) {
     val trip = vm.trip
     val locked = vm.engine.lockedRouteCount()
-    val base = routeTimeline(trip, draft.base)
-    val timeline = routeTimeline(trip, draft.order)
+    val start = currentClockMinute()
+    val base = routeTimeline(trip, draft.base, start)
+    val timeline = routeTimeline(trip, draft.order, start)
     val warnings = routeWarnings(timeline)
     val blockers = vm.engine.manualRouteBlockers(vm.now)
     Column(Modifier.fillMaxWidth().testTag("reorder"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
@@ -369,8 +358,9 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
 
 /** 순서 바꾸기의 왼쪽 패널(분할에서는 본문 아래): 복귀 시각·총 소요 비교, 확인할 점 개수, 바꾸는 이유. */
 @Composable internal fun ReorderSide(vm: ShuttleViewModel, draft: ReorderDraft, onChange: (ReorderDraft) -> Unit, modifier: Modifier = Modifier) {
-    val base = routeTimeline(vm.trip, draft.base)
-    val timeline = routeTimeline(vm.trip, draft.order)
+    val start = currentClockMinute()
+    val base = routeTimeline(vm.trip, draft.base, start)
+    val timeline = routeTimeline(vm.trip, draft.order, start)
     val warnings = routeWarnings(timeline)
     Column(modifier.testTag("reorder-side"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         SideTitle(if (vm.trip.isPickup) "기관 도착 예정" else "복귀 예정")

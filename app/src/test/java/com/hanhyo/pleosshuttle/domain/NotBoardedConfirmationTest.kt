@@ -16,7 +16,7 @@ import java.io.ObjectOutputStream
 /** V-02: 오늘 미탑승 예정 배지 + 선생님 미탑승 확인/취소, V-11 정차 조건, D16 서버 상태 유지. */
 class NotBoardedConfirmationTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun engine(trip: TripState = SampleTrip.create()) = ShuttleEngine(trip).also { it.updateVehicle(parked(), now) }

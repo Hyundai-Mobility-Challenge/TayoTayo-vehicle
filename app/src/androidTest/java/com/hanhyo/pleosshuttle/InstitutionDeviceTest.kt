@@ -54,9 +54,8 @@ class InstitutionDeviceTest {
             compose.waitUntil(15000) { vm.trip.tripId.startsWith("remote-") && !vm.institutionBusy }
             Assert.assertEquals(childId, vm.trip.children.single().id)
             Assert.assertEquals(com.hanhyo.pleosshuttle.domain.IntegrationMode.SDK, vm.trip.integrationMode)
-            // This isolated handover fixture explicitly opts into synthetic vehicle observations.
-            compose.runOnIdle { vm.changeMode(com.hanhyo.pleosshuttle.domain.IntegrationMode.SIMULATION) }
-            compose.waitUntil(5000) { vm.engine.stationaryBlockers(vm.now).isEmpty() }
+            // 출시 앱에는 모의 차량 입력이 없다. Pleos 에뮬레이터 Virtual Console에서 P 기어·정차가 관측되어야 진행된다.
+            compose.waitUntil(15000) { vm.engine.stationaryBlockers(vm.now).isEmpty() }
             compose.runOnIdle { vm.perform { now -> board(childId, now) } }
             Assert.assertEquals(Attendance.ONBOARD, vm.trip.children.single().status)
             compose.runOnIdle { vm.perform { now -> startOperationalTrip(now) } }

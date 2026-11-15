@@ -210,7 +210,7 @@ class RealNaviAdapter(context: Context, private val diagnosticsEnabled: Boolean 
     /** Explicit button only. Does not run on initialize, backgrounding, or close. */
     fun cancelOwnRoute() {
         if (!ownsRoute) { log("No route owned by this adapter; cancel not sent"); return }
-        try { helper?.cancelRoute(); snapshot = snapshot.copy(outcome = SdkOutcome.UNVERIFIED, message = "시험 경로 취소 전송 · 수락 이벤트/상태 미확인"); publish() }
+        try { helper?.cancelRoute(); snapshot = snapshot.copy(outcome = SdkOutcome.UNVERIFIED, message = "이 앱의 경로 안내 취소 전송 · 수락 이벤트/상태 미확인"); publish() }
         catch (e: Exception) { log("Cancel ERROR $e") }
     }
     fun onStop() {

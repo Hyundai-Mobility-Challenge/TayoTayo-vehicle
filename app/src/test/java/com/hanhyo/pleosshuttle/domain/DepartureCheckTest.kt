@@ -19,7 +19,7 @@ import java.io.ObjectOutputStream
 /** V-08 출발 전 확인(D15·D37): 요약, 기사 확인 체크·자동 해제, 출발 비차단, "기사 확인 없음" 기록, 서버 driverConfirmed. */
 class DepartureCheckTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun moving() = parked().copy(speedKph = observed(20.0), gear = observed(Gear.DRIVE))
@@ -176,7 +176,7 @@ class DepartureCheckTest {
         assertEquals(now + 3, restored.driverCheckedAtMillis)
         assertEquals(true, restored.ledger.last().driverCheck)
         // 복원 뒤에도 체크는 유지(사람 확인 기록, 정차·문 확인처럼 시간 제한 없음)
-        val r = ShuttleEngine(); r.restore(restored, now + 4)
+        val r = ShuttleEngine(SampleTrip.create()); r.restore(restored, now + 4)
         assertEquals(now + 3, r.state.driverCheckedAtMillis)
     }
 }

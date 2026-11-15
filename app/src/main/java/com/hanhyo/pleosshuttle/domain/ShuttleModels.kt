@@ -3,7 +3,17 @@ package com.hanhyo.pleosshuttle.domain
 import java.io.Serializable
 
 enum class TripPhase(val label: String) { PREPARING("운행 준비"), DRIVING("운행"), ALIGHTING("하차"), END_REVIEW("종료 확인"), ENDED("운행 종료") }
-enum class IntegrationMode(val label: String) { SIMULATION("모의 체험"), SDK("Pleos SDK · 에뮬레이터") }
+/**
+ * 운행의 차량 연동 방식. 출시 앱은 [SDK](Pleos 차량 연결)만 쓴다.
+ * [SIMULATION]은 이전 빌드가 저장한 trip-v1.bin(Java 직렬화는 enum을 이름으로 저장)을 읽을 때 역직렬화가 실패하지 않도록
+ * 상수만 남긴 것이다. 어떤 화면·흐름에서도 쓰지 않으며, 이 값으로 저장된 운행은 복원하지 않고 버린다([StoredTrips.restorable]).
+ * 상수 이름을 바꾸거나 지우지 말 것.
+ */
+enum class IntegrationMode(val label: String) {
+    /** 역직렬화 호환 전용. 새 운행에 쓰지 않는다. */
+    SIMULATION("이전 빌드 저장 호환용"),
+    SDK("Pleos 차량 연결"),
+}
 enum class Source(val label: String) { SDK("실제 SDK"), EMULATOR_INPUT("에뮬레이터 입력"), SIMULATED("모의 데이터"), MANUAL("수동 기록") }
 enum class ResultStatus(val label: String) {
     UNVERIFIED("미검증"), PERMISSION_REQUIRED("권한 필요"), UNSUPPORTED_HERE("현재 환경 미지원"),
@@ -388,7 +398,7 @@ data class RouteProposal(
 data class TripState(
     val tripId: String,
     val phase: TripPhase = TripPhase.PREPARING,
-    val integrationMode: IntegrationMode = IntegrationMode.SIMULATION,
+    val integrationMode: IntegrationMode = IntegrationMode.SDK,
     val children: List<ChildRecord>,
     val origin: Stop,
     val stops: List<Stop>,
@@ -426,6 +436,8 @@ data class TripState(
      */
     val direction: String? = null,
 ) : Serializable {
+    /** 기관에서 불러온 운행이 있는지. false면 "운행 없음" 자리 표시 상태([NoTrip])다. 계산 프로퍼티(UID 고정). */
+    val hasTrip: Boolean get() = tripId != NoTrip.ID
     /** null 안전 방향. 이전 저장 파일·알 수 없는 값은 DROP_OFF. */
     val tripDirection: String get() = TripDirections.of(direction)
     /** 등원 운행인지. */
@@ -463,47 +475,34 @@ data class TripState(
     }
 }
 
-object SampleTrip {
-    /**
-     * 모의 체험용 등원(PICK_UP) 운행. 같은 가상 명단·정류장을 쓰고, 어린이 나만 결석 알림(미탑승 예정)이다.
-     * routeIsExample은 그대로 두어 [운행 시작] 때 하원과 같은 방식으로 순서를 계산한다.
-     */
-    fun createPickup(): TripState = create().let { trip ->
-        trip.copy(tripId = "fictional-morning-001", direction = TripDirections.PICK_UP,
-            children = trip.children.map { if (it.id == "child-b") it.copy(notExpectedToBoard = true, notBoardingReason = "ABSENT") else it })
-    }
-    fun create(): TripState {
-        val origin = Stop("origin", "가상 출발지 · 서울시청", 37.5665, 126.9780)
-        val stops = listOf(
-            Stop("forest", "가상 정류장 A · 서울숲", 37.5445, 127.0374),
-            Stop("museum", "가상 정류장 B · 국립중앙박물관", 37.5239, 126.9805),
-            Stop("park", "가상 정류장 C · 올림픽공원", 37.5207, 127.1214),
-        )
-        return TripState(
-            tripId = "fictional-afternoon-001", origin = origin, stops = stops,
-            children = listOf(
-                ChildRecord("child-a", "가상 어린이 가", "forest", "가상 좌석 1"),
-                ChildRecord("child-b", "가상 어린이 나", "forest", "가상 좌석 2"),
-                ChildRecord("child-c", "가상 어린이 다", "museum", "가상 좌석 3"),
-                ChildRecord("child-d", "가상 어린이 라", "park", "가상 좌석 4"),
-            ),
-        )
-    }
+/**
+ * 저장된 운행이 없을 때의 "운행 없음" 자리 표시 상태. 명단·정류장이 비어 있고 어떤 운행 조작·음성 자동 안내·위치 전송도 하지 않는다.
+ * 화면은 기관 연결(페어링) → 오늘 운행 불러오기로 안내한다. 이 상태는 trip-v1.bin에 저장하지 않는다.
+ */
+object NoTrip {
+    const val ID = "no-trip"
+    fun state(): TripState = TripState(
+        tripId = ID, integrationMode = IntegrationMode.SDK, children = emptyList(),
+        origin = Stop("origin", "기관", 0.0, 0.0), stops = emptyList(), routeIsExample = false,
+    )
 }
 
-/**
- * 경로 확인·순서 바꾸기 화면의 가상 규칙. 운행 파일(TripState)에 넣지 않아 저장된 기존 운행의 직렬화 형식을 바꾸지 않는다.
- * 출발 시각·약속·마감·메모는 모두 가상 예시이며, 이동 시간은 RoutePlanner의 합성 행렬을 분으로 읽는다.
- */
-object SampleRoutePlan {
-    val departureMinute: Int = RouteTimelines.parseClock("15:30")
-    const val DWELL_MINUTES = 3
-    val returnDeadlineMinute: Int = RouteTimelines.parseClock("17:30")
-    val rules = listOf(
-        StopRule("forest", allowedPreviousIds = setOf("origin", "museum"), approachMessage = "올림픽공원 쪽에서 오면 길 건너편에 서게 돼요",
-            memo = "가상 메모 · 정문 앞 버스 정류장 뒤에 정차 · 시청 쪽에서 진입"),
-        StopRule("museum", earliestArrivalMinute = RouteTimelines.parseClock("16:30"), earliestLabel = "다 친구 보호자와의 약속(16:30 이후)",
-            memo = "가상 메모 · 주차장 입구 옆 하차 구역 · 약속 16:30 이후"),
-        StopRule("park", memo = "가상 메모 · 평화의 문 앞 하차 구역"),
-    )
+/** 저장 파일(trip-v1.bin)에서 읽은 운행을 이어서 쓸지 정한다. */
+object StoredTrips {
+    /** 이전 빌드의 모의 운행(연동 방식 SIMULATION 또는 가상 명단 id "fictional-…")인지. */
+    fun isLegacySimulation(trip: TripState): Boolean =
+        trip.integrationMode == IntegrationMode.SIMULATION || trip.tripId.startsWith("fictional-")
+    /**
+     * 이어서 쓸 운행. 저장된 운행이 없거나, 자리 표시 상태이거나, 이전 빌드의 모의 운행이면 null(= 운행 없음으로 시작).
+     * 예외: 이전 빌드에서 기관 운행을 연동 방식 전환(changeMode)으로 SIMULATION으로 바꿔 저장한 경우, 그 운행이 지금 기관 서버에
+     * 묶인 운행([boundTripId])이고 서버로 보내지 않은 원장([unsentRecords] > 0)이 남아 있으면 버리지 않고 SDK로 바꿔 복원한다
+     * (미전송 기록이 서버로 가도록). 원장·명단 등 다른 값은 그대로 둔다.
+     */
+    fun restorable(saved: TripState?, boundTripId: String? = null, unsentRecords: Int = 0): TripState? {
+        if (saved == null || !saved.hasTrip) return null
+        if (!isLegacySimulation(saved)) return saved
+        val boundWithUnsent = saved.integrationMode == IntegrationMode.SIMULATION && !boundTripId.isNullOrEmpty() &&
+            saved.tripId == boundTripId && unsentRecords > 0
+        return if (boundWithUnsent) saved.copy(integrationMode = IntegrationMode.SDK) else null
+    }
 }

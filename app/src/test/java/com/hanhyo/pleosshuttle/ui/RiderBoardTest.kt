@@ -38,11 +38,11 @@ class RiderBoardTest {
     @Test fun `rows follow visit order then name`() {
         val base = SampleTrip.create()
         val trip = base.copy(children = listOf(
-            ChildRecord("z", "가상 하늘", "forest", ""),
-            ChildRecord("p", "가상 다온", "park", ""),
-            ChildRecord("a", "가상 가람", "forest", ""),
-            ChildRecord("m", "가상 나래", "museum", ""),
-            ChildRecord("x", "가상 바다", "unknown-stop", ""),
+            ChildRecord("z", "하늘", "forest", ""),
+            ChildRecord("p", "다온", "park", ""),
+            ChildRecord("a", "가람", "forest", ""),
+            ChildRecord("m", "나래", "museum", ""),
+            ChildRecord("x", "바다", "unknown-stop", ""),
         ))
         val order = listOf("park", "forest", "museum")
         val rows = riderBoard(trip, order, stationary = true, uxRestricted = false).rows

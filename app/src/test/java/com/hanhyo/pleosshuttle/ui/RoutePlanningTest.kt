@@ -4,8 +4,11 @@ import com.hanhyo.pleosshuttle.domain.*
 import org.junit.Assert.*
 import org.junit.Test
 
-/** 경로 확인·순서 바꾸기 화면이 보여주는 가상 값(합성 이동 시간 · 가상 출발 15:30 · 정차 3분)을 고정한다. */
+/** 경로 확인·순서 바꾸기 화면의 계산(직선거리 어림 이동 시간 · 정차 3분)을 테스트 고정값(출발 15:30 · SampleRoutePlan 규칙)으로 확인한다. */
 class RoutePlanningTest {
+    private val start = SampleRoutePlan.departureMinute
+    private fun routeTimeline(trip: TripState, order: List<String>) = routeTimeline(trip, order, start)
+    private fun routeWarnings(timeline: RouteTimeline) = routeWarnings(timeline, SampleRoutePlan.rules, SampleRoutePlan.returnDeadlineMinute)
     private val boarded = SampleTrip.create().let { trip -> trip.copy(children = trip.children.map { it.copy(status = Attendance.ONBOARD) }) }
     private fun clocks(trip: TripState, order: List<String>) = routeTimeline(trip, order).stops.map { clockText(it.arrivalMinute) }
 
@@ -39,6 +42,12 @@ class RoutePlanningTest {
     @Test fun `올림픽공원에서 서울숲으로 바로 가면 진입 방향 경고를 낸다`() {
         val warnings = routeWarnings(routeTimeline(boarded, listOf("park", "forest", "museum")))
         assertEquals(listOf("forest"), warnings.filter { it.kind == RouteWarningKind.APPROACH_DIRECTION }.map { it.stopId })
+    }
+
+    @Test fun `서버 규칙이 없으면 확인할 점이 없고 정차 시간은 3분이다`() {
+        val moved = listOf("forest", "museum", "park")
+        assertTrue(com.hanhyo.pleosshuttle.ui.routeWarnings(routeTimeline(boarded, moved)).isEmpty())
+        assertEquals(3, ROUTE_DWELL_MINUTES)
     }
 
     @Test fun `정차 중 제안 순서는 지나온 지점과 지금 정류장 위치를 그대로 둔다`() {

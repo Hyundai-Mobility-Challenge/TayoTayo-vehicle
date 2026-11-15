@@ -17,7 +17,7 @@ import java.io.ObjectOutputStream
 /** V-21 보호자 미도착 · 동승 유지(하원), D35 자동 기록(GUARDIAN_NO_SHOW), V-22 복귀 후 기관 인계, V-11 정차 조건. */
 class StayOnboardTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun moving() = parked().copy(speedKph = observed(30.0), gear = observed(Gear.DRIVE))

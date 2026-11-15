@@ -30,14 +30,13 @@ class SdkRuntimeDeviceTest {
     @Test fun `실제_SDK_관측과_재구독_시험_결과를_상태별로_보존한다`() {
         val args = InstrumentationRegistry.getArguments()
         val navigationAllowed = args.getString("allowNavigationTrial") == "true"
-        val unlockAllowed = args.getString("allowUnlockTrial") == "true"
         val report = JSONObject().put("startedAtMillis", System.currentTimeMillis())
             .put("identity", JSONObject().put("fingerprint", Build.FINGERPRINT).put("hardware", Build.HARDWARE).put("product", Build.PRODUCT).put("api", Build.VERSION.SDK_INT))
-            .put("allowNavigationTrial", navigationAllowed).put("allowUnlockTrial", unlockAllowed)
+            .put("allowNavigationTrial", navigationAllowed)
             .put("permissionsAtStart", permissions())
             .put("harnessMeaning", "Harness completion is not proof of SDK feature success. Per-feature status and observations below are authoritative.")
             .put("navigationTrial", JSONObject().put("status", "NOT_AUTHORIZED_NOT_RUN"))
-            .put("unlockTrial", JSONObject().put("status", "NOT_AUTHORIZED_NOT_RUN"))
+            .put("unlockTrial", JSONObject().put("status", "REMOVED_APP_HAS_NO_DOOR_CONTROL"))
         val exactAvd = Build.FINGERPRINT == VERIFIED_FINGERPRINT && Build.HARDWARE == "ranchu" && Build.PRODUCT == "crp_avd_arm64"
         if (!exactAvd) {
             report.put("harness", "SKIPPED_NOT_VERIFIED_PLEOS_AVD")
@@ -81,7 +80,6 @@ class SdkRuntimeDeviceTest {
                 sessions.put(session); report.put("sessions", sessions); save(report)
                 if (sessionIndex == 1) {
                     if (navigationAllowed) runNavigationTrial(navi!!, naviState, naviLog, report)
-                    if (unlockAllowed) runUnlockTrial(vehicle!!, vehicleState, report)
                 }
                 onMain { vehicle!!.onStop(); vehicle!!.onStop(); navi!!.onStop(); navi!!.onStop() }
                 val stoppedVehicleCount = vehicleCallbacks.get(); val stoppedNaviCount = naviCallbacks.get()
@@ -152,38 +150,6 @@ class SdkRuntimeDeviceTest {
         }
     }
 
-    private fun runUnlockTrial(adapter: RealVehicleAdapter, state: AtomicReference<VehicleSnapshot>, report: JSONObject) {
-        val trial = JSONObject().put("before", state.get().json()).put("explicitConfirmation", "Instrumentation argument allowUnlockTrial=true; one emulator-only request allowed")
-        val callbacks = CopyOnWriteArrayList<SdkObservation<Boolean>>()
-        val finished = CountDownLatch(1)
-        report.put("unlockTrial", trial)
-        var confirmation: UnlockConfirmation? = null
-        val confirmedArea = state.get().selectedDoorArea
-        trial.put("confirmedExactDoorGroup", confirmedArea ?: JSONObject.NULL).put("groupScope", "One request applies to the entire exact Area returned by the SDK, not an individual child/passenger door.")
-        onMain { confirmation = adapter.prepareUnlockConfirmation(confirmedArea) }
-        if (confirmation == null) {
-            trial.put("status", "BLOCKED_NO_VALID_REAL_DATA_CONFIRMATION").put("blockReason", state.get().unlockBlockReason).put("requestCount", 0)
-            save(report); return
-        }
-        onMain {
-            adapter.requestUnlock(confirmation!!) { result ->
-                callbacks.add(result)
-                if (result.outcome != SdkOutcome.ACCEPTED && result.outcome != SdkOutcome.UNVERIFIED) finished.countDown()
-            }
-        }
-        finished.await(8_000, TimeUnit.MILLISECONDS)
-        val result = callbacks.lastOrNull()
-        trial.put("adapterInvocationCount", 1).put("callbacks", JSONArray(callbacks.map { it.json() })).put("after", state.get().json())
-            .put("actualSdkRequestCount", state.get().diagnostics.count { it.contains("Door ONE-SHOT") })
-        if (result?.outcome == SdkOutcome.TARGET_OBSERVED) {
-            assertEquals("Unlock target is false only after a separate current observation", false, result.value)
-            assertEquals(false, state.get().doorLocked.value)
-            trial.put("status", "TARGET_UNLOCK_STATE_OBSERVED")
-        } else trial.put("status", "UNLOCK_NOT_CONFIRMED").put("sdkStatus", result?.outcome?.name ?: "TIMEOUT_NO_CALLBACK")
-        // No retries, re-lock, property injection, permission adoption, or privileged grants.
-        save(report)
-    }
-
     private fun routeEmpty(s: NaviSnapshot): Boolean = s.destination.isFresh(maxAgeMillis = 6_000) && s.routeState.isFresh(maxAgeMillis = 6_000) && s.destination.value?.name?.isBlank() == true && s.routeMode == "SAFE_GUIDING" && s.routeIsRouting == false
     private fun onMain(action: () -> Unit) = instrumentation.runOnMainSync(action)
     private fun waitUntil(timeoutMillis: Long, condition: () -> Boolean): Boolean {
@@ -196,7 +162,7 @@ class SdkRuntimeDeviceTest {
     }
     private fun save(report: JSONObject) { evidence.writeText(report.toString(2)) }
     private fun permissions() = JSONObject().also { result ->
-        listOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN", "pleos.car.permission.CAR_DOORS", "pleos.car.permission.CONTROL_CAR_DOORS", "pleos.car.permission.CAR_SEATS", "pleos.car.permission.NAVI_ROUTE", "pleos.car.permission.NAVI_ROUTE_SEARCH", "pleos.car.permission.NAVI_CUSTOM_MAP").forEach { permission ->
+        listOf("android.car.permission.CAR_SPEED", "android.car.permission.CAR_POWERTRAIN", "pleos.car.permission.CAR_DOORS", "pleos.car.permission.CAR_SEATS", "pleos.car.permission.NAVI_ROUTE", "pleos.car.permission.NAVI_ROUTE_SEARCH", "pleos.car.permission.NAVI_CUSTOM_MAP").forEach { permission ->
             result.put(permission, if (context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) "GRANTED" else "DENIED")
         }
     }
@@ -207,8 +173,8 @@ class SdkRuntimeDeviceTest {
         is Double -> if (v.isFinite()) v else v.toString()
         else -> v
     }).put("source", source).put("outcome", outcome.name).put("observedAtMillis", observedAtMillis ?: JSONObject.NULL).put("receivedAtMillis", receivedAtMillis).put("sourceTimestampElapsedNanos", sourceTimestampElapsedNanos ?: JSONObject.NULL).put("error", error ?: JSONObject.NULL)
-    private fun VehicleSnapshot.json() = JSONObject().put("versions", JSONObject(versions)).put("connected", connected).put("emulatorGuard", emulatorGuard).put("unlockBlockReason", unlockBlockReason)
-        .put("speed", speedMetersPerSecond.json()).put("gear", gear.json()).put("parkingBrake", parkingBrake.json()).put("parkingBrakeSupported", parkingBrakeSupported).put("doorLocked", doorLocked.json()).put("doorRequest", doorRequest.json())
+    private fun VehicleSnapshot.json() = JSONObject().put("versions", JSONObject(versions)).put("connected", connected)
+        .put("speed", speedMetersPerSecond.json()).put("gear", gear.json()).put("parkingBrake", parkingBrake.json()).put("parkingBrakeSupported", parkingBrakeSupported).put("doorLocked", doorLocked.json())
         .put("uxRestricted", uxRestricted.json()).put("activeUxRestrictions", activeUxRestrictions ?: JSONObject.NULL)
         .put("supportedDoorAreas", JSONArray(supportedDoorAreas)).put("supportedBeltAreas", JSONArray(supportedBeltAreas))
         .put("selectedDoorArea", selectedDoorArea ?: JSONObject.NULL)

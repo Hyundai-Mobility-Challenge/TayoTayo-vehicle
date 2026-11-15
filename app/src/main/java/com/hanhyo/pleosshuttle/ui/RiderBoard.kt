@@ -24,7 +24,6 @@ import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.ChildRecord
-import com.hanhyo.pleosshuttle.domain.IntegrationMode
 import com.hanhyo.pleosshuttle.domain.PickupFlow
 import com.hanhyo.pleosshuttle.domain.StayOnboardReasons
 import com.hanhyo.pleosshuttle.domain.TripPhase
@@ -230,7 +229,7 @@ internal fun pickupRowActions(trip: TripState, child: ChildRecord): List<RiderAc
 
 internal const val PICKUP_PREPARE_NOTE = "알림 없는 아이는 정류장에서 확정"
 
-private fun displayName(child: ChildRecord) = child.name.removePrefix("가상 ")
+private fun displayName(child: ChildRecord) = child.name
 
 internal fun riderActionTag(action: RiderAction, childId: String): String = when (action) {
     RiderAction.BOARD -> "rider-board-$childId"
@@ -250,7 +249,7 @@ internal fun riderActionTag(action: RiderAction, childId: String): String = when
         trip = trip,
         visitOrder = displayedRouteOrder(trip),
         stationary = vm.engine.stationaryBlockers(vm.now).isEmpty(),
-        uxRestricted = trip.integrationMode == IntegrationMode.SDK && vm.sdkVehicle.uxRestricted.value == true,
+        uxRestricted = vm.sdkVehicle.uxRestricted.value == true,
     )
     val type = AppTheme.typography
     Surface(

@@ -8,7 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
-import com.hanhyo.pleosshuttle.domain.SampleTrip
+import com.hanhyo.pleosshuttle.domain.LedgerEntry
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
 import org.json.JSONArray
@@ -61,42 +61,42 @@ class ProcessRestoreDeviceTest {
         try {
             captureOriginal(original)
             writeAtomic(File(backupDirectory, "original.json"), original)
-            // Only the new app's checkpoint and simulation preferences are isolated.
+            // Only the new app's checkpoint and location-sharing preferences are isolated.
             protectedFiles.filterKeys { it.startsWith("trip") }.values.forEach { check(!it.exists() || it.delete()) }
-            check(preferences.edit().putString("scenario", TrialScenario.PARKED.name).putBoolean("doorLocked", true).commit())
             val tripId = "process-restore-${original.getString("runId") }"
-            TripStore(context).save(SampleTrip.create().copy(tripId = tripId))
+            // 출시 앱에는 모의 차량 입력이 없으므로, 운행 중(탑승 1명) 상태를 운행 파일에 직접 만들어 둔다.
+            val boardedAt = System.currentTimeMillis()
+            val unfinished = DeviceTrips.sdkTrip(tripId).let { trip ->
+                trip.copy(phase = TripPhase.DRIVING,
+                    children = trip.children.map { if (it.id == "child-a") it.copy(status = Attendance.ONBOARD) else it },
+                    ledger = listOf(LedgerEntry("ledger-$boardedAt-1", "child-a", Attendance.NOT_BOARDED, Attendance.ONBOARD, boardedAt, "선생님 탑승 확인")))
+            }
+            TripStore(context).save(unfinished)
             activity = ActivityScenario.launch(MainActivity::class.java)
             lateinit var expected: TripState
             activity!!.onActivity { screen ->
                 val model = screen.model
-                assertEquals(IntegrationMode.SIMULATION, model.trip.integrationMode)
-                model.chooseScenario(TrialScenario.PARKED)
-                model.perform { board("child-a", it) }
-                model.perform { startDriving(it) }
-                model.chooseScenario(TrialScenario.DISCONNECTED)
+                assertEquals(IntegrationMode.SDK, model.trip.integrationMode)
+                assertTrue(model.trip.hasTrip)
                 assertNull(model.storageError)
                 assertEquals(TripPhase.DRIVING, model.trip.phase)
                 assertEquals(1, model.trip.ledger.size)
                 assertEquals(listOf("child-a"), model.trip.onboardChildren.map { it.id })
-                assertFalse(model.vehicle.connected)
                 assertNull(model.trip.unlockConfirmation)
-                assertEquals(0, model.simulatedDoorRequests)
                 expected = model.trip
             }
             closeActivity()
             // Persist the captured unfinished checkpoint through the production AtomicFile store.
             TripStore(context).save(expected)
             assertEquals(expected, TripStore(context).load())
-            assertEquals(TrialScenario.DISCONNECTED.name, preferences.getString("scenario", null))
             val progress = JSONObject().put("status", "PREPARED").put("runId", original.getString("runId"))
                 .put("preparePid", Process.myPid()).put("uid", Process.myUid()).put("tripId", tripId)
                 .put("expectedLedger", ledger(expected)).put("preparedAtMillis", System.currentTimeMillis())
             writeAtomic(File(backupDirectory, "progress.json"), progress)
             report.put("status", "PREPARED_AWAITING_HOST_FORCE_STOP").put("runId", original.getString("runId"))
-                .put("checkpoint", checkpoint(expected)).put("scenario", TrialScenario.DISCONNECTED.name)
+                .put("checkpoint", checkpoint(expected))
                 .put("backupDirectory", backupDirectory.path)
-                .put("boundary", "One fictional boarding record; no door confirmation or real SDK control was created.")
+                .put("boundary", "One test boarding record written directly to the trip file; no door confirmation or SDK control was created.")
             writeAtomic(File(context.filesDir, "process-restore-prepare.json"), report)
             prepared = true
         } catch (failure: Throwable) {
@@ -130,30 +130,24 @@ class ProcessRestoreDeviceTest {
             assertNotEquals("Host must force-stop and run verify in a new process", original.getInt("preparePid"), Process.myPid())
             val savedBeforeLaunch = TripStore(context).load()!!
             assertEquals(progress.getString("tripId"), savedBeforeLaunch.tripId)
-            assertEquals(IntegrationMode.SIMULATION, savedBeforeLaunch.integrationMode)
-            assertEquals(TrialScenario.DISCONNECTED.name, preferences.getString("scenario", null))
+            assertEquals(IntegrationMode.SDK, savedBeforeLaunch.integrationMode)
             activity = ActivityScenario.launch(MainActivity::class.java)
             activity!!.onActivity { screen ->
                 val model = screen.model
                 assertNull(model.storageError)
                 assertEquals(progress.getString("tripId"), model.trip.tripId)
-                assertEquals(IntegrationMode.SIMULATION, model.trip.integrationMode)
+                assertEquals(IntegrationMode.SDK, model.trip.integrationMode)
+                assertTrue(model.trip.hasTrip)
                 assertEquals(TripPhase.DRIVING, model.trip.phase)
                 assertEquals(1, model.trip.ledger.size)
                 assertEquals(progress.getJSONArray("expectedLedger").toString(), ledger(model.trip).toString())
                 assertEquals(Attendance.ONBOARD, model.trip.children.single { it.id == "child-a" }.status)
                 assertEquals(1, model.trip.onboardChildren.size)
                 assertNull(model.trip.endRecord)
-                assertEquals(TrialScenario.DISCONNECTED, model.scenario)
-                assertFalse(model.vehicle.connected)
-                assertNull(model.vehicle.speedKph.value)
-                assertNull(model.vehicle.gear.value)
                 assertNull(model.trip.unlockConfirmation)
                 assertNull(model.trip.manualSurroundingsCheckAtMillis)
-                assertEquals(0, model.simulatedDoorRequests)
-                report.put("restoredCheckpoint", checkpoint(model.trip)).put("scenario", model.scenario.name)
+                report.put("restoredCheckpoint", checkpoint(model.trip))
                     .put("connected", model.vehicle.connected).put("unlockConfirmationPresent", model.trip.unlockConfirmation != null)
-                    .put("simulatedDoorRequestCount", model.simulatedDoorRequests)
             }
             report.put("status", "NEW_PROCESS_UNFINISHED_CHECKPOINT_OBSERVED")
         } catch (failure: Throwable) {
@@ -220,7 +214,7 @@ class ProcessRestoreDeviceTest {
                     "Set" -> { val array = entry.getJSONArray("value"); editor.putStringSet(key, (0 until array.length()).map { array.getString(it) }.toSet()) }
                 }
             }
-            check(editor.commit()) { "Simulation preferences restore failed; backup retained" }
+            check(editor.commit()) { "Location-sharing preferences restore failed; backup retained" }
         } }.onFailure(failures::add)
         protectedFiles.forEach { (key, file) ->
             runCatching {

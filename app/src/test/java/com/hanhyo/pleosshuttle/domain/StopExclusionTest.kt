@@ -15,7 +15,7 @@ import java.io.ObjectOutputStream
 /** V-09·D17 빈 정류장 제외 제안: 제안 규칙, 선생님 확인 빼기·다시 넣기, 자동 재포함, 경유지·출발 요약, 저장, 서버 skip 시점. */
 class StopExclusionTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun moving() = parked().copy(speedKph = observed(30.0), gear = observed(Gear.DRIVE))

@@ -20,12 +20,6 @@ import com.hanhyo.pleosshuttle.domain.TripDirections
     OutlinedTextField(code, { code = it }, label = { Text("차량 연결 코드") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("institution-code"), enabled = !vm.institutionBusy)
     Button(onClick = { vm.pairInstitution(base, code) }, enabled = !vm.institutionBusy && code.isNotBlank(), modifier = Modifier.testTag("institution-pair")) { Text("차량 연결") }
     Text(vm.institutionName)
-    if (vm.canPrepareConnectedDemo) {
-        Text("현재 열린 별도 체험은 보호자 폰과 연결되지 않습니다. 체험 기록을 보관한 뒤 기관 명단을 불러오세요.")
-        Button(onClick = vm::prepareConnectedDemo, modifier = Modifier.testTag("prepare-connected-demo")) {
-            Text("체험 보관 후 기관 명단 준비")
-        }
-    }
     Text("운행 방향")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(TripDirections.PICK_UP, TripDirections.DROP_OFF).forEach { direction ->
@@ -36,7 +30,7 @@ import com.hanhyo.pleosshuttle.domain.TripDirections
     }
     Text("처음에는 시간대로 정해요(정오 전 등원, 그 뒤 하원). 고른 방향은 다음에도 유지돼요.")
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(onClick = vm::loadInstitutionTrip, enabled = !vm.institutionBusy && vm.institutionConnected, modifier = Modifier.testTag("institution-load")) { Text("배정 명단으로 운행 준비") }
+        Button(onClick = { vm.loadInstitutionTrip() }, enabled = !vm.institutionBusy && vm.institutionConnected, modifier = Modifier.testTag("institution-load")) { Text("배정 명단으로 운행 준비") }
         OutlinedButton(onClick = { vm.syncInstitution(true) }, enabled = !vm.institutionBusy && vm.institutionConnected) { Text("기록 전송 재시도") }
     }
     if (vm.tripChoices.isNotEmpty()) TripChoiceList(vm)
@@ -47,7 +41,7 @@ import com.hanhyo.pleosshuttle.domain.TripDirections
 }
 
 /** 오늘 운행이 둘 이상일 때. 누가 골라도 되므로(선생님·기사님) 문구에 사람을 넣지 않는다. */
-@Composable private fun TripChoiceList(vm: ShuttleViewModel) {
+@Composable internal fun TripChoiceList(vm: ShuttleViewModel) {
     Column(Modifier.fillMaxWidth().testTag("trip-choices"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("오늘 ${TripDirections.label(vm.institutionDirection)} 운행을 골라 주세요", style = MaterialTheme.typography.titleMedium)
         vm.tripChoices.forEach { option ->

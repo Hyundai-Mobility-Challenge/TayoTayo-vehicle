@@ -7,7 +7,7 @@ import org.junit.Test
 /** 등원(V-25) 음성: 하원 문장을 쓰지 않고 V-15 탑승 안내, 기관 안내, V-16 재출발 벨트 경고를 쓴다. */
 class PickupVoiceTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun engine() = ShuttleEngine(SampleTrip.createPickup().copy(routeIsExample = false)).also { it.updateVehicle(parked(), now) }
