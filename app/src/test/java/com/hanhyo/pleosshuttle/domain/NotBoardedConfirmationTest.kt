@@ -142,7 +142,7 @@ class NotBoardedConfirmationTest {
         assertFalse(e.confirmNotBoarded("child-a", now))
         assertEquals(ShuttleEngine.NO_TRIP_TODAY, e.lastMessage)
         val rows = timelineStops(absent)
-        assertEquals(listOf("하차 0명", "하차 0명", "하차 0명"), rows.drop(1).dropLast(1).map { it.detail })
+        assertEquals(listOf("하차 예정 0명", "하차 예정 0명", "하차 예정 0명"), rows.drop(1).dropLast(1).map { it.detail })
         assertEquals("탑승 기록 0/0", rows.first().detail)
         assertTrue(absent.stops.all { ridersAt(absent, it.id).isEmpty() })
         // 정류장은 경로에서 빼지 않는다(V-09는 이후).
@@ -152,16 +152,16 @@ class NotBoardedConfirmationTest {
     @Test fun `정류장 하차 인원은 탈 아이만 세고 미탑승 확인만 남은 정류장은 0명으로 남는다`() {
         val e = engine(withAbsentB())
         // 서울숲: 가(예정) + 나(미탑승 예정) → 1명
-        assertEquals("하차 1명", timelineStops(e.state)[1].detail)
+        assertEquals("하차 예정 1명", timelineStops(e.state)[1].detail)
         assertEquals(listOf("어린이 가"), ridersAt(e.state, "forest"))
         assertTrue(e.confirmNotBoarded("child-a", now))
-        assertEquals("하차 0명", timelineStops(e.state)[1].detail)
+        assertEquals("하차 예정 0명", timelineStops(e.state)[1].detail)
         assertTrue(ridersAt(e.state, "forest").isEmpty())
         assertEquals("탑승 기록 0/2", timelineStops(e.state).first().detail)
         assertEquals(3, e.state.routeOrder.size)
         // 미탑승 예정 아이도 실제로 타면 인원에 들어간다.
         assertTrue(e.board("child-b", now))
-        assertEquals("하차 1명", timelineStops(e.state)[1].detail)
+        assertEquals("하차 예정 1명", timelineStops(e.state)[1].detail)
         // 달라진 점: 미탑승 확인 표시
         assertTrue(routeChanges(e.state).any { it.text == "어린이 가 · 미탑승 확인" })
     }

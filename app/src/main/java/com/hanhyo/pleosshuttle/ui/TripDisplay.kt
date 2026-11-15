@@ -106,11 +106,11 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         val detail = if (trip.isPickup) when (progress) {
             StopProgress.CURRENT -> if (trip.phase == TripPhase.ALIGHTING) "탑승 기록 $boardedHere/${riders.size}" else "탑승 예정 ${riders.size}명"
             StopProgress.DONE -> "탑승 ${boardedHere}명"
-            StopProgress.UPCOMING -> "탑승 ${riders.size}명"
+            StopProgress.UPCOMING -> "탑승 예정 ${riders.size}명"
         } else when (progress) {
             StopProgress.CURRENT -> if (trip.phase == TripPhase.ALIGHTING) "하차 기록 $alighted/${riders.size}" else "하차 예정 ${riders.size}명"
             StopProgress.DONE -> "하차 기록 ${alighted}명"
-            StopProgress.UPCOMING -> "하차 ${riders.size}명"
+            StopProgress.UPCOMING -> "하차 예정 ${riders.size}명"
         }
         TimelineStop("${index + 1}", stop.shortName, detail, progress)
     }
@@ -121,4 +121,12 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         progress = when { ended -> StopProgress.DONE; returning -> StopProgress.CURRENT; else -> StopProgress.UPCOMING },
     )
     return listOf(origin) + stops + back
+}
+
+/** "떡잎유치원" → "떡잎유치원으로", "서현역" → "서현역으로", "판교" → "판교로". 받침(ㄹ 제외)이 있으면 "으로". */
+internal fun withRo(name: String): String {
+    val last = name.trimEnd().lastOrNull() ?: return name
+    if (last !in '가'..'힣') return "${name}(으)로"
+    val jong = (last - '가') % 28
+    return if (jong == 0 || jong == 8) "${name}로" else "${name}으로"
 }

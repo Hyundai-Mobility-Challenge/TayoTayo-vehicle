@@ -63,7 +63,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
             tag == PICKUP_INSTITUTION_TAG -> "기관 담당자에게 인계해 주세요"
             tag == "start-trip" -> "${vm.tripDirectionLabel} 준비가 끝났어요"
             tag == "arrive-stop" -> "도착하면 확인해 주세요"
-            tag == "arrive-origin" -> if (pickup) "기관으로 가요" else "출발지로 돌아가요"
+            tag == "arrive-origin" -> if (pickup) "기관으로 가요" else "${withRo(vm.trip.origin.shortName)} 돌아가요"
             tag == "complete-stop" -> "이 지점의 기록을 마쳤어요"
             tag == "confirm-finish" -> "차량 실내를 확인해 주세요"
             tag == "view-history" -> "오늘의 ${vm.tripDirectionLabel}을 마쳤어요"

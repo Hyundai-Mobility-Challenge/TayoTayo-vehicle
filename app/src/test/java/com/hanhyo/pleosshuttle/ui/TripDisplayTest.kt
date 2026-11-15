@@ -16,7 +16,7 @@ class TripDisplayTest {
         assertEquals("탑승 기록 1/4", rows.first().detail)
         assertTrue(rows.drop(1).all { it.progress == StopProgress.UPCOMING })
         assertEquals("서울숲", rows[1].name)
-        assertEquals("하차 2명", rows[1].detail)
+        assertEquals("하차 예정 2명", rows[1].detail)
     }
 
     @Test fun `하차 중에는 지난 정류장이 완료이고 현재 정류장은 하차 기록 수를 보여준다`() {

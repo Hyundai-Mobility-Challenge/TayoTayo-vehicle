@@ -72,7 +72,7 @@ private val SYNTHETIC_NOTE = "도착 시각은 지금 출발한다고 보고 직
     }
     RouteStrip(vm, order, timeline)
     StopExclusionSuggestions(vm)
-    Text("출발하면 위치·예상 도착 시간을 보호자에게 공유(처음엔 위치 권한 필요)",
+    Text("출발하면 차량 위치와 예상 도착 시간을 보호자에게 실시간으로 공유해요",
         style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
     // V-08 출발 전 확인 요약 + 기사 확인 체크: [운행 시작] 바로 위(flow VS-06). 출발은 막지 않는다(D15).
     DepartureCheckBlock(vm, departureSummary(trip, order))

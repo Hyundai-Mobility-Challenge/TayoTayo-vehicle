@@ -266,7 +266,7 @@ class PickupScreenRulesTest {
         val e = engine()
         val stops = timelineStops(e.state)
         assertEquals("기관 도착", stops.last().name)
-        assertEquals("탑승 1명", stops[1].detail) // 서울숲: 가(나는 결석 알림이라 탈 아이에서 빠짐)
+        assertEquals("탑승 예정 1명", stops[1].detail) // 서울숲: 가(나는 결석 알림이라 탈 아이에서 빠짐)
         assertEquals(listOf("어린이 가"), ridersAt(e.state, "forest"))
         val before = e.state
         assertTrue(e.startDriving(now))
