@@ -10,7 +10,7 @@ Pleos 차량의 기어·차속 신호로 주행 중에는 내비만 보여 주�
 **[⬇️ 차량 앱 v1.0.0 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)** (43.5MB · Pleos Connect, API 28 이상) · [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
 
 > [!NOTE]
-> [심사위원용 등원 시연](#심사위원용-등원-시연)은 배포된 HTTPS 주소를 사용합니다. 릴리스 APK는 **HTTPS 서버에만** 연결됩니다. 내부망 HTTP 서버(`http://10.0.2.2:8080` 등)로 시연할 때는 [빌드](#2-빌드)의 디버그 APK를 사용하세요.
+> 차량과 보호자 앱의 설치 및 배포 서버 연결 순서는 [시작하기](#시작하기)를 따라 주세요.
 
 이 저장소는 타요타요의 **대표 저장소**입니다. 차량 앱 소스를 관리하고, 서버와 보호자 앱은 서브모듈로 연결합니다.
 
@@ -19,25 +19,6 @@ Pleos 차량의 기어·차속 신호로 주행 중에는 내비만 보여 주�
 | **Pleos 차량 앱** | [TayoTayo-vehicle](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle) | [`app/`](app) |
 | 기관 서버 | [TayoTayo-server](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server) | [`server/`](server) 서브모듈 |
 | 보호자 앱 | [TayoTayo-parent](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent) | [`parent/`](parent) 서브모듈 |
-
-## 심사위원용 등원 시연
-
-시연 서버 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 두 앱에 이 주소만 입력하세요. 심사위원 PC에는 서버나 MySQL을 설치할 필요가 없습니다. 아래 하원 화면 예시는 별도 운행을 촬영한 자료입니다.
-
-| 준비물 | 설치·접속 방법 |
-| --- | --- |
-| 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.0](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
-| 보호자 앱 | Android 휴대폰 또는 에뮬레이터에 HTTPS 서버 설정을 지원하는 APK를 설치합니다. 공개 버전 `v0.2-invitations`에는 주소 입력 메뉴가 없습니다. HTTPS 지원 릴리스가 올라오기 전에는 팀이 전달한 HTTPS 지원 APK 또는 디버그 빌드를 사용하세요. [보호자 릴리스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases) · [디버그 빌드 방법](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent#시작하기) |
-| 기관 관리자·보호자 계정 | 두 계정의 비밀번호는 심사 안내와 함께 별도로 전달합니다. [서버 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database) |
-
-1. **PC에서 차량 연결 코드 발급.** [시연 서버 Swagger](https://api-demo-e677ea0e.up.railway.app/swagger-ui.html)에서 `POST /auth/login`을 열고 **Try it out**을 누릅니다. `email=orgs@example.com`, 전달받은 관리자 비밀번호, `clientType=ADMIN_WEB`을 입력하고 **Execute**를 누릅니다. 응답의 `accessToken` 값만 상단 **Authorize → BearerAuth**에 등록합니다. `POST /orgs/{orgId}/vehicles/{vehicleId}/pairing-codes`에서 두 ID에 각각 `1`, 본문에 `{"expiresIn":600}`을 넣으면 10분간 유효한 6자리 코드가 나옵니다.
-2. **차량 연결.** 차량 앱 **기관 · 차량 연결** 화면에 서버 주소와 6자리 코드를 입력하고 **차량 연결**을 누릅니다. 연결 완료를 확인합니다.
-3. **오늘 등원 운행 생성.** PC에서 [오늘 운행 만들기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md#차량-연결-후-오늘-운행-만들기)의 PowerShell 명령을 실행합니다. 출력된 JSON의 날짜가 한국 기준 오늘이고 방향이 `PICK_UP`인지 확인합니다. 이 JSON으로 Swagger의 `POST /orgs/{orgId}/trips` 본문 전체를 교체하고 `orgId=1`로 한 번 실행합니다. **차량 페어링이 끝난 뒤에** 생성해야 그 기기에 운행이 배정됩니다. 응답에서 운행 번호(`id`), `PREPARING`, 정류장 3곳과 원아 3명을 확인합니다.
-4. **두 앱에서 명단 확인.** 차량 앱에서 **등원 → 배정 명단으로 운행 준비**를 누릅니다. 선택 목록이 뜨면 방금 만든 운행 번호의 **이 운행 준비**를 누릅니다. 보호자 앱에서는 같은 서버 주소를 설정하고 `pickup-judge@example.com`과 보호자 비밀번호로 로그인합니다. 김하늘이 이미 연결돼 있어 별도의 어린이 초대 코드는 필요하지 않습니다.
-5. **승차·기관 인계.** 차량에서 명단과 순서를 확인하고 출발합니다. **판교역 김하늘 → 야탑역 김바다 → 성남시청 이마음** 순서로 정차합니다. 각 정류장에서 기어 P·차속 0을 확인하고, 아이를 넘겨준 사람 유형을 고른 뒤 **인계받음 → 탑승 → 벨트 확인**을 누릅니다. 마지막에는 기관에 도착해 각 아이의 **기관 인계 확인 · 하차 기록**을 누르고, 실내 확인 후 운행을 종료합니다.
-6. **결과 확인.** 보호자 앱을 새로고침해 김하늘의 탑승·하차 기록을 확인합니다. 시연 서버는 휴대폰 푸시를 보내지 않습니다. 관리자 Swagger의 `GET /trips/{tripId}`에서 운행 번호로 조회하면 `COMPLETED`와 세 아이의 `DROPPED_OFF` 기록을 확인할 수 있습니다.
-
-[서버 README에서 전체 절차와 요청 예시 보기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md#심사위원용-등원-시연)
 
 ## 왜 만들었나
 
@@ -93,15 +74,38 @@ flowchart TD
 
 ## 시작하기
 
-### 1. 전체 소스 받기
+### 1. 앱 설치
+
+| 준비물 | 설치·접속 방법 |
+| --- | --- |
+| 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.0](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
+| 보호자 앱 | Android 휴대폰 또는 에뮬레이터에 HTTPS 서버 설정을 지원하는 APK를 설치합니다. 공개 버전 `v0.2-invitations`에는 주소 입력 메뉴가 없습니다. HTTPS 지원 릴리스가 올라오기 전에는 팀이 전달한 HTTPS 지원 APK 또는 디버그 빌드를 사용하세요. [보호자 릴리스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases) · [디버그 빌드 방법](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent#시작하기) |
+| 기관 관리자·보호자 계정 | 두 계정의 비밀번호는 심사 안내와 함께 별도로 전달합니다. [서버 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database) |
+
+### 2. 배포 서버에 연결하고 오늘 운행 만들기
+
+차량 앱과 보호자 앱에 입력할 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 주소 끝에 `/api/v1`을 붙이지 마세요. 서버와 MySQL은 이미 실행 중입니다.
+
+1. **PC에서 차량 연결 코드 발급.** [시연 서버 Swagger](https://api-demo-e677ea0e.up.railway.app/swagger-ui.html)에서 `POST /auth/login`을 열고 **Try it out**을 누릅니다. `email=orgs@example.com`, 전달받은 관리자 비밀번호, `clientType=ADMIN_WEB`을 입력하고 **Execute**를 누릅니다. 응답의 `accessToken` 값만 상단 **Authorize → BearerAuth**에 등록합니다. `POST /orgs/{orgId}/vehicles/{vehicleId}/pairing-codes`에서 두 ID에 각각 `1`, 본문에 `{"expiresIn":600}`을 넣으면 10분간 유효한 6자리 코드가 나옵니다.
+2. **차량 연결.** 차량 앱 **기관 · 차량 연결** 화면에 서버 주소와 6자리 코드를 입력하고 **차량 연결**을 누릅니다. 연결 완료를 확인합니다.
+3. **오늘 등원 운행 생성.** PC에서 [오늘 운행 만들기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md#차량-연결-후-오늘-운행-만들기)의 PowerShell 명령을 실행합니다. 출력된 JSON의 날짜가 한국 기준 오늘이고 방향이 `PICK_UP`인지 확인합니다. 이 JSON으로 Swagger의 `POST /orgs/{orgId}/trips` 본문 전체를 교체하고 `orgId=1`로 한 번 실행합니다. **차량 페어링이 끝난 뒤에** 생성해야 그 기기에 운행이 배정됩니다. 응답에서 운행 번호(`id`), `PREPARING`, 정류장 3곳과 원아 3명을 확인합니다.
+
+### 3. 등원 운행과 보호자 확인
+
+1. **두 앱에서 명단 확인.** 차량 앱에서 **등원 → 배정 명단으로 운행 준비**를 누릅니다. 선택 목록이 뜨면 방금 만든 운행 번호의 **이 운행 준비**를 누릅니다. 보호자 앱에서는 같은 서버 주소를 설정하고 `pickup-judge@example.com`과 보호자 비밀번호로 로그인합니다. 김하늘이 이미 연결돼 있어 별도의 어린이 초대 코드는 필요하지 않습니다.
+2. **승차·기관 인계.** 차량에서 명단과 순서를 확인하고 출발합니다. **판교역 김하늘 → 야탑역 김바다 → 성남시청 이마음** 순서로 정차합니다. 각 정류장에서 기어 P·차속 0을 확인하고, 아이를 넘겨준 사람 유형을 고른 뒤 **인계받음 → 탑승 → 벨트 확인**을 누릅니다. 마지막에는 기관에 도착해 각 아이의 **기관 인계 확인 · 하차 기록**을 누르고, 실내 확인 후 운행을 종료합니다.
+3. **결과 확인.** 보호자 앱을 새로고침해 김하늘의 탑승·하차 기록을 확인합니다. 시연 서버는 휴대폰 푸시를 보내지 않습니다. 관리자 Swagger의 `GET /trips/{tripId}`에서 운행 번호로 조회하면 `COMPLETED`와 세 아이의 `DROPPED_OFF` 기록을 확인할 수 있습니다.
+
+[서버 README의 Swagger 요청 예시](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md#시작하기)
+
+<details>
+<summary>개발용 차량 앱을 소스에서 빌드하는 방법</summary>
 
 ```sh
 git clone --recurse-submodules https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle.git
 ```
 
 이미 받았다면 `git submodule update --init --recursive`를 실행합니다. GitHub의 **Download ZIP**에는 서브모듈 소스가 들어 있지 않습니다. 서버·보호자 앱의 소스 수정은 각 저장소에서 관리합니다.
-
-### 2. 빌드
 
 Android Studio에서 저장소 루트를 엽니다. Android SDK 35, JDK 17 이상, Pleos Maven 저장소 접근이 필요하고 최소 API는 28입니다. 실행 대상은 Pleos Connect 에뮬레이터입니다.
 
@@ -115,23 +119,7 @@ Android Studio에서 저장소 루트를 엽니다. Android SDK 35, JDK 17 이�
 | 디버그 APK | `app/build/outputs/apk/debug/app-debug.apk` |
 | Firebase 설정 | 차량 앱에는 필요 없음 (알림은 서버가 보냄) |
 
-### 3. 서버에 연결하고 운행하기
-
-아래는 직접 빌드한 디버그 앱으로 로컬 서버에서 하원 운행을 재현하는 절차입니다. 공개 서버로 등원을 시연할 때는 [심사위원용 등원 시연](#심사위원용-등원-시연)을 따르세요.
-
-1. [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server)대로 서버를 실행하고 기관·차량·정류장·노선·원아 배정을 준비합니다.
-2. 차량 앱 **기관 연결** 탭에 서버 주소와 관리자 웹에서 발급한 **차량 연결 코드**(10분 유효)를 입력합니다.
-
-   | 실행 환경 | 서버 주소 |
-   | --- | --- |
-   | Pleos 에뮬레이터 (서버와 같은 PC) | `http://10.0.2.2:8080` |
-   | 실제 차량 기기 | `http://<서버 PC의 LAN IPv4>:8080` |
-
-3. 관리자 웹이나 API로 **오늘 날짜의 운행**을 만듭니다. 차량 앱은 운행이나 명단을 직접 만들지 않습니다.
-4. 하원 방향을 고르고 **배정 명단으로 운행 준비 → 탑승 기록 → 이 순서로 · 운행 시작**을 누릅니다.
-5. 정차할 때마다 **도착·정차 확인 → 인계 확인 → 하차 기록**, 복귀하면 **복귀·정차 확인 → 실내 확인 완료 · 운행 종료**를 누릅니다.
-
-새 보호자 계정에 아이를 연결할 때는 **어린이 초대 코드**를 사용합니다. 세 앱을 함께 연결하는 순서는 [전체 연결 안내](docs/INTEGRATION.md)와 [시연 순서](docs/DEMO_STEP_BY_STEP.md)에 있습니다.
+</details>
 
 ## 구조
 
