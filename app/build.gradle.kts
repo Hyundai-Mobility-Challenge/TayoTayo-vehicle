@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -18,6 +20,22 @@ android {
         buildConfigField("String", "PLEOS_VEHICLE_SDK", "\"${libs.versions.vehicleSdk.get()}\"")
         buildConfigField("String", "PLEOS_NAVI_SDK", "\"${libs.versions.naviHelper.get()}\"")
         buildConfigField("String", "PLEOS_TTS_SDK", "\"${libs.versions.textToSpeech.get()}\"")
+    }
+    // 릴리스 서명: 저장소 루트의 keystore.properties(git 제외)가 있을 때만 서명한다. 키 파일과 비밀번호는 저장소에 올리지 않는다.
+    // 형식: storeFile=<keystore 절대경로>, storePassword=, keyAlias=, keyPassword=
+    val releaseKeys = rootProject.file("keystore.properties").takeIf { it.isFile }?.let { f -> Properties().apply { f.inputStream().use(::load) } }
+    signingConfigs {
+        if (releaseKeys != null) create("release") {
+            storeFile = file(releaseKeys.getProperty("storeFile"))
+            storePassword = releaseKeys.getProperty("storePassword")
+            keyAlias = releaseKeys.getProperty("keyAlias")
+            keyPassword = releaseKeys.getProperty("keyPassword")
+        }
+    }
+    buildTypes {
+        release {
+            if (releaseKeys != null) signingConfig = signingConfigs.getByName("release")
+        }
     }
     buildFeatures { compose = true; buildConfig = true }
     sourceSets["main"].java.srcDir("../common/kotlin")
