@@ -1,4 +1,9 @@
-# 타요타요 — 어린이 통학 차량 Pleos 앱
+<p align="center">
+  <img src="docs/images/tayotayo-wordmark.svg" alt="타요타요" width="220">
+</p>
+<p align="center">
+  <img src="docs/images/tayotayo-header.png" alt="스쿨버스가 달리는 등하원길" width="420">
+</p>
 
 **아이가 차에 타고 내리는 순간을 동승 선생님이 차량 화면에서 확인하고 기록하는 Pleos Connect 앱입니다.**
 Pleos 차량의 기어·차속 신호로 주행 중에는 내비만 보여 주고, P로 정차하면 탑승·인계·하차 기록 화면으로 돌아옵니다. 기록은 기관 서버를 거쳐 보호자 앱에 바로 나타납니다.
