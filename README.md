@@ -7,7 +7,7 @@ Pleos 차량의 기어·차속 신호로 주행 중에는 내비만 보여 주�
 
 > 운행을 시작하면 Pleos 내비가 정류장 3곳을 경유지로 안내합니다. 2026-11-15 Pleos Connect 에뮬레이터에서 로컬 서버와 가상 아동 4명으로 진행한 하원 운행 화면입니다.
 
-**[⬇️ 차량 앱 v1.0.1 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/%EA%BC%AC%EB%A7%88%EB%B2%84%EC%8A%A4_%ED%83%80%EC%9A%94%ED%83%80%EC%9A%94(%EC%B0%A8%EB%9F%89%EC%9A%A9)_release.apk)** (43.5MB · Pleos Connect, API 28 이상) · [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
+**[⬇️ 차량 앱 v1.0.1 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/TayoTayo-vehicle-1.0.1-release.apk)** (43.5MB · Pleos Connect, API 28 이상) · [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
 
 > [!NOTE]
 > 차량과 보호자 앱의 설치 및 배포 서버 연결 순서는 [시작하기](#시작하기)를 따라 주세요.
@@ -78,7 +78,7 @@ flowchart TD
 
 | 준비물 | 설치·접속 방법 |
 | --- | --- |
-| 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.1](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/%EA%BC%AC%EB%A7%88%EB%B2%84%EC%8A%A4_%ED%83%80%EC%9A%94%ED%83%80%EC%9A%94(%EC%B0%A8%EB%9F%89%EC%9A%A9)_release.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
+| 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.1](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/TayoTayo-vehicle-1.0.1-release.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
 | 보호자 앱 | Android 휴대폰 또는 에뮬레이터에 HTTPS 서버 설정을 지원하는 APK를 설치합니다. 공개 버전 `v0.2-invitations`에는 주소 입력 메뉴가 없습니다. HTTPS 지원 릴리스가 올라오기 전에는 팀이 전달한 HTTPS 지원 APK 또는 디버그 빌드를 사용하세요. [보호자 릴리스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases) · [디버그 빌드 방법](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent#시작하기) |
 | 기관 관리자·보호자 계정 | 두 계정의 비밀번호는 심사 안내와 함께 별도로 전달합니다. [서버 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database) |
 
