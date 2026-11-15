@@ -83,12 +83,13 @@ flowchart TD
 
 #### 시연용 로그인 계정
 
-| 로그인할 곳 | 이메일 |
-| --- | --- |
-| 기관 관리자 · Swagger (`ADMIN_WEB`) | `orgs@example.com` |
-| 보호자 앱 · 김하늘 보호자 | `pickup-judge@example.com` |
+| 로그인할 곳 | 이메일 | 비밀번호
+| --- | --- | --- |
+| 기관 관리자 · Swagger (`ADMIN_WEB`) | `orgs@example.com` | Bs319zuUd6NWIYno-MYJZFCd |
+| 보호자 앱 · 김하늘 보호자 | `pickup-judge@example.com` | htAFvYHHLXhYRniZkxtsyg |
 
-두 시연 계정의 비밀번호는 참가팀의 심사 안내에서 확인하세요. 차량 연결 코드는 아래 절차에서 별도로 발급합니다.
+차량 연결 코드는 아래 절차에서 별도로 발급합니다.
+시연 테스트를 위해 이메일 주소 및 비밀번호를 readme에 공개 추가해 두었으며 악용을 금합니다.
 
 [시연 서버 연결 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database)
 
