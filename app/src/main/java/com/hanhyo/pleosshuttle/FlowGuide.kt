@@ -46,7 +46,7 @@ internal fun nextFlowGuide(
             val reviewed = boardingReviewed && trip.onboardChildren.isNotEmpty()
             when {
                 child == null && trip.onboardChildren.isEmpty() -> FlowGuide("선생님", "탑승한 어린이 없음", "모두 미탑승 확인", NO_RIDERS_TAG)
-                child == null -> FlowGuide("선생님", "운행 시작", "방문 순서는 자동 계산", "start-trip")
+                child == null -> FlowGuide("선생님", "운행 시작", "방문 순서는 기관이 정한 순서", "start-trip")
                 // V-02: 탑승 마침 뒤 탑승 기록이 없는 아이마다 선생님이 미탑승을 확인한다. 미탑승 예정 아이는 처음부터 미탑승 확인이 먼저.
                 reviewed -> FlowGuide("선생님", "미탑승 확인", "탑승 기록 없는 어린이", "not-boarded-${child.id}", confirmingRemaining = true)
                 !child.expectedToBoard -> FlowGuide("선생님", "미탑승 확인", "오늘 미탑승 예정", "not-boarded-${child.id}")

@@ -110,7 +110,8 @@ class TripTrackingService : Service() {
                 }
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        connection.reportTracking(current, true, fix, navigation) {
+                        // 차량 상태(속도·기어)는 DriveStateObserver 관측이 신선할 때만 함께 보낸다.
+                        connection.reportTracking(current, true, fix, navigation, vehicleSample(drive?.current, System.currentTimeMillis())) {
                             val latest = runCatching { store.load() }.getOrNull()
                             prefs.getBoolean("trackingEnabled", false) && latest != null && active(latest) &&
                                 latest.routeVersion == current.routeVersion && latest.currentStopIndex == current.currentStopIndex

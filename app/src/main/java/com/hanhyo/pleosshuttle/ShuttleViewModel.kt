@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -54,6 +55,10 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
     val audio = LocalAudioAdapter(application) { audioState = it }
     private var lastSaved: TripState? = null
     private val institution = InstitutionConnection(application)
+    // 연결 해제 판단용 미전송 수(아래 refreshUnsentRecords). init의 publish()보다 먼저 초기화되어야 해서 여기 둔다.
+    private var unsentEvents by mutableIntStateOf(0)
+    private var unsentSteps by mutableIntStateOf(0)
+    private var unsentKey: List<Any?>? = null
     val institutionBase get() = institution.base
     var institutionDirection by mutableStateOf(institution.direction); private set
     /** 화면 표시용 운행 방향(등원/하원). 운행에 저장된 방향(TripState.direction, 이전 저장 파일은 하원)을 읽는다. */
@@ -232,6 +237,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         updateTrackingService()
         refreshConsoleDrive()
         DriveFocusController.update(getApplication(), trip)
+        refreshUnsentRecords()
         if (foreground && storageError == null) syncInstitution()
     }
 
@@ -266,10 +272,76 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             try {
                 withContext(Dispatchers.IO) { institution.pair(address, code) }
                 institutionName = institution.name; institutionConnected = true
+                refreshUnsentRecords(force = true)
                 institutionStatus = "차량 연결 완료 · 오늘 운행을 불러와 주세요."
             } catch (e: Exception) { institutionStatus = e.message ?: "차량 연결 실패" }
             finally { institutionBusy = false }
         }
+    }
+
+    /**
+     * 서버로 아직 안 보낸 원장 이벤트 + 단계 기록 수. prefs를 읽으므로 다시 그릴 때마다 계산하지 않고,
+     * 운행 기록이 바뀌었을 때(publish)·동기화가 끝났을 때·연결이 바뀌었을 때만 [refreshUnsentRecords]로 갱신한다.
+     */
+    private fun refreshUnsentRecords(force: Boolean = false) {
+        val key = listOf(institutionConnected, trip.tripId, trip.phase, trip.currentStopIndex, trip.ledger.size, trip.excludedStops, trip.routeOrder)
+        if (!force && key == unsentKey) return
+        unsentKey = key
+        unsentEvents = runCatching { institution.pending(trip) }.getOrDefault(0)
+        unsentSteps = runCatching { institution.unsentLifecycle(trip) }.getOrDefault(0)
+    }
+    /** [차량 연결 해제]를 막을 이유(없으면 null). 운행 바꾸기와 같은 기준 + 미전송 이벤트·단계 기록·저장 오류·통신 중(InstitutionTrips.disconnectBlocker). */
+    val disconnectBlocker: String? get() = InstitutionTrips.disconnectBlocker(disconnectState())
+    private fun disconnectState() = InstitutionTrips.DisconnectState(institutionConnected, trip.hasTrip, trip.phase,
+        trip.ledger.isEmpty(), trip.onboardChildren.isEmpty(), unsentEvents, unsentSteps, institutionBusy || syncing, storageError != null)
+
+    /**
+     * 차량 연결 해제. 서버 revoke가 성공하거나 401(이미 폐기·무효)이면 로컬 연결 정보와 운행 바인딩을 지우고
+     * "운행 없음 · 기관 연결 전"으로 돌아간다. 네트워크 오류·다른 서버 오류는 로컬을 그대로 두고 오류를 보여 준다.
+     */
+    fun disconnectInstitution() {
+        refreshUnsentRecords(force = true)
+        disconnectBlocker?.let { institutionStatus = it; return }
+        institutionBusy = true
+        viewModelScope.launch {
+            val result = try { withContext(Dispatchers.IO) { institution.revoke() } } catch (e: Exception) {
+                institutionStatus = "연결 해제 실패 · 연결 정보는 그대로예요: ${e.message ?: "서버 연결 실패"}"
+                institutionBusy = false
+                return@launch
+            }
+            // 서버 쪽은 이미 해제됐다. 여기서 실패하면 실제 상태(서버 해제 · 기기 정리 실패)대로 알린다. 다시 누르면 401로 로컬만 정리한다.
+            val note = try { resetAfterDisconnect() } catch (e: Exception) {
+                institutionStatus = "서버 연결은 해제됐어요 · 기기 정리에 실패했어요, 다시 눌러 주세요. (${e.javaClass.simpleName})"
+                institutionBusy = false
+                refreshUnsentRecords(force = true)
+                return@launch
+            }
+            institutionStatus = (if (result == RevokeResult.ALREADY_REVOKED) "서버에서 이미 해제된 연결이에요. 이 기기의 연결 정보를 지웠어요. 다시 쓰려면 새 연결 코드로 연결해 주세요."
+                else "차량 연결을 해제했어요. 다시 쓰려면 새 연결 코드로 연결해 주세요.") + (note?.let { " · $it" } ?: "")
+            institutionBusy = false
+        }
+    }
+    /** 로컬 연결 정보를 지우고 운행 없음으로 돌아간다. 운행 파일 보관에 실패하면 파일을 지우지 않고 그 사실을 돌려준다(문구에 붙임). */
+    private fun resetAfterDisconnect(): String? {
+        institution.clearLocal()
+        if (ConsoleDriveRunner.running) ConsoleDriveRunner.stop()
+        trackingEnabled = false
+        trackingPrefs.edit().putBoolean("trackingEnabled", false).commit()
+        var note: String? = null
+        if (trip.hasTrip) {
+            // 운행 준비 중(기록 없음)이거나 끝난 운행만 여기 온다. 보관 폴더에 사본을 남긴 뒤에만 진행 중 파일을 지운다.
+            val archived = runCatching { store.archiveSnapshot(trip) }.isSuccess
+            note = if (!archived) "운행 기록 보관에 실패해 기기의 운행 파일은 지우지 않았어요"
+                else if (runCatching { store.clear() }.isFailure) "기기의 운행 파일을 지우지 못했어요" else null
+        }
+        audio.stopSpeech()
+        engine = ShuttleEngine(); lastSaved = null
+        tripChoices = emptyList(); guardianCalls = emptyMap(); pendingPrepare = false; pendingPrepareTripId = null
+        institutionConnected = false; institutionName = institution.name
+        trackingGeneration++
+        publish()
+        refreshUnsentRecords(force = true)
+        return note
     }
 
     fun chooseInstitutionDirection(direction: String) {
@@ -352,6 +424,13 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
         val fix = if (console || !enabled || !foreground || trip.phase !in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING)) null
             else realNavi?.trackingLocation?.takeIf { it.valid(System.currentTimeMillis()) }
         val navigation = if (fix != null && trip.integrationMode == IntegrationMode.SDK) realNavi?.trackingNavigation else null
+        // 위치와 함께 보낼 차량 상태: SDK 관측이 둘 다 신선할 때만(SdkObservation.isFresh: 관측 시각 5초 이내 · TARGET_OBSERVED).
+        // UNVERIFIED·오래된 값은 보내지 않는다. 신선도 기준 시각은 둘 중 오래된 관측 시각이다.
+        val sampleAt = System.currentTimeMillis()
+        val speedObs = sdkVehicle.speedMetersPerSecond; val gearObs = sdkVehicle.gear
+        val vehicle = if (fix == null || !sdkVehicle.connected || !speedObs.isFresh(sampleAt) || !gearObs.isFresh(sampleAt)) null
+            else vehicleSample(DriveObservation(speedObs.value?.toDouble(), gearObs.value.toGear(), null,
+                minOf(speedObs.observedAtMillis!!, gearObs.observedAtMillis!!)), sampleAt)
         val active = snapshot.phase in listOf(TripPhase.DRIVING, TripPhase.ALIGHTING)
         viewModelScope.launch {
             try {
@@ -361,7 +440,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
                     val sent = institution.sync(snapshot)
                     if (!console && !(enabled && TripTrackingService.running && active)) {
                         // 위치 서비스 대신 보고할 때도 Pleos 내비 예상 시간을 함께 보낸다(SDK 운행).
-                        reportedHere = institution.reportTracking(snapshot, enabled, fix, navigation, stillCurrent = { generation == trackingGeneration })
+                        reportedHere = institution.reportTracking(snapshot, enabled, fix, navigation, vehicle, stillCurrent = { generation == trackingGeneration })
                     }
                     sent
                 }
@@ -375,6 +454,7 @@ class ShuttleViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) { trackingStatus = "위치 전송 실패 · 보호자 화면은 갱신 지연으로 전환"; institutionStatus = "기기 기록 유지 · 전송 대기 ${institution.pending(snapshot)}건: ${e.message ?: "연결 실패"}" }
             finally {
                 syncing = false
+                refreshUnsentRecords(force = true)
                 nextSyncAt = if (generation != trackingGeneration) 0 else System.currentTimeMillis() + 5000
                 // 동기화 중에 눌린 운행 준비를 이어서 한다(미전송이 남았으면 그때 거절 안내).
                 if (pendingPrepare) { val id = pendingPrepareTripId; pendingPrepare = false; pendingPrepareTripId = null; loadInstitutionTrip(id) }

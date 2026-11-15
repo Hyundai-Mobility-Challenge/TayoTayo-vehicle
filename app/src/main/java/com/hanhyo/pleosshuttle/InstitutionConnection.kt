@@ -3,6 +3,7 @@ package com.hanhyo.pleosshuttle
 import android.content.Context
 import com.hanhyo.pleosshuttle.domain.*
 import com.hanhyo.shuttle.net.Api
+import com.hanhyo.shuttle.net.ApiFailure
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
@@ -27,10 +28,32 @@ class InstitutionConnection(context: Context) {
         val server = Api.base(address, BuildConfig.DEBUG)
         val installId = prefs.getString("installId", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("installId", it).commit() }
         val value = Api.request(server, "/api/v1/vehicle/pair", data = JSONObject().put("code", code.trim())
-            .put("installId", installId).put("appVersion", BuildConfig.VERSION_NAME).put("pleosSdkVersion", "unknown"))
+            .put("installId", installId).put("appVersion", BuildConfig.VERSION_NAME).put("pleosSdkVersion", InstitutionTrips.pleosSdkVersion(BuildConfig.PLEOS_VEHICLE_SDK, BuildConfig.PLEOS_NAVI_SDK, BuildConfig.PLEOS_TTS_SDK)))
         check(prefs.edit().putString("base", server).putString("credential", value.getString("vehicleCredential"))
             .putString("vehicleId", value.optString("vehicleId")).putString("orgId", value.optString("orgId"))
             .putString("name", value.optString("vehicleName").trim()).remove("token").commit())
+    }
+
+    /**
+     * 차량 연결 해제(서버 VehicleManagementController.revoke: X-Vehicle-Credential의 기기 자격 증명에 revoked_at 기록).
+     * 서버가 401이면 이 자격 증명은 이미 폐기됐거나 서버가 모르는 것이다(모든 차량 API가 같은 검사로 401). 더 쓸 수 없으므로
+     * [RevokeResult.ALREADY_REVOKED]로 알리고 호출부가 로컬 연결 정보를 지운다. 네트워크 오류·다른 서버 오류는 예외로 올린다.
+     */
+    fun revoke(): RevokeResult = try {
+        call("/api/v1/vehicle/session/revoke", JSONObject(), "POST"); RevokeResult.REVOKED
+    } catch (e: ApiFailure) {
+        if (InstitutionTrips.revokeClearsLocal(e.status)) RevokeResult.ALREADY_REVOKED else throw e
+    }
+
+    /**
+     * 로컬 연결 정보를 지운다: 자격 증명·차량·기관 id·차량 이름·운행 바인딩·전송 기록 키("<운행>:<키>", "sentEvents:<운행>").
+     * 서버 주소·설치 id(installId)·고른 운행 방향은 다시 연결할 때 쓰려고 남긴다.
+     */
+    fun clearLocal() {
+        lastGuardianCalls = emptyMap()
+        val edit = prefs.edit()
+        InstitutionTrips.connectionKeysToClear(prefs.all.keys).forEach { edit.remove(it) }
+        check(edit.commit())
     }
 
     /** Trips are created by the organization web/API. The vehicle app selects today's prepared trip. */
@@ -109,6 +132,9 @@ class InstitutionConnection(context: Context) {
     fun recover(trip: TripState) { if (prefs.getString("pendingTrip", null) == trip.tripId) bind(trip) }
     private fun sentEventIds(tripId: String) = InstitutionTrips.sentEventIds(tripId, prefs.all)
     fun pending(trip: TripState): Int = if (trip.tripId != boundTrip) 0 else InstitutionTrips.pendingCount(trip.ledger, sentEventIds(trip.tripId))
+    /** 지금 운행 단계에서 보냈어야 하는데 아직 서버에 가지 않은 단계 기록 수(sync와 같은 키 규칙, InstitutionTrips.lifecycleSteps). */
+    fun unsentLifecycle(trip: TripState): Int = if (!connected || trip.tripId != boundTrip) 0
+        else InstitutionTrips.unsentLifecycleKeys(trip) { key -> prefs.getBoolean("$boundTrip:$key", false) }.size
 
     companion object {
         private val reportingLock = Any()
@@ -119,10 +145,12 @@ class InstitutionConnection(context: Context) {
      * [TrackingReport.eta] = [EtaReport.FAILED]로만 알린다. 같은 예상 시간 관측은 다시 보내지 않으며, 보낸 키는 성공했을 때만 기억한다.
      */
     fun reportTracking(trip: TripState, enabled: Boolean, fix: TrackingLocation?, navigation: TrackingNavigation? = null,
-                       stillCurrent: () -> Boolean = { true }): TrackingReport = synchronized(reportingLock) {
+                       vehicle: VehicleSample? = null, stillCurrent: () -> Boolean = { true }): TrackingReport = synchronized(reportingLock) {
         if (!connected || trip.tripId != boundTrip || !stillCurrent() || fix == null) return@synchronized TrackingReport(locationSent = false)
         val body = JSONObject().put("samples", JSONArray().put(JSONObject().put("recordedAt", Instant.ofEpochMilli(fix.receivedAt).toString())
-            .put("latitude", fix.latitude).put("longitude", fix.longitude).put("source", if (fix.simulated) "SIMULATED" else "PLEOS")))
+            .put("latitude", fix.latitude).put("longitude", fix.longitude).put("source", if (fix.simulated) "SIMULATED" else "PLEOS")
+            // 차량 상태는 신선한 관측이 있을 때만(vehicleSample). 방향·정확도는 관측 출처가 없어 넣지 않는다.
+            .apply { vehicle?.let { put("speedKph", it.speedKph).put("gear", it.gear) } }))
         call("/api/v1/vehicle/trips/${trip.tripId}/locations", body)
         // 내비 남은 시간 → 서버 eta-snapshots(VehicleTelemetryController.eta). 서버는 tripStopId가 있는 항목으로
         // trip_stops.eta_remaining_sec/m를 갱신하고, 보호자 앱·공유 링크가 그 값을 읽는다.
@@ -162,30 +190,11 @@ class InstitutionConnection(context: Context) {
             if (!sent("start")) lifecycle("start", "/start")
         }
 
-        val localStops = trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }
-        for (i in localStops.indices) {
-            val stopId = localStops[i].id
-            val serverId = stopId
-            val key = "stop-$serverId"
-            if (trip.phase == TripPhase.ALIGHTING && trip.currentStop?.id == stopId) lifecycle("$key-arrive", "/stops/$serverId/arrive")
-            if (trip.currentStopIndex > i || trip.phase in listOf(TripPhase.END_REVIEW, TripPhase.ENDED)) {
-                if (!sent("$key-arrive")) lifecycle("$key-arrive", "/stops/$serverId/arrive")
-                lifecycle("$key-complete", "/stops/$serverId/complete")
-            }
-        }
-        // V-09·D17: 선생님이 뺀 정류장은 복귀(종료 확인) 뒤에만 서버에 skip으로 알린다. 서버 skip은 되돌릴 수 없고
-        // (TripController.skip: PENDING/ARRIVED → SKIPPED, 되돌리는 API 없음) 운행 중에는 자동 재포함(D17)이 가능하므로
-        // 더 이상 다시 넣을 수 없는 시점까지 기다린다. 서버 /complete는 COMPLETED·SKIPPED가 아닌 정류장이 있으면 거절한다.
-        for (stopId in InstitutionTrips.stopsToSkip(trip)) lifecycle("stop-$stopId-skip", "/stops/$stopId/skip")
-        // 등원(V-29)은 기관 도착이 종착이라 "복귀 중"(RETURNING)을 보내지 않는다. 서버 /complete는 IN_PROGRESS도 받는다.
-        val sendReturn = !trip.isPickup
-        if (trip.phase == TripPhase.END_REVIEW && sendReturn) {
-            lifecycle("return", "/return")
-        }
-        if (trip.phase == TripPhase.ENDED) {
-            if (sendReturn) lifecycle("return", "/return")
-            lifecycle("interior", "/interior-check", JSONObject().put("checked", true))
-            lifecycle("complete", "/complete")
+        // 정류장 도착·완료 → 뺀 정류장 skip → 복귀 → 실내 확인 → 완료. 보낼 키와 순서는 InstitutionTrips.lifecycleSteps 한곳에서 정한다
+        // (연결 해제 판단 disconnectBlocker도 같은 규칙으로 "아직 안 보낸 단계 기록"을 센다). start는 위에서 서버 상태에 맞춰 보냈다.
+        for (step in InstitutionTrips.lifecycleSteps(trip)) {
+            if (step.key == InstitutionTrips.START_KEY) continue
+            lifecycle(step.key, step.path, if (step.checkedBody) JSONObject().put("checked", true) else null)
         }
 
         val sentEvents = sentEventIds(trip.tripId).toMutableSet()
@@ -196,20 +205,28 @@ class InstitutionConnection(context: Context) {
             val eventType = InstitutionTrips.ledgerEventType(entry)
             val body = JSONObject().put("tripChildId", entry.childId).put("tripStopId", stopByChild[entry.childId])
             InstitutionTrips.eventPayload(entry).takeIf { it.isNotEmpty() }?.let { body.put("payload", JSONObject(it)) }
-            Triple(entry.id, eventType, body)
+            Triple(entry.id, eventType, body) to entry.childId
         }
-        val handovers = trip.handoverChildIds.map { id -> Triple("handover-$id", "CHILD_HANDED_OVER", JSONObject().put("tripChildId", id).put("tripStopId", stopByChild[id])) }
-        for ((key, type, body) in ledgerRows + handovers) {
-            if (key in sentEvents) continue
+        val handovers = trip.handoverChildIds.map { id -> Triple("handover-$id", "CHILD_HANDED_OVER", JSONObject().put("tripChildId", id).put("tripStopId", stopByChild[id])) to id }
+        val pending = (ledgerRows + handovers).filter { (row, _) -> row.first !in sentEvents }.map { (row, childId) ->
+            val (key, type, body) = row
             body.put("clientEventId", UUID.nameUUIDFromBytes("${trip.tripId}:$key".toByteArray()).toString())
                 .put("eventType", type).put("occurredAt", Instant.now().toString())
             if (type == "CHILD_NOT_BOARDED") body.put("reason", "OTHER")
-            // V-28: 보호자 호출은 guardian-calls로 실제 알림을 열고(서버가 열린 호출이 있으면 그 호출을 돌려줘 중복 알림 없음),
-            // 같은 원장 항목을 GUARDIAN_CALL_REQUESTED 이벤트로도 남긴다. 둘 다 성공해야 전송 완료로 표시한다.
-            guardianCalls[key]?.let { (path, callBody) -> call(path, JSONObject(callBody)) }
-            call("$prefix/events", body)
-            sentEvents.add(key); check(prefs.edit().putStringSet(InstitutionTrips.sentEventsKey(trip.tripId), sentEvents.toSet()).commit()); count++
+            PendingEvent(key, type, childId.takeIf { it.isNotBlank() }, body, guardianCall = key in guardianCalls)
         }
+        // 묶음 나누기·보호자 호출 순서·응답 해석·실패 대체는 InstitutionTrips.sendPendingEvents(단위 테스트 대상)가 정한다.
+        InstitutionTrips.sendPendingEvents(pending, EventTransport(
+            guardianCall = { item -> guardianCalls[item.key]?.let { (path, callBody) -> call(path, JSONObject(callBody)) } },
+            single = { item -> call("$prefix/events", item.body) },
+            batch = { items ->
+                val response = call("$prefix/events/batch", JSONObject().put("events", JSONArray().apply { items.forEach { put(it.body) } }))
+                if (response.has("acceptedCount")) response.optInt("acceptedCount", -1) else null
+            },
+            markSent = { keys ->
+                sentEvents.addAll(keys); check(prefs.edit().putStringSet(InstitutionTrips.sentEventsKey(trip.tripId), sentEvents.toSet()).commit()); count += keys.size
+            },
+        ))
         return count
     }
 }
@@ -219,6 +236,21 @@ class InstitutionConnection(context: Context) {
 data class TripOption(val id: String, val status: String, val stopNames: List<String>, val childCount: Int, val expectedCount: Int) {
     val inProgress get() = status == "IN_PROGRESS" || status == "RETURNING"
 }
+
+/** sync가 보내는 운행 단계 기록 하나. [checkedBody]면 {"checked": true}를 함께 보낸다. */
+data class LifecycleStep(val key: String, val path: String, val checkedBody: Boolean = false)
+/** 미전송 원장 이벤트 하나. [body]는 실제 전송 본문(앱에서는 JSONObject). [guardianCall]이면 보내기 전에 보호자 호출을 연다. */
+data class PendingEvent<B>(val key: String, val type: String, val childId: String?, val body: B, val guardianCall: Boolean = false)
+/** 이벤트 전송 수단. batch는 서버 acceptedCount(없으면 null)를 돌려준다. 실패는 예외(HTTP 오류는 ApiFailure). */
+class EventTransport<B>(
+    val guardianCall: (PendingEvent<B>) -> Unit,
+    val single: (PendingEvent<B>) -> Unit,
+    val batch: (List<PendingEvent<B>>) -> Int?,
+    val markSent: (List<String>) -> Unit,
+)
+
+/** 차량 연결 해제 결과. ALREADY_REVOKED = 서버가 401(이미 폐기·무효)로 답해 로컬만 지움. */
+enum class RevokeResult { REVOKED, ALREADY_REVOKED }
 
 /** 예상 시간(eta-snapshots) 전송 결과. NOT_AVAILABLE = 보낼 내비 관측 없음, UNCHANGED = 이미 보낸 관측과 같아 보내지 않음. */
 enum class EtaReport { NOT_AVAILABLE, SENT, UNCHANGED, FAILED }
@@ -247,6 +279,7 @@ internal object InstitutionTrips {
      * - 각 항목은 남은 방문 순서의 정류장([navigationWaypoints])과 좌표가 일치할 때만 tripStopId를 단다.
      *   (NavigationTracking.snapshot이 정규화한 좌표는 등록 정류장 좌표와 같다.) 일치가 없으면 null.
      * - routeRevisionNo: 서버 운행 응답에 서버 노선 개정 번호가 없어 차량의 [TripState.routeVersion]을 보낸다(서버는 저장만 함).
+     * - 정차·하차 중(ALIGHTING)이면 현재 정류장(이미 도착) 항목은 뺀다. 남는 항목이 없으면 보내지 않는다(null).
      */
     fun etaSnapshot(trip: TripState, nav: TrackingNavigation?, simulated: Boolean): EtaSnapshot? {
         if (nav == null || nav.state != "READY") return null
@@ -256,14 +289,165 @@ internal object InstitutionTrips {
         }
         if (points.isEmpty()) return null
         val candidates = navigationWaypoints(trip)
-        val entries = points.mapIndexed { i, p ->
-            val stop = candidates.firstOrNull { kotlin.math.abs(it.latitude - p.latitude) < 0.00001 && kotlin.math.abs(it.longitude - p.longitude) < 0.00001 }
+        // 정차·하차 중(ALIGHTING)인 현재 정류장은 이미 도착했다. 그 정류장 항목은 보내지 않는다(보호자 화면에 "곧 도착"이 다시 뜨지 않게).
+        val arrived = trip.currentStop?.takeIf { trip.phase == TripPhase.ALIGHTING }
+        fun same(stop: Stop, p: NavigationStopEta) = kotlin.math.abs(stop.latitude - p.latitude) < 0.00001 && kotlin.math.abs(stop.longitude - p.longitude) < 0.00001
+        val entries = points.mapIndexedNotNull { i, p ->
+            val stop = candidates.firstOrNull { same(it, p) }
+            if (arrived != null && (stop?.id == arrived.id || (stop == null && same(arrived, p)))) return@mapIndexedNotNull null
             EtaEntry(i, if (i == points.lastIndex) "DESTINATION" else "WAYPOINT", stop?.id?.toLongOrNull(),
                 p.latitude, p.longitude, p.seconds, p.meters)
         }
+        if (entries.isEmpty()) return null
         return EtaSnapshot(trip.routeVersion.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt(), nav.routeId?.take(100),
             points.first().receivedAt, simulated, entries)
     }
+
+    /** 연결 해제 때 지울 로컬 키. 서버 주소(base)·installId·direction은 남긴다. */
+    fun connectionKeysToClear(keys: Collection<String>): List<String> = keys.filter { key ->
+        key in setOf("credential", "token", "vehicleId", "orgId", "name", "trip", "pendingTrip") || ':' in key
+    }
+    /** revoke 실패 상태 중 로컬을 지워도 되는 경우: 401(자격 증명 폐기됨·무효 → 어떤 차량 API도 더 쓸 수 없음). */
+    fun revokeClearsLocal(status: Int): Boolean = status == 401
+    /** 연결 해제 판단에 쓰는 운행·기록 상태. [unsentSteps]는 아직 안 보낸 단계 기록(start·정류장·복귀·완료 등) 수. */
+    data class DisconnectState(
+        val connected: Boolean, val hasTrip: Boolean, val phase: TripPhase, val ledgerEmpty: Boolean, val onboardEmpty: Boolean,
+        val pendingEvents: Int, val unsentSteps: Int, val busy: Boolean, val storageError: Boolean,
+    )
+    /**
+     * [차량 연결 해제]를 막을 이유. null이면 해제해도 된다.
+     * 운행 바꾸기와 같은 기준(ShuttleViewModel.canReplaceInstitutionTrip)으로, 운행이 없거나 · 끝났거나 · 기록 없는 운행 준비일 때만 허용한다.
+     * 저장 오류, 서버 통신 중, 아직 안 보낸 원장 이벤트·단계 기록(예: 종료했는데 /complete 미전송)이 있으면 막는다.
+     */
+    fun disconnectBlocker(s: DisconnectState): String? = when {
+        !s.connected -> "연결된 차량이 없어요."
+        s.storageError -> "운행 저장 오류가 있어요. 오류를 먼저 확인해 주세요."
+        s.busy -> "서버와 기록을 주고받는 중이에요. 잠시 뒤 다시 시도해 주세요."
+        s.hasTrip && s.phase != TripPhase.ENDED && !(s.phase == TripPhase.PREPARING && s.ledgerEmpty && s.onboardEmpty) ->
+            if (s.phase == TripPhase.PREPARING) "운행 준비 중 기록이 있어요. 운행을 마친 뒤 해제해 주세요." else "진행 중인 운행이 있어요. 운행을 마친 뒤 해제해 주세요."
+        s.pendingEvents + s.unsentSteps > 0 -> "서버로 보내지 않은 기록 ${s.pendingEvents + s.unsentSteps}건이 있어요. [기록 전송 재시도]로 보낸 뒤 해제해 주세요."
+        else -> null
+    }
+
+    const val START_KEY = "start"
+    /**
+     * sync가 운행 단계에 따라 보내는 단계 기록(키 · 경로)과 그 순서. sync와 연결 해제 판단(unsentLifecycleKeys)이 같이 쓴다.
+     * - 출발 뒤(운행 준비가 아님): start. checklist는 서버가 아직 PREPARING일 때만 보내므로 여기 넣지 않는다.
+     * - 방문 순서의 정류장: 정차 중인 지금 정류장은 arrive, 지난 정류장(복귀·종료 뒤에는 전부)은 arrive와 complete.
+     * - 복귀·종료 뒤 뺀 정류장: skip. 하원 복귀(END_REVIEW·ENDED): return. 종료(ENDED): interior-check, complete.
+     */
+    fun lifecycleSteps(trip: TripState): List<LifecycleStep> = buildList {
+        if (!trip.hasTrip) return@buildList
+        if (trip.phase != TripPhase.PREPARING) add(LifecycleStep(START_KEY, "/start"))
+        val finished = trip.phase == TripPhase.END_REVIEW || trip.phase == TripPhase.ENDED
+        trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }.forEachIndexed { i, stop ->
+            val key = "stop-${stop.id}"
+            if (trip.phase == TripPhase.ALIGHTING && trip.currentStop?.id == stop.id) add(LifecycleStep("$key-arrive", "/stops/${stop.id}/arrive"))
+            if (trip.currentStopIndex > i || finished) {
+                add(LifecycleStep("$key-arrive", "/stops/${stop.id}/arrive"))
+                add(LifecycleStep("$key-complete", "/stops/${stop.id}/complete"))
+            }
+        }
+        stopsToSkip(trip).forEach { add(LifecycleStep("stop-$it-skip", "/stops/$it/skip")) }
+        // 등원(V-29)은 기관 도착이 종착이라 "복귀 중"(RETURNING)을 보내지 않는다. 서버 /complete는 IN_PROGRESS도 받는다.
+        if (finished && !trip.isPickup) add(LifecycleStep("return", "/return"))
+        if (trip.phase == TripPhase.ENDED) {
+            add(LifecycleStep("interior", "/interior-check", checkedBody = true))
+            add(LifecycleStep("complete", "/complete"))
+        }
+    }.distinctBy { it.key }
+    /** 지금 단계에서 보냈어야 하는데 아직 서버에 가지 않은 단계 기록 키. [sent]는 "<운행>:<키>" 전송 표시 조회. */
+    fun unsentLifecycleKeys(trip: TripState, sent: (String) -> Boolean): List<String> = lifecycleSteps(trip).map { it.key }.filterNot(sent)
+
+    /** 서버 TripController.event에서 푸시(notifyChildDroppedOff)를 동기로 보내는 이벤트. 묶음이 롤백돼도 푸시는 이미 나가므로 묶음에 넣지 않고 한 건씩 보낸다. */
+    val PUSH_EVENT_TYPES = setOf("CHILD_DROPPED_OFF", "CHILD_RECEIVED_BY_ORG")
+    /** 서버 TripController.event에서 그 아이의 보호자 호출을 닫는(closeGuardianCallsForChild) 이벤트. */
+    val CLOSES_GUARDIAN_CALL_TYPES = setOf("CHILD_BOARDED", "CHILD_NOT_BOARDED", "TEACHER_CONFIRMED_NOT_BOARDED", "GUARDIAN_NO_SHOW")
+    fun sendsPushOnServer(type: String): Boolean = type in PUSH_EVENT_TYPES
+
+    /**
+     * 미전송 이벤트를 보낼 묶음으로 나눈다(원래 순서 유지).
+     * - 푸시를 일으키는 이벤트([PUSH_EVENT_TYPES])는 혼자 한 묶음(단건 전송).
+     * - 보호자 호출이 붙은 이벤트 앞에, 같은 묶음 안에 같은 아이의 호출을 닫는 이벤트가 있으면 거기서 끊는다
+     *   (묶음은 보호자 호출을 먼저 보내므로, 끊지 않으면 방금 연 호출이 앞 이벤트에 닫힌다).
+     * - 한 묶음은 최대 [max]건.
+     */
+    fun <B> eventSegments(items: List<PendingEvent<B>>, max: Int = EVENT_BATCH_MAX): List<List<PendingEvent<B>>> {
+        val out = mutableListOf<List<PendingEvent<B>>>()
+        var current = mutableListOf<PendingEvent<B>>()
+        fun flush() { if (current.isNotEmpty()) { out += current; current = mutableListOf() } }
+        for (item in items) {
+            if (sendsPushOnServer(item.type)) { flush(); out += listOf(item); continue }
+            val closesBefore = item.guardianCall && item.childId != null &&
+                current.any { it.childId == item.childId && it.type in CLOSES_GUARDIAN_CALL_TYPES }
+            if (closesBefore || current.size >= max.coerceAtLeast(1)) flush()
+            current += item
+        }
+        flush()
+        return out
+    }
+
+    /**
+     * 미전송 이벤트 전송. 묶음마다 보호자 호출(guardian-calls)을 먼저 개별로 보내고(기존 순서), 1건이면 /events, 여러 건이면 /events/batch.
+     * - 보호자 호출이 실패하면 그 앞 이벤트까지만 보내고 실패를 알린다(나머지는 다음 동기화).
+     * - batch는 acceptedCount가 보낸 건수와 같을 때만 전송 완료로 표시한다([batchAcceptedKeys]). 아니면 표시하지 않고 실패를 알린다.
+     * - batch가 HTTP 오류로 거절되면(서버는 묶음 전체를 롤백) 한 건씩 다시 보낸다. 401·403은 그대로 알린다([fallBackToSingleEvents]).
+     *   묶음에는 푸시 이벤트가 없으므로 다시 보내도 푸시가 두 번 가지 않는다.
+     */
+    fun <B> sendPendingEvents(items: List<PendingEvent<B>>, transport: EventTransport<B>) {
+        for (segment in eventSegments(items)) {
+            var ready = segment.size
+            var callFailure: Exception? = null
+            for ((index, item) in segment.withIndex()) {
+                if (!item.guardianCall) continue
+                try { transport.guardianCall(item) } catch (e: Exception) { ready = index; callFailure = e; break }
+            }
+            val sendable = segment.take(ready)
+            fun oneByOne() { for (item in sendable) { transport.single(item); transport.markSent(listOf(item.key)) } }
+            if (sendable.size == 1) oneByOne()
+            else if (sendable.size > 1) {
+                val acceptedCount = try { transport.batch(sendable) } catch (e: com.hanhyo.shuttle.net.ApiFailure) {
+                    if (!fallBackToSingleEvents(e.status)) throw e
+                    oneByOne(); null
+                }
+                // 대체 경로(oneByOne)는 이미 건별로 표시했고 acceptedCount는 null이다.
+                if (acceptedCount != null) {
+                    val accepted = batchAcceptedKeys(sendable.map { it.key }, acceptedCount)
+                    if (accepted.isEmpty()) error("이벤트 묶음 응답을 확인하지 못했습니다 · 다음 동기화 때 다시 보냅니다.")
+                    transport.markSent(accepted)
+                }
+            }
+            callFailure?.let { throw it }
+        }
+    }
+
+    /**
+     * 이벤트 묶음 크기. 서버 events/batch는 건수 제한이 없지만, 묶음 하나가 한 트랜잭션이라 실패하면 전체를 다시 보내야 하므로
+     * 요청 크기와 재전송량을 줄이려고 50건씩 나눈다.
+     */
+    const val EVENT_BATCH_MAX = 50
+    /**
+     * events/batch 응답 해석. 서버는 묶음 전체를 한 트랜잭션으로 처리하고(실패하면 전체 롤백 · 오류 응답), 성공하면
+     * 처리한 건수(acceptedCount, 중복 clientEventId 포함)만 돌려준다. 그래서 acceptedCount가 보낸 건수와 같을 때만
+     * 모두 전송 완료로 표시하고, 다르거나 없으면 아무것도 표시하지 않는다(다음 동기화 때 다시 보냄 · clientEventId로 멱등).
+     */
+    fun batchAcceptedKeys(sentKeys: List<String>, acceptedCount: Int?): List<String> =
+        if (acceptedCount != null && acceptedCount == sentKeys.size) sentKeys else emptyList()
+    /**
+     * 묶음이 HTTP 오류로 거절됐을 때 한 건씩 다시 보낼지. 특정 항목 때문에 거절된 요청 오류(4xx)만 한 건씩 보낸다.
+     * 인증·권한 오류(401·403)는 한 건씩 보내도 같고, 서버 오류(5xx)는 부하만 키우므로 다음 동기화로 미룬다.
+     */
+    fun fallBackToSingleEvents(status: Int): Boolean = status in 400..499 && status != 401 && status != 403
+
+    /** 서버 vehicle_devices.pleos_sdk_version 컬럼 길이(varchar(20)). 서버 pair는 길이를 검사하지 않아 넘으면 저장이 실패한다. */
+    const val PLEOS_SDK_VERSION_MAX = 20
+    /**
+     * 페어링 때 보내는 Pleos SDK 버전. "Vehicle 2.3.2; NaviHelper 3.0.5; TextToSpeech 3.3.1"은 51자라 컬럼(20자)에 맞지 않아
+     * 머리글자로 줄인 "V2.3.2;N3.0.5;T3.3.1"(20자)을 보낸다. 버전이 길어져 넘치면 TTS → Navi 순으로 빼고, 그래도 길면 자른다.
+     */
+    fun pleosSdkVersion(vehicle: String, navi: String, tts: String): String =
+        listOf("V$vehicle;N$navi;T$tts", "V$vehicle;N$navi", "V$vehicle").firstOrNull { it.length <= PLEOS_SDK_VERSION_MAX }
+            ?: "V$vehicle".take(PLEOS_SDK_VERSION_MAX)
 
     /** 같은 예상 시간 관측(운행·관측 시각·항목이 같은 키)은 다시 보내지 않는다. */
     fun shouldSendEta(key: String, lastSentKey: String?): Boolean = key != lastSentKey

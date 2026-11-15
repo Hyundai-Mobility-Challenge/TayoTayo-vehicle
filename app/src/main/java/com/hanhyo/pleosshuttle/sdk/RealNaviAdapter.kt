@@ -54,7 +54,7 @@ class RealNaviAdapter(context: Context, private val diagnosticsEnabled: Boolean 
     private var destination: DestinationInfo? = null
     private var destinationAt = 0L
     private var requestedAt = 0L
-    private var snapshot = NaviSnapshot(versions = mapOf("NaviHelper SDK" to "3.0.5", "Navi Service" to packageVersion("ai.pleos.playground.service.navi")))
+    private var snapshot = NaviSnapshot(versions = mapOf("NaviHelper SDK" to com.hanhyo.pleosshuttle.BuildConfig.PLEOS_NAVI_SDK, "Navi Service" to packageVersion("ai.pleos.playground.service.navi")))
     val current: NaviSnapshot get() = snapshot
 
     fun initialize() = onStart()

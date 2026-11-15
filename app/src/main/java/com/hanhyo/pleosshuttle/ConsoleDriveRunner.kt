@@ -31,6 +31,8 @@ object ConsoleDriveRunner {
     @Volatile var frame: ConsoleDriveFrame? = null; private set
     @Volatile var speedMps: Double? = null; private set
     @Volatile var gear: Gear = Gear.UNKNOWN; private set
+    /** [speedMps]·[gear]를 받은 시각(관측 또는 화면 힌트). 위치 표본의 차량 상태 신선도 판단에 쓴다. 없으면 0. */
+    @Volatile private var vehicleAt: Long = 0
     @Volatile var uploadStatus: String = "아직 전송하지 않음"; private set
     val running get() = drive.running
 
@@ -78,6 +80,7 @@ object ConsoleDriveRunner {
         val useHint = observed == null && hintSpeedMps != null && now - hintAt in 0..5_000
         speedMps = observed?.speedMps ?: if (useHint) hintSpeedMps else null
         gear = observed?.gear ?: if (useHint) hintGear else Gear.UNKNOWN
+        vehicleAt = observed?.receivedAt ?: if (useHint) hintAt else 0
         val next = drive.tick(current, speedMps, gear == Gear.DRIVE) ?: run { stop(); return }
         frame = next
         log("tick speed=${speedMps} gear=${gear} remain=${next.remainingMeters}m near=${next.nearTarget} src=${if (observed != null) "observer" else if (useHint) "hint" else "none"}")
@@ -105,7 +108,9 @@ object ConsoleDriveRunner {
                 // HTTP 자체에도 연결 7초·읽기 10초 제한이 있다(Api.request). 여기서 한 번 더 상한을 둔다.
                 withTimeout(UPLOAD_TIMEOUT_MS) {
                     withContext(Dispatchers.IO) {
-                        conn.reportTracking(current, true, fix, nav) { drive.tripId == current.tripId && drive.routeId == routeId }
+                        // 차량 상태는 Virtual Console에서 실제로 읽은 속도·기어가 신선할 때만 함께 보낸다.
+                        val vehicle = vehicleSample(DriveObservation(speedMps, gear, null, vehicleAt), System.currentTimeMillis())
+                        conn.reportTracking(current, true, fix, nav, vehicle) { drive.tripId == current.tripId && drive.routeId == routeId }
                     }
                 }
                 status("모의 위치 전송 · 실제 차량 위치 아님")

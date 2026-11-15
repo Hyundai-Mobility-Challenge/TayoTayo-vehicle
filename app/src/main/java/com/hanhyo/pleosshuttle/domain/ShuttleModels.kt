@@ -500,9 +500,26 @@ object StoredTrips {
      */
     fun restorable(saved: TripState?, boundTripId: String? = null, unsentRecords: Int = 0): TripState? {
         if (saved == null || !saved.hasTrip) return null
-        if (!isLegacySimulation(saved)) return saved
+        if (!isLegacySimulation(saved)) return serverOrder(saved)
         val boundWithUnsent = saved.integrationMode == IntegrationMode.SIMULATION && !boundTripId.isNullOrEmpty() &&
             saved.tripId == boundTripId && unsentRecords > 0
-        return if (boundWithUnsent) saved.copy(integrationMode = IntegrationMode.SDK) else null
+        return if (boundWithUnsent) serverOrder(saved.copy(integrationMode = IntegrationMode.SDK)) else null
+    }
+
+    /**
+     * 기관 운행은 서버 정류장 순서(seq)를 그대로 쓴다. 저장본이 "예시 순서"(routeIsExample)로 표시돼 있으면 [운행 시작] 때
+     * 앱이 순서를 자동 계산해 바꾸므로(ShuttleEngine.startOperationalTrip), 복원할 때 그 표시와 미리보기를 지운다.
+     * 차량에서 바꾼 순서는 서버로 전달되지 않기 때문이다(서버 route-revisions 차량 허용 후 재연결 예정).
+     */
+    fun serverOrder(trip: TripState): TripState {
+        val cleared = if (trip.routeIsExample || trip.routeProposal != null) trip.copy(routeIsExample = false, routeProposal = null) else trip
+        // 이전 빌드에서 순서를 바꿔 둔 운행 준비 저장본은 서버 정류장 순서(stops = seq 순)로 되돌린다. 뺀 정류장은 빼고 정규화한다.
+        // 출발 뒤에는 진행 위치(currentStopIndex)가 순서에 묶여 있어 바꾸지 않는다.
+        if (cleared.phase != TripPhase.PREPARING) return cleared
+        val server = cleared.stops.map { it.id }.filter { it !in cleared.excludedStops }
+        val reordered = if (server == cleared.routeOrder) cleared else cleared.copy(routeOrder = server, routeVersion = cleared.routeVersion + 1)
+        // 출발 전 순서(또는 예시 표시)가 바뀌었으면 기사 확인을 다시 받는다(ShuttleEngine.clearDriverCheckIfChanged와 같은 규칙).
+        val orderChanged = reordered.routeOrder != trip.routeOrder || trip.routeIsExample
+        return if (orderChanged && reordered.driverCheckedAtMillis != null) reordered.copy(driverCheckedAtMillis = null) else reordered
     }
 }

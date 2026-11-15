@@ -65,6 +65,17 @@ class StoredTripsTest {
         assertEquals(serverTrip(), StoredTrips.restorable(serverTrip(), boundTripId = null, unsentRecords = 0))
     }
 
+    @Test fun `기관 운행은 복원할 때 서버 정류장 순서로 고정되어 출발 때 순서를 다시 계산하지 않는다`() {
+        val example = serverTrip().copy(routeIsExample = true)
+        val restored = StoredTrips.restorable(example)!!
+        assertFalse(restored.routeIsExample)
+        assertEquals(example.routeOrder, restored.routeOrder)
+        val engine = ShuttleEngine(restored).also { it.updateVehicle(parked(), now) }
+        assertTrue(engine.board("child-a", now))
+        assertTrue(engine.startOperationalTrip(now))
+        assertEquals(example.routeOrder, engine.state.routeOrder) // RoutePlanner 자동 계산(forest → park → museum)이 적용되지 않음
+    }
+
     @Test fun `SIMULATION 상수로 저장된 운행도 역직렬화는 실패하지 않는다`() {
         val legacy = serverTrip().copy(integrationMode = IntegrationMode.SIMULATION)
         val bytes = ByteArrayOutputStream().also { out -> ObjectOutputStream(out).use { it.writeObject(legacy) } }.toByteArray()

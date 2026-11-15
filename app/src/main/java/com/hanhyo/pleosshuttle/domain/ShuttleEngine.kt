@@ -91,6 +91,7 @@ class ShuttleEngine(initial: TripState = NoTrip.state()) {
         lastMessage = "진행 중 운행을 복원했습니다. 센서와 확인 절차는 다시 확인합니다."
         return true
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun setRoutePolicy(objective: RouteObjective?, returnToOrigin: Boolean, now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("방문 순서 기준은 운행 준비에서 정합니다.")
         if (vehicle.connected && stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
@@ -252,7 +253,7 @@ class ShuttleEngine(initial: TripState = NoTrip.state()) {
         return true
     }
 
-    /** 뺀 정류장 다시 넣기(선생님). 운행 준비·정차 중에만. 지나온 지점 뒤 가장 가까운 위치에 넣는다. */
+    /** 뺀 정류장 다시 넣기(선생님). 운행 준비·정차 중에만. 고정 구간(지나온·정차 중인 지점) 뒤, 원래 서버 정류장 순서(seq) 자리에 넣는다. */
     fun includeStop(stopId: String, now: Long): Boolean {
         manualRouteBlockers(now).firstOrNull()?.let { return reject(it) }
         if (stopId !in state.excludedStops) return reject("뺀 정류장이 아닙니다.")
@@ -504,6 +505,8 @@ class ShuttleEngine(initial: TripState = NoTrip.state()) {
     }
     fun startOperationalTrip(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("이미 운행을 시작했습니다.")
+        // 예시 순서(routeIsExample)일 때만 자동 계산 순서를 적용한다. 기관 운행은 createTrip·복원(StoredTrips.serverOrder)에서
+        // routeIsExample=false라 서버 정류장 순서를 그대로 쓴다. 자동 계산은 서버 route-revisions 차량 허용 후 재연결 예정.
         if (state.routeIsExample) {
             if (!calculateRoute(now) || !applyRouteProposal(now)) return false
         }
@@ -692,11 +695,13 @@ class ShuttleEngine(initial: TripState = NoTrip.state()) {
             pickupAction = PickupActions.INSTITUTION_HANDOVER)
     }
 
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun previewRoute(proposal: RouteProposal): Boolean {
         if (state.phase != TripPhase.PREPARING || proposal.routeVersion != state.routeVersion) return reject("현재 운행 준비에 맞는 경로 계산이 아닙니다.")
         if (!validOrder(proposal.stopOrder)) return reject("승인된 지점 전체만 재정렬할 수 있습니다.")
         return update(state.copy(routeProposal = proposal), "합성 비용 계산 결과 미리보기. 적용 전 순서를 확인하세요.")
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun applyRoute(order: List<String>, now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("운행 중 방문 순서를 변경하지 않습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태 확인 후 순서를 적용하세요.")
@@ -707,17 +712,21 @@ class ShuttleEngine(initial: TripState = NoTrip.state()) {
         clearDriverCheckIfChanged(before, "방문 순서 변경", now)
         return true
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun applyPreview(now: Long): Boolean {
         val proposal = state.routeProposal ?: return reject("적용할 계산 결과가 없습니다.")
         if (proposal.routeVersion != state.routeVersion) return reject("계산 후 경로 조건이 바뀌었습니다. 다시 계산하세요.")
         return applyRoute(proposal.stopOrder, now)
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun calculateRoute(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("운행 준비에서만 순서를 계산할 수 있습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태 확인 후 계산하세요.")
         return try { previewRoute(RoutePlanner.plan(state)) } catch (error: IllegalArgumentException) { reject(error.message ?: "비용 행렬을 확인하세요.") }
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun applyRouteProposal(now: Long): Boolean = applyPreview(now)
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun reorderStops(order: List<String>, now: Long): Boolean = applyRoute(order, now)
 
     /** 순서 바꾸기에서 고정할 앞부분 길이. 정차 중이면 이미 방문한 지점과 지금 정류장까지 그대로 둔다. */
@@ -729,6 +738,7 @@ class ShuttleEngine(initial: TripState = NoTrip.state()) {
     }
 
     /**
+     * 서버 route-revisions 차량 허용 후 재연결 예정(지금은 UI·ViewModel에서 호출하지 않음).
      * 선생님이 정한 방문 순서를 RouteObjective.FIXED로 반영한다. 운행 전에는 previewRoute/applyRoute를 거치고,
      * 정차 중에는 남은 지점만 바꾼다. 내비는 다음 목적지로 넘어갈 때 새 순서의 다음 지점을 받는다.
      */

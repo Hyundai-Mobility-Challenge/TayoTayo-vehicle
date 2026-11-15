@@ -43,10 +43,24 @@ object StopExclusions {
     }
 
     /**
-     * [stopId]를 [TripState.routeOrder]의 고정 앞부분 뒤 가장 싼 위치(합성 직선거리, 출발지 복귀 반영)에 끼워 넣는다.
-     * 다른 정류장의 순서는 바꾸지 않는다.
+     * [stopId]를 다시 넣을 방문 순서. 고정 앞부분(지난 정류장 · 정차 중인 지금 정류장) 뒤에서, 원래 정류장 순서
+     * ([TripState.stops] = 서버 seq 순서) 기준 자리에 넣는다: 원래 순서가 [stopId]보다 뒤인 첫 정류장 바로 앞, 없으면 맨 뒤.
+     * 다른 정류장의 순서는 바꾸지 않는다. 기관 운행에서 앱이 서버 순서와 다른 순서를 만들지 않게 하기 위해서다.
      */
     fun insertOrder(trip: TripState, stopId: String): List<String> {
+        val order = trip.routeOrder.filter { it != stopId }
+        val locked = lockedCount(trip).coerceIn(0, order.size)
+        val seq = trip.stops.indexOfFirst { it.id == stopId }
+        fun seqOf(id: String) = trip.stops.indexOfFirst { it.id == id }.let { if (it < 0) Int.MAX_VALUE else it }
+        val after = (locked until order.size).firstOrNull { seqOf(order[it]) > seq } ?: order.size
+        return order.toMutableList().apply { add(if (seq < 0) order.size else after, stopId) }
+    }
+
+    /**
+     * 서버 route-revisions 차량 허용 후 재연결 예정(지금은 쓰지 않음): [stopId]를 고정 앞부분 뒤 가장 싼 위치
+     * (합성 직선거리, 출발지 복귀 반영)에 끼워 넣는다.
+     */
+    fun insertOrderByDistance(trip: TripState, stopId: String): List<String> {
         val order = trip.routeOrder.filter { it != stopId }
         val locked = lockedCount(trip).coerceIn(0, order.size)
         val matrix = RoutePlanner.syntheticMatrix(trip.origin, trip.stops, RouteObjective.DISTANCE)

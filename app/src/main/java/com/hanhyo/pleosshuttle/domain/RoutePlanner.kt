@@ -83,6 +83,7 @@ object RoutePlanner {
         )
     }
 
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 기관 운행(routeIsExample=false)에는 적용되지 않는다.
     fun plan(trip: TripState): RouteProposal {
         val objective = trip.routeObjective ?: RouteObjective.DISTANCE
         return optimize(trip.origin.id, trip.routeOrder, syntheticMatrix(trip.origin, trip.stops, objective), objective, trip.returnToOrigin, trip.routeVersion)

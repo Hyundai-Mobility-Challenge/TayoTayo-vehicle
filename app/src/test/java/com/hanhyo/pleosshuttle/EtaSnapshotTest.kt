@@ -68,4 +68,22 @@ class EtaSnapshotTest {
         val nav = TrackingNavigation("READY", 1, "x".repeat(150), s1.latitude, s1.longitude, 10, 10, 1L)
         assertEquals(100, InstitutionTrips.etaSnapshot(trip(), nav, false)!!.navRouteKey!!.length)
     }
+
+    @Test fun alightingAtCurrentStopDoesNotSendItsEta() {
+        // 운행 7: 정류장 정차·하차 중(ALIGHTING)인데 그 정류장 ETA가 전송됐던 경우. 이미 도착한 정류장 항목은 뺀다.
+        val alighting = trip(index = 0).copy(phase = TripPhase.ALIGHTING)
+        val stops = listOf(eta(s1, 5, 10), eta(s2, 300, 2100), eta(s3, 540, 3900))
+        val nav = TrackingNavigation("READY", 3, "route-a", s1.latitude, s1.longitude, 5, 10, 1_000L, stops)
+        val snap = InstitutionTrips.etaSnapshot(alighting, nav, false)!!
+        assertEquals(listOf(102L, 103L), snap.entries.map { it.tripStopId })
+        assertEquals(listOf(1, 2), snap.entries.map { it.bundleIndex })
+        // 운행 중(DRIVING)이면 같은 내비 값의 현재 정류장 항목을 그대로 보낸다.
+        assertEquals(listOf(101L, 102L, 103L), InstitutionTrips.etaSnapshot(trip(index = 0), nav, false)!!.entries.map { it.tripStopId })
+    }
+
+    @Test fun alightingWithOnlyTheArrivedStopSendsNothing() {
+        val alighting = trip(index = 2).copy(phase = TripPhase.ALIGHTING)
+        val nav = TrackingNavigation("READY", 1, "r", s3.latitude, s3.longitude, 3, 5, 1_000L)
+        assertNull(InstitutionTrips.etaSnapshot(alighting, nav, false))
+    }
 }

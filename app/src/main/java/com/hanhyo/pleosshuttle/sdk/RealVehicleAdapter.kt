@@ -57,7 +57,7 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
     private var pendingAaosRead: PendingAaosRead? = null
     private val aaosReadPending: Boolean get() = pendingAaosRead != null
     private var snapshot = VehicleSnapshot(parkingBrakeSupported = capabilityPreferences.getBoolean("parking_brake_supported", false), versions = mapOf(
-        "Vehicle SDK" to "2.3.2", "Vehicle Service" to packageVersion("ai.pleos.playground.service.vehicle"),
+        "Vehicle SDK" to com.hanhyo.pleosshuttle.BuildConfig.PLEOS_VEHICLE_SDK, "Vehicle Service" to packageVersion("ai.pleos.playground.service.vehicle"),
         "Android" to "${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}",
         "Build fingerprint" to Build.FINGERPRINT, "Hardware" to Build.HARDWARE,
     ))

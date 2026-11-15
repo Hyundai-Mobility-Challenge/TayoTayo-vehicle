@@ -2,6 +2,8 @@
 
 package com.hanhyo.pleosshuttle.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,10 +21,8 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -72,7 +72,7 @@ private fun shortName(child: ChildRecord) = child.name
 }
 
 /** VS-18 정류장 인계받음·탑승. 아무 행이나 먼저 처리할 수 있다. */
-@Composable internal fun PickupStopBody(vm: ShuttleViewModel, remainingReorder: @Composable () -> Unit) {
+@Composable internal fun PickupStopBody(vm: ShuttleViewModel) {
     val trip = vm.trip
     val type = AppTheme.typography
     val stop = trip.currentStop ?: return
@@ -173,7 +173,6 @@ private fun shortName(child: ChildRecord) = child.name
     Action(PickupFlow.leaveStopLabel(trip), "pickup-leave-stop", prominent = true, enabled = stationary && PickupFlow.canLeaveStop(trip)) {
         vm.perform { completeCurrentStop(it) }
     }
-    remainingReorder()
     sheetChildId?.let { id -> trip.children.find { it.id == id } }?.let { child ->
         PickupNotBoardedDialog(vm, child) { sheetChildId = null }
     }

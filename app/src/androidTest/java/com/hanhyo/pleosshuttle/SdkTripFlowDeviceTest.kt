@@ -17,7 +17,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.IntegrationMode
-import com.hanhyo.pleosshuttle.domain.RouteObjective
 import com.hanhyo.pleosshuttle.domain.Source
 import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
@@ -90,7 +89,7 @@ class SdkTripFlowDeviceTest {
     }
 
     /**
-     * (옛 148) 상세 조작 화면으로 탑승 → 순서 계산·적용 → 출발 → 정류장마다 정차·인계·하차·복귀 → 복귀·실내 확인 → 종료 저장.
+     * (옛 148) 상세 조작 화면으로 탑승 → (서버 순서 그대로) 출발 → 정류장마다 정차·인계·하차·복귀 → 복귀·실내 확인 → 종료 저장.
      * 전제: 공통 전제(정차 관측). 이동 관측은 쓰지 않는다(정차 상태로 단계만 넘긴다; 잠깐 멈춤으로 하차 단계가 되지 않는 것은 엔진 단위 테스트).
      */
     @Test fun `탑승부터_인계와_하차와_실내확인을_거쳐_하원_종료기록을_저장한다`() {
@@ -102,13 +101,10 @@ class SdkTripFlowDeviceTest {
         assertEquals(4, state().ledger.size)
         compose.onNodeWithTag("board-${childIds.first()}").assertIsNotEnabled()
 
-        press("calculate-route")
-        assertNotNull(state().routeProposal)
-        assertEquals(6, state().routeProposal!!.evaluatedOrders)
-        val proposed = state().routeProposal!!.stopOrder
-        press("apply-route")
-        assertEquals(proposed, state().routeOrder)
-        assertNull(state().routeProposal)
+        // 방문 순서는 기관(서버)이 정한 순서 그대로다. 순서 계산·적용 버튼은 없다(서버 route-revisions 차량 허용 후 재연결 예정).
+        listOf("calculate-route", "apply-route", "open-reorder").forEach { compose.onNodeWithTag(it).assertDoesNotExist() }
+        val proposed = state().routeOrder
+        assertEquals(listOf("forest", "museum", "park"), proposed)
         checkpoints.put(record("prepared", state()))
         press("start-driving")
 
@@ -157,14 +153,19 @@ class SdkTripFlowDeviceTest {
      * 전제: 공통 전제 + Pleos 기기 내 TTS(ON_DEVICE)가 동작해야 첫 출발 안내 음성이 COMPLETED가 된다.
      */
     @Test fun `자동_음성과_같은_화면으로_인계와_하차를_기록하고_운행을_종료한다`() {
+        // 예시 순서로 저장돼 있어도 복원 때 서버 순서로 고정된다(StoredTrips.serverOrder) → 출발 때 순서를 바꾸지 않는다.
         start(DeviceTrips.sdkTrip("device-guided-1", routeIsExample = true), detailed = false)
+        assertFalse(state().routeIsExample)
+        val serverOrder = state().routeOrder
         compose.onNodeWithTag("flow-guide").assertIsDisplayed()
         compose.onNodeWithTag("voice-toolbar").assertIsDisplayed()
         compose.onNodeWithTag(NO_TRIP_LOADED_TAG).assertDoesNotExist()
         state().children.forEach { visiblePress("board-${it.id}") }
         compose.onNodeWithTag("start-trip").performScrollTo()
+        compose.onNodeWithTag("open-reorder").assertDoesNotExist()
         visiblePress("start-trip")
         assertEquals(TripPhase.DRIVING, state().phase)
+        assertEquals(serverOrder, state().routeOrder)
         compose.waitUntil(20_000) { model.audioState.speechStatus == com.hanhyo.pleosshuttle.audio.SpeechStatus.COMPLETED }
         assertEquals(1, compose.runOnIdle { model.automaticAnnouncementKeys.size })
         // 백그라운드 복귀가 같은 목적지 안내를 반복하지 않는다.
@@ -193,52 +194,6 @@ class SdkTripFlowDeviceTest {
         assertEquals(TripPhase.ENDED, TripStore(context).load()?.phase)
         val cues = compose.runOnIdle { model.automaticAnnouncementKeys.toList() }
         assertEquals(cues.size, cues.distinct().size)
-    }
-
-    /**
-     * (옛 571) 경로 확인에서 순서 바꾸기 → 고정 순서로 출발, 정차 중에는 지금 정류장을 고정하고 남은 순서만 바꾼다.
-     * 전제: 공통 전제. 경로 기준 설정(route-settings)은 테스트마다 처음 상태로 시작한다.
-     */
-    @Test fun `경로_확인에서_순서를_바꾸면_고정_순서로_출발하고_정차_중에는_남은_순서만_바꾼다`() {
-        start(DeviceTrips.sdkTrip("device-route-1", routeIsExample = true), detailed = false)
-        state().children.forEach { visiblePress("board-${it.id}") }
-        compose.onNodeWithTag("route-strip").assertIsDisplayed()
-        compose.onNodeWithTag("route-criteria-list").assertIsDisplayed()
-        compose.onNodeWithTag("start-trip").assertExists()
-        assertTrue(compose.runOnIdle { model.routeCriteriaSeen })
-        visiblePress("open-reorder")
-        compose.onNodeWithTag("reorder").assertIsDisplayed()
-        compose.onNodeWithTag("move-up-forest").assertIsNotEnabled()
-        visiblePress("move-up-park")
-        visiblePress("reorder-reason-보호자 요청")
-        compose.onNodeWithTag("reorder-apply").performScrollTo()
-        visiblePress("reorder-apply")
-        assertEquals(listOf("park", "forest", "museum"), state().routeOrder)
-        assertEquals(RouteObjective.FIXED, state().routeObjective)
-        assertFalse(state().routeIsExample)
-        assertTrue(state().diagnostics.last { it.feature == "방문 순서 변경" }.message.contains("보호자 요청"))
-        compose.onNodeWithTag("reorder").assertDoesNotExist()
-        compose.onNodeWithTag("start-trip").performScrollTo()
-        visiblePress("start-trip")
-        assertEquals(listOf("park", "forest", "museum"), state().routeOrder)
-        awaitStationary()
-        visiblePress("arrive-stop")
-        compose.onNodeWithTag("open-reorder").performScrollTo()
-        visiblePress("open-reorder")
-        compose.onNodeWithTag("move-up-park").assertDoesNotExist()
-        compose.onNodeWithTag("move-up-forest").assertIsNotEnabled()
-        visiblePress("move-up-museum")
-        compose.onNodeWithTag("reorder-apply").performScrollTo()
-        visiblePress("reorder-apply")
-        assertEquals(listOf("park", "museum", "forest"), state().routeOrder)
-        assertEquals(TripPhase.ALIGHTING, state().phase)
-        assertEquals("park", state().currentStop?.id)
-        state().currentStopChildren.filter { it.status == Attendance.ONBOARD }.forEach { child ->
-            visiblePress("handover-${child.id}")
-            visiblePress("alight-${child.id}")
-        }
-        assertEquals(TripPhase.DRIVING, state().phase)
-        assertEquals("museum", state().currentStop?.id)
     }
 
     /**

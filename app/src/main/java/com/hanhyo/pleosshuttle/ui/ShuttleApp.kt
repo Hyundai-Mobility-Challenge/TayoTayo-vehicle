@@ -2,6 +2,8 @@
 
 package com.hanhyo.pleosshuttle.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,13 +29,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,9 +114,7 @@ import com.hanhyo.pleosshuttle.ui.component.VoiceGuidanceBar
     CompositionLocalProvider(
         LocalGuideFocus provides if (vm.panel == "flow") GuideFocus(guide.targetTag, requester) else null,
         LocalGuideEditing provides { editingReason = it },
-        LocalGuideAction provides { tag ->
-            if (tag == "calculate-route") boardingReviewed = true
-        },
+        LocalGuideAction provides { _ -> },
     ) {
         Column(
             Modifier.fillMaxSize().padding(if (compact) AppSpacing.screenCompact else AppSpacing.screen),
@@ -170,46 +167,31 @@ import com.hanhyo.pleosshuttle.ui.component.VoiceGuidanceBar
     }
 }
 
-private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
-    save = { draft -> if (draft == null) emptyList() else listOf(ArrayList(draft.base), ArrayList(draft.order), draft.lastMoved, draft.reason) },
-    restore = { saved ->
-        @Suppress("UNCHECKED_CAST")
-        if (saved.isEmpty()) null else ReorderDraft(saved[0] as List<String>, saved[1] as List<String>, saved[2] as String?, saved[3] as String?)
-    },
-)
-
 /**
  * 기본 운행 화면. 가로는 왼쪽 패널과 본문, 세로 분할은 '다음 · 이후' 줄 아래 본문 한 열.
- * 왼쪽 패널은 보통 정류장 타임라인이고, 경로 확인(L2)·순서 바꾸기(L9)에서는 그 화면의 보조 정보로 바뀐다.
+ * 왼쪽 패널은 보통 정류장 타임라인이고, 경로 확인(L2)에서는 그 화면의 보조 정보로 바뀐다.
+ * (순서 바꾸기 L9는 서버 route-revisions가 차량을 허용할 때까지 뺐다.)
  */
 @Composable private fun FlowArea(vm: ShuttleViewModel, guide: FlowGuide, compact: Boolean, scroll: ScrollState, onBoardingReviewed: () -> Unit, modifier: Modifier) {
     val stops = timelineStops(vm.trip)
-    // 운행 단계나 정류장이 바뀌면 초안을 버린다(정차가 끝나면 순서 바꾸기도 닫힘).
-    var draft by rememberSaveable(vm.trip.tripId, vm.trip.phase, vm.trip.currentStopIndex, stateSaver = reorderDraftSaver) { mutableStateOf<ReorderDraft?>(null) }
-    val reordering = draft != null && (vm.trip.phase == TripPhase.PREPARING || vm.trip.phase == TripPhase.ALIGHTING)
-    val routeCheck = !reordering && vm.trip.phase == TripPhase.PREPARING && guide.targetTag == "start-trip"
+    val routeCheck = vm.trip.phase == TripPhase.PREPARING && guide.targetTag == "start-trip"
     var criteriaOpen by rememberSaveable(vm.trip.tripId) { mutableStateOf(!vm.routeCriteriaSeen) }
     LaunchedEffect(routeCheck) { if (routeCheck) vm.markRouteCriteriaSeen() }
-    LaunchedEffect(reordering) { scroll.scrollTo(0) }
-    val openReorder = { val order = displayedRouteOrder(vm.trip); draft = ReorderDraft(base = order, order = order) }
     // 가로 화면의 운행 준비에서는 탑승 명단을 왼쪽 패널([경로 | 명단] 탭)에 따로 스크롤되게 둔다.
     // 행을 눌러 흐름 카드 높이가 바뀌거나 다음 아이로 화면이 이동해도 명단 행 위치는 그대로라 연속으로 눌러도 엉뚱한 행이 눌리지 않는다.
     // 탑승 기록 단계는 [명단]이 기본, 경로 확인(출발 직전)은 [출발 전 확인]이 기본이다.
-    val rosterTabs = !compact && !reordering && vm.trip.phase == TripPhase.PREPARING && vm.trip.children.isNotEmpty()
+    val rosterTabs = !compact && vm.trip.phase == TripPhase.PREPARING && vm.trip.children.isNotEmpty()
     var rosterSelected by rememberSaveable(vm.trip.tripId, routeCheck) { mutableStateOf(!routeCheck) }
     // 세로 분할(좁은 화면)도 같은 이유로 운행 준비 중엔 [지금 할 일 | 명단] 탭을 둔다. 명단은 따로 스크롤되어
     // 행을 누를 때 흐름 카드 높이 변화·다음 할 일로의 자동 스크롤(bringIntoView)에 밀리지 않는다.
     // 하원 탑승 기록이 남았으면 [명단]이 기본, 다 기록되면(또는 등원 준비) [지금 할 일]로 돌아온다.
-    val compactTabs = compact && !reordering && vm.trip.phase == TripPhase.PREPARING && vm.trip.children.isNotEmpty()
+    val compactTabs = compact && vm.trip.phase == TripPhase.PREPARING && vm.trip.children.isNotEmpty()
     val boardingLeft = compactTabs && !vm.trip.isPickup && !vm.trip.noTripToday &&
         vm.trip.children.any { it.status == Attendance.NOT_BOARDED }
     var compactRosterSelected by rememberSaveable(vm.trip.tripId, routeCheck, boardingLeft) { mutableStateOf(boardingLeft && !routeCheck) }
     val boardOnSide = (rosterTabs && rosterSelected) || (compactTabs && compactRosterSelected)
     val side = @Composable { sideModifier: Modifier ->
-        when {
-            reordering -> ReorderSide(vm, draft!!, { draft = it }, sideModifier)
-            routeCheck -> RouteCheckSide(vm, criteriaOpen, { criteriaOpen = !criteriaOpen }, sideModifier)
-        }
+        if (routeCheck) RouteCheckSide(vm, criteriaOpen, { criteriaOpen = !criteriaOpen }, sideModifier)
     }
     val body = @Composable { bodyModifier: Modifier ->
         Column(
@@ -221,17 +203,16 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
             verticalArrangement = Arrangement.spacedBy(if (compact) AppSpacing.xl else 0.dp),
         ) {
             if (compact) Text("차내 기록 ${vm.trip.onboardChildren.size}명  ·  남은 ${vm.trip.remainingStopCount}곳  ·  ${phaseLabel(vm.trip)}", style = AppTheme.typography.body3SemiBold, color = AppTheme.colors.textSecondary)
-            if (reordering) ReorderBody(vm, draft!!, { draft = it }, onClose = { draft = null })
-            else TeacherFlow(vm, guide, onBoardingReviewed, onOpenReorder = openReorder)
-            // V-03 탑승 명단 보드: 흐름 카드(지금 할 일) 아래에 모든 아이 행을 늘 보인다. 순서 바꾸기 중에는 그 작업만 보인다.
-            if (!reordering && !boardOnSide && !compactTabs && vm.trip.hasTrip) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
+            TeacherFlow(vm, guide, onBoardingReviewed)
+            // V-03 탑승 명단 보드: 흐름 카드(지금 할 일) 아래에 모든 아이 행을 늘 보인다.
+            if (!boardOnSide && !compactTabs && vm.trip.hasTrip) RiderBoardSection(vm, Modifier.padding(top = if (compact) 0.dp else AppSpacing.xxl))
             // 세로 분할에는 왼쪽 패널이 없으므로 같은 보조 정보를 본문 아래에 둔다.
-            if (compact && (reordering || routeCheck)) side(Modifier.fillMaxWidth())
+            if (compact && routeCheck) side(Modifier.fillMaxWidth())
         }
     }
     if (compact) {
         Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-            if (!reordering && !routeCheck && vm.trip.hasTrip) CompactTimeline(stops)
+            if (!routeCheck && vm.trip.hasTrip) CompactTimeline(stops)
             if (compactTabs) SidePaneTabs(routeLabel = "지금 할 일", rosterSelected = boardOnSide) { compactRosterSelected = it }
             if (compactTabs && boardOnSide) Column(
                 Modifier.weight(1f).fillMaxWidth()
@@ -269,7 +250,7 @@ private val reorderDraftSaver = listSaver<ReorderDraft?, Any?>(
                         else -> StopTimelinePanel("${vm.tripDirectionLabel} 경로 · 정류장 ${vm.trip.routeOrder.size}곳", stops, paneModifier)
                     }
                 }
-            } else if (reordering || routeCheck) {
+            } else if (routeCheck) {
                 Column(
                     sideModifier
                         .background(AppTheme.colors.surface, RoundedCornerShape(AppRadius.panel))

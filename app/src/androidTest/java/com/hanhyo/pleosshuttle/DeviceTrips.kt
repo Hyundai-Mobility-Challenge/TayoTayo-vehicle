@@ -10,7 +10,7 @@ import com.hanhyo.pleosshuttle.domain.TripState
  * 이 운행을 trip-v1.bin에 직접 저장해 준비한다. 연동 방식은 SDK(기관 운행과 같음).
  */
 object DeviceTrips {
-    /** [routeIsExample]=true면 [운행 시작] 때 방문 순서를 자동 계산한다(거리 기준 forest → park → museum). */
+    /** [routeIsExample]=true는 이전 저장본 흉내용. 앱은 복원할 때 서버 순서로 고정한다(StoredTrips.serverOrder). */
     fun sdkTrip(tripId: String, routeIsExample: Boolean = false): TripState {
         val origin = Stop("origin", "출발지 · 서울시청", 37.5665, 126.9780)
         val stops = listOf(

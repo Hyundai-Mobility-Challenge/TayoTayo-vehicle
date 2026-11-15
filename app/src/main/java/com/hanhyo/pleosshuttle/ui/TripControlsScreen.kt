@@ -4,15 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import com.hanhyo.pleosshuttle.ShuttleViewModel
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
 import com.hanhyo.pleosshuttle.domain.PickupFlow
 import com.hanhyo.pleosshuttle.ui.component.Action
-import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.GuideReasonField
 import com.hanhyo.pleosshuttle.ui.component.Notice
 import com.hanhyo.pleosshuttle.ui.component.Section
@@ -38,23 +37,11 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
             }
         }
     }
-    Section("방문 순서 조정", "직선거리 기준 · 운행 시작 전 변경 가능") {
-        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Action("방문 순서 계산", "calculate-route") { vm.perform { calculateRoute(it) } }
-            StatusChip(if (vm.trip.routeIsExample) "현재: 고정 예제 순서" else "현재: 검토 후 적용한 순서", tone = ChipTone.INFO)
-        }
-        vm.trip.routeProposal?.let { proposal ->
-            Notice("미리보기  ${proposal.stopOrder.joinToString(" → ") { id -> vm.trip.stops.first { it.id == id }.shortName }} → ${vm.trip.origin.shortName}\n직선거리 비용 ${"%.1f".format(proposal.cost)} ${proposal.costUnit} · ${proposal.evaluatedOrders}개 순서 비교")
-            Action("이 순서 적용", "apply-route") { vm.perform { applyRouteProposal(it) } }
-        }
+    // 방문 순서는 기관(서버)이 정한 정류장 순서 그대로 보여 준다. 순서 계산·적용·위로 옮기기는 서버 route-revisions가
+    // 차량 자격 증명을 허용할 때까지 뺐다(차량에서 바꾼 순서는 서버에 전달되지 않음).
+    Section("방문 순서", "기관이 정한 순서 · 빈 정류장 빼기·다시 넣기는 운행 화면에서") {
         vm.trip.routeOrder.forEachIndexed { index, id ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                Text("${index + 1}. ${vm.trip.stops.first { it.id == id }.name}", Modifier.weight(1f))
-                Action("위로", "route-up-$id", enabled = index > 0, secondary = true) {
-                    val order = vm.trip.routeOrder.toMutableList(); val prev = order[index - 1]; order[index - 1] = id; order[index] = prev
-                    vm.perform { reorderStops(order, it) }
-                }
-            }
+            Text("${index + 1}. ${vm.trip.stops.first { it.id == id }.name}", modifier = Modifier.testTag("route-order-$id"))
         }
         // 등원은 정류장에서 태우므로 탑승 기록 없이 출발한다(탈 아이 0명이면 엔진이 막음, D34).
         Action("운행 화면으로", "start-driving", enabled = (vm.trip.onboardChildren.isNotEmpty() || (vm.trip.isPickup && !vm.trip.noTripToday)) && vm.engine.stationaryBlockers(vm.now).isEmpty()) { vm.perform { startDriving(it) } }

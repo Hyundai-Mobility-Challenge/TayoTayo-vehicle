@@ -1,14 +1,14 @@
 package com.hanhyo.pleosshuttle.ui
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +33,7 @@ import com.hanhyo.pleosshuttle.ui.component.StatusChip
 import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
 
 /** Teacher actions are explicit; destination and guidance advance after the last child record. */
-@Composable internal fun TeacherFlow(vm: ShuttleViewModel, guide: FlowGuide, onBoardingReviewed: () -> Unit, onOpenReorder: () -> Unit) {
+@Composable internal fun TeacherFlow(vm: ShuttleViewModel, guide: FlowGuide, onBoardingReviewed: () -> Unit) {
     val tag = guide.targetTag
     val child = vm.trip.children.firstOrNull { tag in listOf("board-${it.id}", "not-boarded-${it.id}", "handover-${it.id}", "alight-${it.id}", "end-handover-${it.id}", "correct-${it.id}", "return-org-${it.id}") }
     val pickup = vm.trip.isPickup
@@ -45,12 +45,6 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
     val warning = AppTheme.colors.primaryContent
     // V-21: [보호자 미도착 · 동승 유지]를 누르면 같은 카드에서 고정 사유를 고른다(단계가 바뀌면 닫힘).
     var choosingStay by remember(tag) { mutableStateOf(false) }
-    // 정차 중 인계 화면에서도 남은 지점이 둘 이상이면 순서를 바꿀 수 있다(바뀌는 것은 다음 정류장부터).
-    val remainingReorder = @Composable {
-        if (vm.trip.routeOrder.size - (vm.trip.currentStopIndex + 1) >= 2) {
-            Action("남은 순서 바꾸기", "open-reorder", secondary = true, enabled = vm.engine.manualRouteBlockers(vm.now).isEmpty(), action = onOpenReorder)
-        }
-    }
     Column(Modifier.fillMaxWidth().testTag("flow-guide"), verticalArrangement = Arrangement.spacedBy(AppSpacing.xl)) {
         Text("동승 선생님 · ${flowTitle(vm.trip)}", style = type.body1SemiBold, color = AppTheme.colors.infoContent)
         val title = when {
@@ -87,7 +81,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                 Action("명단 열기", "open-roster", secondary = true) { vm.panel = "details" }
             }
             tag == PICKUP_PREPARE_TAG -> PickupPrepareBody(vm, onBoardingReviewed)
-            tag == PICKUP_STOP_TAG -> PickupStopBody(vm, remainingReorder)
+            tag == PICKUP_STOP_TAG -> PickupStopBody(vm)
             tag == PICKUP_INSTITUTION_TAG -> PickupInstitutionBody(vm)
             (tag?.startsWith("board-") == true || tag?.startsWith("not-boarded-") == true) && child != null -> {
                 // V-02: 미탑승 예정 배지는 표시만 하고, 탑승·미탑승은 선생님이 정한다. 미탑승 예정이거나 탑승 마침 뒤면 [미탑승 확인]이 먼저.
@@ -127,14 +121,12 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                     Action("인계 확인", tag, prominent = true) { vm.perform { confirmHandover(child.id, it) } }
                     if (atStop) {
                         Action("보호자 미도착 · 동승 유지", "stay-onboard-${child.id}", secondary = true, enabled = stationary) { choosingStay = true }
-                        remainingReorder()
                     }
                 }
             }
             tag?.startsWith("alight-") == true && child != null -> {
                 Text("인계 확인 완료 · 차에서 내렸나요?", style = question)
                 Action("하차 기록", tag, prominent = true) { vm.perform { recordAlightingAndContinue(child.id, it) } }
-                remainingReorder()
             }
             tag?.startsWith("return-org-") == true && child != null -> {
                 // V-22: 동승 유지(V-21)로 돌아온 아이. 선생님이 기관 담당자에게 직접 인계한 뒤 하차 기록한다.
@@ -150,7 +142,7 @@ import com.hanhyo.pleosshuttle.ui.component.LocalCompactLayout
                 // 인원·벨트·경로 요약은 [운행 시작] 바로 위 "출발 전 확인" 블록(V-08)에 모아, 여기서는 중복하지 않는다.
                 if (vm.trip.confirmedNotBoardedChildren.isNotEmpty()) Text("미탑승 확인 ${vm.trip.confirmedNotBoardedChildren.size}명 · 출발 전에는 명단에서 취소할 수 있어요", style = hint, color = AppTheme.colors.textSecondary)
                 if (pickup) Text("$PICKUP_PREPARE_NOTE · 탑승은 정류장에서 인계받은 뒤 기록해요", style = hint, color = AppTheme.colors.textSecondary)
-                RouteCheckBody(vm, onOpenReorder)
+                RouteCheckBody(vm)
             }
             tag in setOf("arrive-stop", "arrive-origin") -> {
                 Text(when {

@@ -20,6 +20,7 @@ import com.hanhyo.pleosshuttle.domain.TripDirections
     OutlinedTextField(code, { code = it }, label = { Text("차량 연결 코드") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("institution-code"), enabled = !vm.institutionBusy)
     Button(onClick = { vm.pairInstitution(base, code) }, enabled = !vm.institutionBusy && code.isNotBlank(), modifier = Modifier.testTag("institution-pair")) { Text("차량 연결") }
     Text(vm.institutionName)
+    if (vm.institutionConnected) DisconnectInstitution(vm)
     Text("운행 방향")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         listOf(TripDirections.PICK_UP, TripDirections.DROP_OFF).forEach { direction ->
@@ -59,4 +60,21 @@ import com.hanhyo.pleosshuttle.domain.TripDirections
         }
         TextButton(onClick = vm::dismissTripChoices, enabled = !vm.institutionBusy) { Text("닫기") }
     }
+}
+
+/** [차량 연결 해제]: 연결된 경우에만 보인다. 진행 중 운행·미전송 기록이 있으면 버튼을 끄고 이유를 보여 준다. 누르면 한 번 더 확인한다. */
+@Composable private fun DisconnectInstitution(vm: ShuttleViewModel) {
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    val blocker = vm.disconnectBlocker
+    OutlinedButton(onClick = { confirming = true }, enabled = blocker == null, modifier = Modifier.testTag("institution-disconnect")) { Text("차량 연결 해제") }
+    blocker?.takeIf { vm.institutionConnected }?.let { Text(it, modifier = Modifier.testTag("institution-disconnect-blocked")) }
+    if (confirming) AlertDialog(
+        onDismissRequest = { confirming = false },
+        title = { Text("차량 연결 해제") },
+        text = { Text("이 차량의 기관 연결을 해제할까요? 다시 쓰려면 새 연결 코드가 필요해요.\n\n" +
+            "오늘 이미 만들어진 운행은 다시 연결해도 이 기기에서 보이지 않아요. 기관에서 운행을 다시 만들어야 해요.",
+            modifier = Modifier.testTag("institution-disconnect-warning")) },
+        confirmButton = { TextButton(onClick = { confirming = false; vm.disconnectInstitution() }, modifier = Modifier.testTag("institution-disconnect-confirm")) { Text("연결 해제") } },
+        dismissButton = { TextButton(onClick = { confirming = false }) { Text("취소") } },
+    )
 }
