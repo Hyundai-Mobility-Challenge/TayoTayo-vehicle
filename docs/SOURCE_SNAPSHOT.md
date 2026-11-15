@@ -1,6 +1,6 @@
 # 분리 기준
 
-- 원본: [Hyundai-Mobility-Challenge/PleosShuttlePoC](https://github.com/Hyundai-Mobility-Challenge/PleosShuttlePoC)
+- 원본: `Hyundai-Mobility-Challenge/PleosShuttlePoC` (분리 당시 저장소명)
 - 원본 기준 커밋: `99670e7f8a02fb7834d71ca59cb91e79636504f2`
 - 분리 시점: 2026-11-06
 - 원본 브랜치: `codex/institution-invitations`

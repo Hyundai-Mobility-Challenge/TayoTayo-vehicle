@@ -6,20 +6,20 @@
 
 - [대표 저장소 · 차량](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle): Pleos 차량 Android 앱, 전체 소스 진입점
 - [연동 서버 소스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server): Java Spring Boot API, MySQL, FCM 발송. 대표 저장소의 `server/` submodule로 연결
-- [보호자](https://github.com/Hyundai-Mobility-Challenge/tonghak-parent): Android 보호자 앱
+- [보호자](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent): Android 보호자 앱. 대표 저장소의 `parent/` submodule로 연결
 
-차량 앱과 서버는 각각 독립적으로 빌드/실행하며, 실행 중에는 HTTP API로 통신합니다. 대표 저장소는 서버 코드를 복사하지 않고 서버 저장소의 특정 커밋을 참조합니다. `common/kotlin`과 `common/web`은 각 저장소에 필요한 사본을 포함합니다. 공통 API 계약이나 렌더러를 수정할 때 관련 저장소에도 같은 변경을 반영하세요.
+차량 앱과 서버는 각각 독립적으로 빌드/실행하며, 실행 중에는 HTTP API로 통신합니다. 대표 저장소는 서버와 보호자 앱 저장소의 특정 커밋을 참조합니다. `common/kotlin`과 `common/web`은 각 저장소에 필요한 사본을 포함합니다. 공통 API 계약이나 렌더러를 수정할 때 관련 저장소에도 같은 변경을 반영하세요.
 
-## 서버 소스 내려받기와 갱신
+## 연동 소스 내려받기와 갱신
 
-처음에는 대표 저장소를 서버 소스와 함께 내려받습니다.
+처음에는 대표 저장소를 서버 및 보호자 앱 소스와 함께 내려받습니다.
 
 ```sh
 git clone --recurse-submodules https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle.git
 cd TayoTayo-vehicle
 ```
 
-이미 내려받은 대표 저장소에서 서버 소스를 준비하거나, 대표 저장소를 갱신한 뒤 기록된 서버 버전을 맞출 때는 다음 명령을 실행합니다.
+이미 내려받은 대표 저장소에서 두 submodule을 준비하거나 대표 저장소에 기록된 버전으로 맞출 때는 다음 명령을 실행합니다.
 
 ```sh
 git submodule update --init --recursive
@@ -35,7 +35,7 @@ git commit -m "Update linked server source"
 git push
 ```
 
-서버 `main`의 새 커밋은 대표 저장소에 자동 반영되지 않습니다. 대표 저장소에서 연결 커밋을 갱신해야 다른 사람도 같은 서버 버전을 내려받습니다. 서버 실행 절차는 [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md)를 참고하세요.
+보호자 앱만 갱신하려면 위 명령에서 `server` 경로를 `parent`로 바꿉니다. 각 저장소의 새 커밋은 대표 저장소의 참조를 갱신해야 반영됩니다. 서버 실행 절차는 [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md)를 참고하세요.
 
 ## 최초 연결
 
@@ -58,8 +58,8 @@ git push
 
 ## Firebase 파일
 
-- 보호자 앱: `tonghak-parent/parent/google-services.json` (앱 ID `com.ssafy.tonghak.parent`에 해당하는 설정)
-- 서버: 저장소 밖의 서비스 계정 JSON을 `--credentials` 또는 `-CredentialPath`로 지정
+- 보호자 앱: 보호자 저장소 루트 기준 `parent/google-services.json` (앱 ID `com.ssafy.tonghak.parent`에 해당하는 설정)
+- 서버: 서버 저장소의 `backend/.secrets/server.properties`에서 `FIREBASE_CREDENTIALS_PATH`에 서비스 계정 JSON의 전체 경로를 지정합니다. JSON 파일은 저장소 밖에 보관합니다.
 - 서비스 계정 키는 APK에 넣지 않습니다. 두 설정 파일은 Git에서 제외됩니다.
 - Firebase 설정 없이도 보호자 앱을 빌드하고 API 기록을 조회할 수 있지만 푸시 등록/발송은 활성화되지 않습니다.
 
