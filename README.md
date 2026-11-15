@@ -7,6 +7,11 @@ Pleos 차량의 기어·차속 신호로 주행 중에는 내비만 보여 주�
 
 > 운행을 시작하면 Pleos 내비가 정류장 3곳을 경유지로 안내합니다. 2026-11-15 Pleos Connect 에뮬레이터에서 로컬 서버와 가상 아동 4명으로 진행한 하원 운행 화면입니다.
 
+**[⬇️ 차량 앱 v1.0.0 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)** (43.5MB · Pleos Connect, API 28 이상) · [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
+
+> [!NOTE]
+> 릴리스 APK는 **HTTPS 서버에만** 연결됩니다. 내부망 HTTP 서버(`http://10.0.2.2:8080` 등)로 시연할 때는 [빌드](#2-빌드)의 디버그 APK를 사용하세요.
+
 이 저장소는 타요타요의 **대표 저장소**입니다. 차량 앱 소스를 관리하고, 서버와 보호자 앱은 서브모듈로 연결합니다.
 
 | 구성 | 저장소 | 이 저장소 안의 위치 |
