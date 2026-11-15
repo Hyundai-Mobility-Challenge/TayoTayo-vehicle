@@ -5,14 +5,14 @@ import org.junit.Test
 
 class ShuttleEngineTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T, time: Long = now, source: Source = Source.SIMULATED) =
+    private fun <T> observed(value: T, time: Long = now, source: Source = Source.SDK) =
         Observation(value, source, time, ResultStatus.TARGET_OBSERVED)
-    private fun parked(time: Long = now, locked: Boolean = true, source: Source = Source.SIMULATED) = VehicleSnapshot(
+    private fun parked(time: Long = now, locked: Boolean = true, source: Source = Source.SDK) = VehicleSnapshot(
         connected = true, speedKph = observed(0.0, time, source), gear = observed(Gear.PARK, time, source),
         parkingBrake = observed(true, time, source), doorLocked = observed(locked, time, source),
         seats = listOf(SeatObservation(1, observed(false, time, source), observed(false, time, source))), connectionGeneration = 1,
     )
-    private fun ready(): ShuttleEngine = ShuttleEngine().also { it.updateVehicle(parked(), now) }
+    private fun ready(): ShuttleEngine = ShuttleEngine(SampleTrip.create()).also { it.updateVehicle(parked(), now) }
     private fun driving(): ShuttleEngine = ready().also {
         assertTrue(it.board("child-a", now)); assertTrue(it.startDriving(now))
     }
@@ -157,18 +157,18 @@ class ShuttleEngineTest {
         assertTrue(engine.state.diagnostics.any { it.feature == "늦은 문 응답" })
     }
 
-    @Test fun `실제 SDK 모드에서 모의 입력은 해제 요청을 만들지 못한다`() {
+    @Test fun `차량에서 받지 않은 입력은 정차 확인과 해제 요청을 만들지 못한다`() {
         val engine = ShuttleEngine(SampleTrip.create().copy(integrationMode = IntegrationMode.SDK, phase = TripPhase.DRIVING))
-        engine.updateVehicle(parked(), now)
+        engine.updateVehicle(parked(source = Source.SIMULATED), now)
         assertFalse(engine.chooseAlighting(now))
-        assertTrue(engine.stationaryBlockers(now).any { it.contains("모의") })
+        assertTrue(engine.stationaryBlockers(now).any { it.contains("차량에서 받은 속도·기어가 아니어서") })
         assertNull(engine.consumeUnlock(now))
     }
 
-    @Test fun `모의 해제 요청은 실제 모드가 아닌 모의 모드를 명시한다`() {
-        val (_, request) = requested()
-        assertEquals(IntegrationMode.SIMULATION, request.mode)
-        assertNotEquals(IntegrationMode.SDK, request.mode)
+    @Test fun `해제 요청은 운행의 연동 방식을 그대로 기록한다`() {
+        val (engine, request) = requested()
+        assertEquals(IntegrationMode.SDK, request.mode)
+        assertEquals(engine.state.integrationMode, request.mode)
     }
 
     @Test fun `문 해제 관측은 어린이를 자동 하차 처리하지 않는다`() {
@@ -227,7 +227,7 @@ class ShuttleEngineTest {
         val engine = alighting()
         engine.prepareUnlock(now)
         val saved = engine.state
-        val restored = ShuttleEngine()
+        val restored = ShuttleEngine(SampleTrip.create())
         restored.restore(saved, now + 100)
         assertEquals(TripPhase.ALIGHTING, restored.state.phase)
         assertEquals(saved.ledger, restored.state.ledger)
@@ -386,7 +386,7 @@ class ShuttleEngineTest {
         val before = moving.state.routeOrder
         assertFalse(moving.applyManualRoute(before.reversed(), null, now))
         assertEquals(before, moving.state.routeOrder)
-        val unknown = ShuttleEngine()
+        val unknown = ShuttleEngine(SampleTrip.create())
         assertFalse(unknown.applyManualRoute(listOf("park", "forest", "museum"), null, now))
         assertEquals(listOf("forest", "museum", "park"), unknown.state.routeOrder)
     }

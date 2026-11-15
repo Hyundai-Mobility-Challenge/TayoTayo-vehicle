@@ -19,14 +19,14 @@ internal fun hourMinuteText(at: Long): String = SimpleDateFormat("HH:mm", Locale
 internal fun boolText(value: Boolean?, yes: String, no: String) = when (value) { true -> yes; false -> no; null -> "미확인" }
 internal fun <T> valueLabel(value: Observation<T>, now: Long): String = if (value.isFresh(now)) value.value.toString() else "미확인/오래됨"
 
-/** '가상 정류장 A · 서울숲' → '서울숲'. 화면에는 짧은 이름만 쓴다. */
+/** '정류장 A · 서울숲' → '서울숲'. 화면에는 짧은 이름만 쓴다. */
 internal val Stop.shortName: String get() = com.hanhyo.pleosshuttle.domain.stopLabel(this)
 
 /**
  * 헤더·탭의 단계 칩 문구. 하원은 TripPhase.label 그대로. 등원은 정류장 정차(ALIGHTING)가 "하차"가 아니라
  * 인계받음·탑승 단계이므로 "정류장 탑승", 종료 확인(END_REVIEW)은 기관 도착 뒤라 "기관 인계"로 보인다.
  */
-internal fun phaseLabel(trip: TripState): String = if (!trip.isPickup) trip.phase.label else when (trip.phase) {
+internal fun phaseLabel(trip: TripState): String = if (!trip.hasTrip) "운행 없음" else if (!trip.isPickup) trip.phase.label else when (trip.phase) {
     TripPhase.ALIGHTING -> "정류장 탑승"
     TripPhase.END_REVIEW -> "기관 인계"
     else -> trip.phase.label
@@ -55,7 +55,7 @@ internal fun childStatusText(trip: TripState, child: ChildRecord): String =
     if (trip.isPickup) com.hanhyo.pleosshuttle.domain.PickupFlow.statusLabel(trip, child) else child.status.label
 
 /** 운행 화면 제목: 준비·완료 단계 이름 또는 지금 처리할 지점. */
-internal fun flowTitle(trip: TripState): String = when (trip.phase) {
+internal fun flowTitle(trip: TripState): String = if (!trip.hasTrip) "운행 없음" else when (trip.phase) {
     TripPhase.PREPARING -> "탑승 준비"
     TripPhase.ENDED -> "${TripDirections.label(trip.direction)} 완료"
     else -> (trip.currentStop ?: trip.origin).shortName
@@ -106,11 +106,11 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         val detail = if (trip.isPickup) when (progress) {
             StopProgress.CURRENT -> if (trip.phase == TripPhase.ALIGHTING) "탑승 기록 $boardedHere/${riders.size}" else "탑승 예정 ${riders.size}명"
             StopProgress.DONE -> "탑승 ${boardedHere}명"
-            StopProgress.UPCOMING -> "탑승 ${riders.size}명"
+            StopProgress.UPCOMING -> "탑승 예정 ${riders.size}명"
         } else when (progress) {
             StopProgress.CURRENT -> if (trip.phase == TripPhase.ALIGHTING) "하차 기록 $alighted/${riders.size}" else "하차 예정 ${riders.size}명"
             StopProgress.DONE -> "하차 기록 ${alighted}명"
-            StopProgress.UPCOMING -> "하차 ${riders.size}명"
+            StopProgress.UPCOMING -> "하차 예정 ${riders.size}명"
         }
         TimelineStop("${index + 1}", stop.shortName, detail, progress)
     }
@@ -121,4 +121,12 @@ internal fun timelineStops(trip: TripState): List<TimelineStop> {
         progress = when { ended -> StopProgress.DONE; returning -> StopProgress.CURRENT; else -> StopProgress.UPCOMING },
     )
     return listOf(origin) + stops + back
+}
+
+/** "떡잎유치원" → "떡잎유치원으로", "서현역" → "서현역으로", "판교" → "판교로". 받침(ㄹ 제외)이 있으면 "으로". */
+internal fun withRo(name: String): String {
+    val last = name.trimEnd().lastOrNull() ?: return name
+    if (last !in '가'..'힣') return "${name}(으)로"
+    val jong = (last - '가') % 28
+    return if (jong == 0 || jong == 8) "${name}로" else "${name}으로"
 }

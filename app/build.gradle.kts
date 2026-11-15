@@ -11,9 +11,13 @@ android {
         applicationId = "com.hanhyo.pleosshuttle"
         minSdk = 28
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.1.6-poc"
+        versionCode = 8
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // 페어링 때 서버로 보내는 Pleos SDK 버전(InstitutionConnection.pair → pleosSdkVersion). 값은 libs.versions.toml 한곳에서 온다.
+        buildConfigField("String", "PLEOS_VEHICLE_SDK", "\"${libs.versions.vehicleSdk.get()}\"")
+        buildConfigField("String", "PLEOS_NAVI_SDK", "\"${libs.versions.naviHelper.get()}\"")
+        buildConfigField("String", "PLEOS_TTS_SDK", "\"${libs.versions.textToSpeech.get()}\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     sourceSets["main"].java.srcDir("../common/kotlin")
@@ -27,8 +31,8 @@ android {
 dependencies {
     implementation(libs.vehicle.sdk)
     implementation(libs.kotlin.reflect)
-    implementation("ai.pleos.playground:NaviHelper:3.0.5")
-    implementation("ai.pleos.playground:TextToSpeech:3.3.1")
+    implementation(libs.pleos.navi.helper)
+    implementation(libs.pleos.text.to.speech)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

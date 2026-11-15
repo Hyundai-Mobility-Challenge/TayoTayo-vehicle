@@ -39,13 +39,7 @@ data class VehicleSnapshot(
     val diagnostics: List<String> = emptyList(),
     val versions: Map<String, String> = emptyMap(),
     val connected: Boolean = false,
-    val emulatorGuard: Boolean = false,
-    val doorRequest: SdkObservation<Boolean> = SdkObservation(),
-    val unlockBlockReason: String = "실제 입력 확인 중",
 )
-
-/** Adapter-issued, short-lived token; no simulated values may be supplied to the adapter. */
-data class UnlockConfirmation internal constructor(internal val nonce: Long, internal val revision: Long, internal val createdElapsed: Long, internal val areaKey: String? = null)
 
 data class NaviDestination(val name: String, val latitude: Double, val longitude: Double)
 data class NaviSnapshot(

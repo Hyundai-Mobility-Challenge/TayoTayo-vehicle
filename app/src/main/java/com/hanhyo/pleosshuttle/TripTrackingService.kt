@@ -110,14 +110,16 @@ class TripTrackingService : Service() {
                 }
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        connection.reportTracking(current, true, fix, navigation) {
+                        // 차량 상태(속도·기어)는 DriveStateObserver 관측이 신선할 때만 함께 보낸다.
+                        connection.reportTracking(current, true, fix, navigation, vehicleSample(drive?.current, System.currentTimeMillis())) {
                             val latest = runCatching { store.load() }.getOrNull()
                             prefs.getBoolean("trackingEnabled", false) && latest != null && active(latest) &&
                                 latest.routeVersion == current.routeVersion && latest.currentStopIndex == current.currentStopIndex
                         }
                     }
-                }.onSuccess {
-                    prefs.edit().putString("trackingServiceStatus", if (fix == null) "Pleos 위치 수신 대기" else "Pleos 내비 위치 전송 중 · 내비 화면에서도 유지").apply()
+                }.onSuccess { report ->
+                    // 위치는 보냈고 예상 시간만 실패한 경우는 연결 끊김으로 표시하지 않는다.
+                    prefs.edit().putString("trackingServiceStatus", InstitutionTrips.trackingServiceStatus(fix != null, report)).apply()
                 }.onFailure {
                     prefs.edit().putString("trackingServiceStatus", "전송 연결 끊김 · 보호자 화면은 갱신 대기로 전환").apply()
                 }

@@ -7,35 +7,28 @@ import com.hanhyo.pleosshuttle.domain.RouteObjective
 import com.hanhyo.pleosshuttle.domain.RoutePlanner
 import com.hanhyo.pleosshuttle.domain.RouteTimeline
 import com.hanhyo.pleosshuttle.domain.RouteTimelines
-import com.hanhyo.pleosshuttle.domain.RouteWarning
-import com.hanhyo.pleosshuttle.domain.SampleRoutePlan
-import com.hanhyo.pleosshuttle.domain.TripPhase
 import com.hanhyo.pleosshuttle.domain.TripState
 
-/** 순서 바꾸기에서 고를 수 있는 이유. 고르지 않아도 정할 수 있다. */
-internal val reorderReasons = listOf("보호자 요청", "도로 상황", "기타")
-
-/** 순서를 정하는 기준(L2). 처음 한 번 펼쳐 보이고 이후에는 버튼으로만 연다. */
+/**
+ * 경로 확인(L2)의 방문 순서 안내. 앱은 순서를 정하지 않는다: 기관(서버)이 정한 정류장 순서를 그대로 따르고,
+ * 빈 정류장 빼기·다시 넣기만 한다(다시 넣으면 원래 순서 자리). 처음 한 번 펼쳐 보이고 이후에는 버튼으로만 연다.
+ */
 internal val routeCriteria = listOf(
-    "기관이 승인한 정류장만 들러요",
-    "아이가 인도 쪽으로 내릴 수 있게 진입 방향을 맞춰요",
-    "길을 건너는 하차를 줄여요",
-    "보호자와 약속한 시간보다 일찍 도착하지 않게 해요",
+    "방문 순서는 기관이 정한 정류장 순서를 그대로 따라요",
+    "내릴 어린이가 없는 정류장은 빼고, 다시 생기면 원래 순서 자리에 다시 넣어요",
     "결석하거나 타지 않은 아이는 하차 인원에서 빼요",
 )
 
-/** 경로 확인에 보여줄 순서. 운행 시작 때 자동 계산될 순서라면 그 결과(RoutePlanner.plan)를 미리 보여준다. */
-/** 등원(V-25) 경로 확인 기준. 하원 기준의 "하차"를 "탑승"으로 바꾼 것. */
+/** 등원(V-25) 방문 순서 안내. 하원 안내의 "하차"를 "탑승"으로 바꾼 것. */
 internal val pickupRouteCriteria = listOf(
-    "기관이 승인한 정류장만 들러요",
-    "아이가 인도 쪽에서 탈 수 있게 진입 방향을 맞춰요",
-    "길을 건너는 탑승을 줄여요",
-    "보호자와 약속한 시간보다 일찍 도착하지 않게 해요",
+    "방문 순서는 기관이 정한 정류장 순서를 그대로 따라요",
+    "탈 어린이가 없는 정류장은 빼고, 다시 생기면 원래 순서 자리에 다시 넣어요",
     "결석·직접 등원으로 타지 않을 아이는 탑승 인원에서 빼요",
 )
 
 internal fun routeCriteriaFor(trip: TripState): List<String> = if (trip.isPickup) pickupRouteCriteria else routeCriteria
 
+/** 경로 확인에 보여줄 순서. 기관 운행은 서버 순서 그대로다(예시 순서일 때만 운행 시작 때의 자동 계산 결과를 미리 보여 준다). */
 internal fun displayedRouteOrder(trip: TripState): List<String> = departureRouteOrder(trip)
 
 /** V-08 출발 전 확인 칩. [warn]이면 경고 톤(벨트 미확인 > 0, 아직 결정 안 된 어린이 > 0). */
@@ -62,44 +55,33 @@ internal fun departureRouteText(summary: DepartureSummary): String =
     if (summary.stopNames.isEmpty()) "들를 정류장 없음"
     else "첫 정류장 ${summary.firstStopName} · 경로 ${summary.stopNames.joinToString(" → ")}" + if (summary.pickup) " → 기관" else ""
 
-/** '제안 순서로 되돌리기'의 기준. 정차 중이면 지나온 지점과 지금 정류장 위치는 고정한 채 거리 기준으로 다시 계산한다. */
-internal fun suggestedRouteOrder(trip: TripState, lockedCount: Int): List<String> = runCatching {
-    RoutePlanner.optimize(
-        originId = trip.origin.id,
-        approvedStopIds = trip.routeOrder,
-        matrix = RoutePlanner.syntheticMatrix(trip.origin, trip.stops, RouteObjective.DISTANCE),
-        objective = RouteObjective.DISTANCE,
-        returnToOrigin = trip.returnToOrigin,
-        fixedPositions = trip.routeOrder.take(lockedCount).withIndex().associate { it.index to it.value },
-    ).stopOrder
-}.getOrDefault(trip.routeOrder)
+/** 정류장마다 더하는 정차 시간(분). 서버 운행 응답에 정차 시간이 없어 고정값을 쓴다. */
+internal const val ROUTE_DWELL_MINUTES = 3
 
-/** 가상 출발 시각과 합성 이동 시간(RoutePlanner TIME 행렬, '모의 분')으로 도착 시각을 계산한다. */
-internal fun routeTimeline(trip: TripState, order: List<String>): RouteTimeline = RouteTimelines.build(
+/** 지금 시각(하루 중 분). 경로 확인의 예상 도착 시각은 "지금 출발" 기준으로 어림한다. */
+internal fun currentClockMinute(): Int = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
+
+/** [startMinute]에 출발한다고 보고, 직선거리로 어림한 이동 시간(RoutePlanner TIME 행렬)과 정차 시간으로 도착 시각을 계산한다. */
+internal fun routeTimeline(trip: TripState, order: List<String>, startMinute: Int = currentClockMinute()): RouteTimeline = RouteTimelines.build(
     originId = trip.origin.id,
     order = order,
     matrix = RoutePlanner.syntheticMatrix(trip.origin, trip.stops, RouteObjective.TIME),
-    startMinute = SampleRoutePlan.departureMinute,
-    dwellMinutes = SampleRoutePlan.DWELL_MINUTES,
+    startMinute = startMinute,
+    dwellMinutes = ROUTE_DWELL_MINUTES,
     returnToOrigin = trip.returnToOrigin,
 )
-
-internal fun routeWarnings(timeline: RouteTimeline): List<RouteWarning> =
-    RouteTimelines.warnings(timeline, SampleRoutePlan.rules, SampleRoutePlan.returnDeadlineMinute)
-
-internal fun stopMemo(stopId: String): String? = SampleRoutePlan.rules.firstOrNull { it.stopId == stopId }?.memo
 
 /** 정류장에서 내릴(등원은 탈) 아이 이름. 운행 준비에는 오늘 탈 아이(미탑승 예정·미탑승 확인 제외), 출발 뒤에는 탄 아이만. */
 internal fun ridersAt(trip: TripState, stopId: String): List<String> = trip.children
     .filter { it.stopId == stopId && ridesFrom(trip, it) }
-    .map { it.name.removePrefix("가상 ") }
+    .map { it.name }
 
 /** 평소와 달라진 점(L2). 지금은 탑승 기록만으로 알 수 있는 것만 보여준다. 결석·인계자 변경 연동은 4단계. */
 internal data class RouteChange(val kind: String, val text: String)
 
 internal fun routeChanges(trip: TripState): List<RouteChange> = if (trip.isPickup) pickupRouteChanges(trip) else buildList {
     trip.children.filter { it.status == Attendance.NOT_BOARDED || it.status == Attendance.CONFIRMED_NOT_BOARDED }.forEach {
-        add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else "탑승 기록 없음"}"))
+        add(RouteChange("빠짐", "${it.name} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else "탑승 기록 없음"}"))
     }
     trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }
         .filter { stop -> trip.children.none { it.stopId == stop.id && (it.status == Attendance.ONBOARD || it.status == Attendance.ALIGHTED) } }.forEach {
@@ -114,7 +96,7 @@ internal fun routeChanges(trip: TripState): List<RouteChange> = if (trip.isPicku
 /** 등원 경로 확인의 달라진 점: 미탑승 예정(알림)·출발 전 미탑승 확인 아이, 탈 어린이가 없는 정류장, 뺀 정류장. */
 private fun pickupRouteChanges(trip: TripState): List<RouteChange> = buildList {
     trip.children.filter { it.status == Attendance.CONFIRMED_NOT_BOARDED || !it.expectedToBoard }.forEach {
-        add(RouteChange("빠짐", "${it.name.removePrefix("가상 ")} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else com.hanhyo.pleosshuttle.domain.PickupFlow.notBoardingBadge(it)}"))
+        add(RouteChange("빠짐", "${it.name} · ${if (it.status == Attendance.CONFIRMED_NOT_BOARDED) "미탑승 확인" else com.hanhyo.pleosshuttle.domain.PickupFlow.notBoardingBadge(it)}"))
     }
     trip.routeOrder.mapNotNull { id -> trip.stops.find { it.id == id } }
         .filter { stop -> ridersAt(trip, stop.id).isEmpty() }.forEach {
@@ -127,9 +109,18 @@ private fun pickupRouteChanges(trip: TripState): List<RouteChange> = buildList {
 
 internal fun clockText(minute: Int): String = RouteTimelines.formatClock(minute)
 
-/** '+7분', '-3분', '같음' */
-internal fun minuteDiffText(diff: Int): String = when {
-    diff > 0 -> "+${diff}분"
-    diff < 0 -> "${diff}분"
-    else -> "같음"
+/** 하루 중 분 → "오후 4시 5분", 정각이면 "오후 4시". 경로 화면에서 운전자·선생님이 바로 읽는 시각. */
+internal fun koreanClockText(minute: Int): String {
+    val normalized = ((minute % 1_440) + 1_440) % 1_440
+    val hour = normalized / 60
+    val min = normalized % 60
+    val half = if (hour < 12) "오전" else "오후"
+    val hour12 = if (hour % 12 == 0) 12 else hour % 12
+    return if (min == 0) "$half ${hour12}시" else "$half ${hour12}시 ${min}분"
 }
+
+/** "오후 4시 출발" */
+internal fun departureClockText(minute: Int): String = "${koreanClockText(minute)} 출발"
+
+/** "오후 4시 23분 도착 예정" */
+internal fun arrivalClockText(minute: Int): String = "${koreanClockText(minute)} 도착 예정"

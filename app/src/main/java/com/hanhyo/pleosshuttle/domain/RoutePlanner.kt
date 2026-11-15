@@ -31,7 +31,7 @@ object RoutePlanner {
         routeVersion: Long = 0,
         fixedPositions: Map<Int, String> = emptyMap(),
     ): RouteProposal {
-        require(approvedStopIds.size <= 6) { "이 PoC의 완전탐색은 최대 6개 지점만 지원합니다." }
+        require(approvedStopIds.size <= 6) { "자동 순서 계산은 최대 6개 지점까지 지원합니다. 순서를 직접 정해 주세요." }
         require(approvedStopIds.toSet().size == approvedStopIds.size) { "승인 지점 ID는 중복될 수 없습니다." }
         require(originId !in approvedStopIds) { "출발지는 방문 지점과 다른 ID를 사용합니다." }
         require(fixedPositions.all { it.key in approvedStopIds.indices && it.value in approvedStopIds }) { "고정 순서가 승인 지점 범위를 벗어났습니다." }
@@ -77,12 +77,13 @@ object RoutePlanner {
         } }.toMap()
         return CostMatrix(
             costs = costs,
-            unit = if (objective == RouteObjective.TIME) "모의 분" else "직선 km",
+            unit = if (objective == RouteObjective.TIME) "어림 분" else "직선 km",
             sourceDescription = if (objective == RouteObjective.TIME) "합성 시간 비용: 직선거리·가정 속도 20km/h·지점당 1분" else "직선거리 기반 합성 비용 행렬",
             synthetic = true,
         )
     }
 
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 기관 운행(routeIsExample=false)에는 적용되지 않는다.
     fun plan(trip: TripState): RouteProposal {
         val objective = trip.routeObjective ?: RouteObjective.DISTANCE
         return optimize(trip.origin.id, trip.routeOrder, syntheticMatrix(trip.origin, trip.stops, objective), objective, trip.returnToOrigin, trip.routeVersion)

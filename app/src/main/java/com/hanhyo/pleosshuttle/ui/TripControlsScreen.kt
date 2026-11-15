@@ -4,16 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import com.hanhyo.pleosshuttle.ShuttleViewModel
 import com.hanhyo.pleosshuttle.designsystem.theme.AppSpacing
 import com.hanhyo.pleosshuttle.designsystem.theme.AppTheme
 import com.hanhyo.pleosshuttle.domain.Attendance
-import com.hanhyo.pleosshuttle.domain.IntegrationMode
 import com.hanhyo.pleosshuttle.domain.PickupFlow
 import com.hanhyo.pleosshuttle.ui.component.Action
-import com.hanhyo.pleosshuttle.ui.component.ChipTone
 import com.hanhyo.pleosshuttle.ui.component.GuideReasonField
 import com.hanhyo.pleosshuttle.ui.component.Notice
 import com.hanhyo.pleosshuttle.ui.component.Section
@@ -39,23 +37,11 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
             }
         }
     }
-    Section("방문 순서 조정", "직선거리 기준 · 운행 시작 전 변경 가능") {
-        Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Action("방문 순서 계산", "calculate-route") { vm.perform { calculateRoute(it) } }
-            StatusChip(if (vm.trip.routeIsExample) "현재: 고정 예제 순서" else "현재: 검토 후 적용한 순서", tone = ChipTone.INFO)
-        }
-        vm.trip.routeProposal?.let { proposal ->
-            Notice("미리보기  ${proposal.stopOrder.joinToString(" → ") { id -> vm.trip.stops.first { it.id == id }.shortName }} → 서울시청\n합성 비용 ${"%.1f".format(proposal.cost)} ${proposal.costUnit} · ${proposal.evaluatedOrders}개 순서 비교")
-            Action("이 순서 적용", "apply-route") { vm.perform { applyRouteProposal(it) } }
-        }
+    // 방문 순서는 기관(서버)이 정한 정류장 순서 그대로 보여 준다. 순서 계산·적용·위로 옮기기는 서버 route-revisions가
+    // 차량 자격 증명을 허용할 때까지 뺐다(차량에서 바꾼 순서는 서버에 전달되지 않음).
+    Section("방문 순서", "기관이 정한 순서 · 빈 정류장 빼기·다시 넣기는 운행 화면에서") {
         vm.trip.routeOrder.forEachIndexed { index, id ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)) {
-                Text("${index + 1}. ${vm.trip.stops.first { it.id == id }.name}", Modifier.weight(1f))
-                Action("위로", "route-up-$id", enabled = index > 0, secondary = true) {
-                    val order = vm.trip.routeOrder.toMutableList(); val prev = order[index - 1]; order[index - 1] = id; order[index] = prev
-                    vm.perform { reorderStops(order, it) }
-                }
-            }
+            Text("${index + 1}. ${vm.trip.stops.first { it.id == id }.name}", modifier = Modifier.testTag("route-order-$id"))
         }
         // 등원은 정류장에서 태우므로 탑승 기록 없이 출발한다(탈 아이 0명이면 엔진이 막음, D34).
         Action("운행 화면으로", "start-driving", enabled = (vm.trip.onboardChildren.isNotEmpty() || (vm.trip.isPickup && !vm.trip.noTripToday)) && vm.engine.stationaryBlockers(vm.now).isEmpty()) { vm.perform { startDriving(it) } }
@@ -76,7 +62,7 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
         NavigationStatus(vm)
         Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
             Action("다음 지점 안내", "navigate-next") { vm.navigateNext() }
-            if (vm.trip.integrationMode == IntegrationMode.SDK) Action("순정 내비 보기", "show-native", secondary = true) { vm.showNativeNavigation() }
+            Action("순정 내비 보기", "show-native", secondary = true) { vm.showNativeNavigation() }
         }
         Notice(if (vm.trip.isPickup) "잠깐 멈춰도 정류장 단계가 되지 않습니다. 정류장에서 정차를 확인한 뒤 직접 선택합니다."
             else "잠깐 멈춰도 하차 모드가 되지 않습니다. 하차 지점에서 정차를 확인한 뒤 운전자가 직접 선택합니다.")
@@ -154,7 +140,9 @@ import com.hanhyo.pleosshuttle.ui.component.BlockReasons
         val end = vm.trip.endRecord
         Text("종료 ${timeText(end?.recordedAtMillis)} · 직접 실내 확인 ${timeText(end?.manualInspectionAtMillis)}")
         Notice(end?.statement ?: "종료 기록 미확인")
-        Action("진단·이력 보기", "view-history") { vm.panel = "diagnostics" }
-        Action("완료 기록 보관 후 새 모의 운행", "new-trip", secondary = true) { vm.startNewSimulationTrip() }
+        Action("완료 기록 보기", "view-history") { vm.panel = "history" }
+        // 개발용 빌드에서만 진단·이력 화면(개발 도구)으로 가는 버튼을 보인다.
+        if (com.hanhyo.pleosshuttle.BuildConfig.DEBUG) Action("진단·이력 보기", "view-diagnostics", secondary = true) { vm.panel = "diagnostics" }
+        Action("다음 운행 불러오기", "next-trip", secondary = true) { vm.panel = "institution" }
     }
 }

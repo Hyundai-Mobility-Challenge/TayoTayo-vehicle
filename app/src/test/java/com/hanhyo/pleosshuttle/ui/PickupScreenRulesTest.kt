@@ -15,7 +15,7 @@ import org.junit.Test
 /** 등원 화면 규칙(VS-02 방향 기본값, VS-17 운행 준비, VS-18 정류장, VS-04 (b) 시트, VS-14 정류장 정정, VS-20 최소). */
 class PickupScreenRulesTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
 
@@ -266,7 +266,7 @@ class PickupScreenRulesTest {
         val e = engine()
         val stops = timelineStops(e.state)
         assertEquals("기관 도착", stops.last().name)
-        assertEquals("탑승 1명", stops[1].detail) // 서울숲: 가(나는 결석 알림이라 탈 아이에서 빠짐)
+        assertEquals("탑승 예정 1명", stops[1].detail) // 서울숲: 가(나는 결석 알림이라 탈 아이에서 빠짐)
         assertEquals(listOf("어린이 가"), ridersAt(e.state, "forest"))
         val before = e.state
         assertTrue(e.startDriving(now))

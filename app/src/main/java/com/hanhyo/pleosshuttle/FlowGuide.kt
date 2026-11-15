@@ -13,6 +13,8 @@ internal data class FlowGuide(
 )
 
 internal const val NO_TRIP_TODAY_TAG = "no-trip-today"
+/** 불러온 운행이 없음(운행 없음 자리 표시 상태, [TripState.hasTrip] false). 기관 연결 → 오늘 운행 불러오기로 안내한다. */
+internal const val NO_TRIP_LOADED_TAG = "no-trip-loaded"
 /** 운행 준비에서 모든 아이가 미탑승 확인되어 탈 아이가 없는 상태(출발 불가, 취소는 명단에서). */
 internal const val NO_RIDERS_TAG = "no-riders"
 /** VS-17 등원 운행 준비(명단 확인 → [준비 마침]). */
@@ -29,6 +31,7 @@ internal fun nextFlowGuide(
     uxRestricted: Boolean = false,
     surroundingsWarning: Boolean = false,
 ): FlowGuide {
+    if (!trip.hasTrip) return FlowGuide("선생님", "오늘 운행 불러오기", "불러온 운행 없음", NO_TRIP_LOADED_TAG)
     // Keep the upcoming destination visible while moving; arrival confirmation remains disabled.
     if (trip.phase == TripPhase.DRIVING) return FlowGuide("선생님", "도착·정차 확인", "도착 확인은 자동 위치 판정이 아닙니다.", if(trip.currentStop == null) "arrive-origin" else "arrive-stop")
     if (uxRestricted) return FlowGuide("선생님", "정차 후 확인하세요", "차량 조작 제한 중", null)
@@ -43,7 +46,7 @@ internal fun nextFlowGuide(
             val reviewed = boardingReviewed && trip.onboardChildren.isNotEmpty()
             when {
                 child == null && trip.onboardChildren.isEmpty() -> FlowGuide("선생님", "탑승한 어린이 없음", "모두 미탑승 확인", NO_RIDERS_TAG)
-                child == null -> FlowGuide("선생님", "운행 시작", "방문 순서는 자동 계산", "start-trip")
+                child == null -> FlowGuide("선생님", "운행 시작", "방문 순서는 기관이 정한 순서", "start-trip")
                 // V-02: 탑승 마침 뒤 탑승 기록이 없는 아이마다 선생님이 미탑승을 확인한다. 미탑승 예정 아이는 처음부터 미탑승 확인이 먼저.
                 reviewed -> FlowGuide("선생님", "미탑승 확인", "탑승 기록 없는 어린이", "not-boarded-${child.id}", confirmingRemaining = true)
                 !child.expectedToBoard -> FlowGuide("선생님", "미탑승 확인", "오늘 미탑승 예정", "not-boarded-${child.id}")
@@ -57,7 +60,6 @@ internal fun nextFlowGuide(
                 surroundingsWarning -> FlowGuide("운전자", "주변 위험 확인", "경고 유지", "surroundings-status")
                 child != null && child.id !in trip.handoverChildIds -> FlowGuide("선생님", "보호자 인계 확인", "직접 인계", "handover-${child.id}")
                 child != null -> FlowGuide("선생님", "하차 기록", "직접 하차 확인", "alight-${child.id}")
-                trip.unlockAttempt?.let { it.completedAtMillis == null } == true -> FlowGuide("운전자", "별도 문 시험 응답 대기", "시험 진행 중", "door-result")
                 else -> FlowGuide("선생님", "다음 지점", "기록 완료", "complete-stop")
             }
         }
@@ -86,7 +88,6 @@ private fun pickupFlowGuide(trip: TripState, boardingReviewed: Boolean, surround
         else FlowGuide("선생님", "등원 준비", "알림 없는 아이는 정류장에서 확정", PICKUP_PREPARE_TAG)
     TripPhase.ALIGHTING -> when {
         surroundingsWarning -> FlowGuide("운전자", "주변 위험 확인", "경고 유지", "surroundings-status")
-        trip.unlockAttempt?.let { it.completedAtMillis == null } == true -> FlowGuide("운전자", "별도 문 시험 응답 대기", "시험 진행 중", "door-result")
         else -> FlowGuide("선생님", "인계받음·탑승", "정류장 아이마다 기록", PICKUP_STOP_TAG)
     }
     // VS-20: 처리 안 된 아이 미탑승 확인 → 탄 아이마다 기관 인계(하차 기록) → 실내 확인 → [운행 종료](S-19). 한 화면에서 처리한다.

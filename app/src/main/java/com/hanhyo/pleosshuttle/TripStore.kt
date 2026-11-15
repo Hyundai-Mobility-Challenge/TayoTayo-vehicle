@@ -47,6 +47,9 @@ class TripStore(context: Context) {
 
     fun save(state: TripState) = writeAtomic(file, state)
 
+    /** 진행 중 운행 파일을 지운다. 이전 빌드의 모의 운행처럼 이어서 쓰지 않을 저장본을 [archiveSnapshot]으로 보관한 뒤에만 쓴다. */
+    fun clear() = synchronized(ioLock) { file.delete() }
+
     private fun writeAtomic(target: AtomicFile, state: TripState) = synchronized(ioLock) {
         val output = target.startWrite()
         try {

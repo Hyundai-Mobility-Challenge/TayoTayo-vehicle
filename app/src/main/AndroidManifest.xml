@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
-    <uses-permission android:name="pleos.car.permission.CONTROL_CAR_DOORS" />
     <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
     <!-- V-06 벨트 경고등(Safety.registerTelltales/getTelltalesInfo) 읽기 전용 -->
     <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />
@@ -35,7 +34,6 @@
             <intent-filter>
                 <action android:name="OPEN_DROPOFF_PREPARATION" />
                 <action android:name="SHOW_NEXT_STOP" />
-                <action android:name="PLAY_TEST_MUSIC" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

@@ -6,7 +6,7 @@ import org.junit.Test
 /** D34: 탈 아이(expectedToBoard)가 0명이면 운행하지 않음("오늘 운행 없음"). */
 class NoTripTodayTest {
     private val now = 1_000_000L
-    private fun <T> observed(value: T) = Observation(value, Source.SIMULATED, now, ResultStatus.TARGET_OBSERVED)
+    private fun <T> observed(value: T) = Observation(value, Source.SDK, now, ResultStatus.TARGET_OBSERVED)
     private fun parked() = VehicleSnapshot(connected = true, speedKph = observed(0.0), gear = observed(Gear.PARK),
         parkingBrake = observed(true), doorLocked = observed(true), connectionGeneration = 1)
     private fun allAbsent() = SampleTrip.create().let { trip ->

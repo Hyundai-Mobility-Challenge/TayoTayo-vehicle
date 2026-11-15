@@ -89,6 +89,13 @@ class FlowGuideTest {
         assertNull(nextFlowGuide(trip, uxRestricted = true).targetTag)
     }
 
+    @Test fun `불러온 운행이 없으면 기관 연결과 운행 불러오기만 안내한다`() {
+        val none = NoTrip.state()
+        assertEquals(NO_TRIP_LOADED_TAG, nextFlowGuide(none).targetTag)
+        assertEquals(NO_TRIP_LOADED_TAG, nextFlowGuide(none, boardingReviewed = true, stationaryReady = false, uxRestricted = true).targetTag)
+        assertNotEquals(NO_TRIP_TODAY_TAG, nextFlowGuide(none).targetTag)
+    }
+
     @Test fun `탈 어린이 0명이면 탑승 단계 대신 오늘 운행 없음을 안내한다`() {
         val absent = SampleTrip.create().let { t -> t.copy(children = t.children.map { it.copy(notExpectedToBoard = true) }) }
         assertEquals(NO_TRIP_TODAY_TAG, nextFlowGuide(absent).targetTag)

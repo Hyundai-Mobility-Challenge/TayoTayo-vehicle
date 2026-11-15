@@ -50,25 +50,19 @@ class TrackingTransportDeviceTest {
             assertEquals(fix.latitude, view.getJSONObject("location").getDouble("latitude"), .000001)
             if (trip.currentStop?.id == own.id) assertEquals("SIMULATED_NAVI_ESTIMATE", view.getJSONObject("eta").getString("kind"))
             else assertTrue(view.isNull("eta"))
-            var demoClock = 0L
-            val demo = MovingTrackingDemo { demoClock }
+            // 이동 중 위치 두 번: 정류장 쪽으로 다가가는 합성 위치(SIMULATED)와 줄어드는 남은 시간.
             val next = trip.currentStop!!
-            demo.start("synthetic-test", next.latitude, next.longitude)
-            fun transmit() {
-                val frame = demo.sample()!!
+            val movingRoute = "synthetic-moving"
+            fun transmit(longitudeOffset: Double, seconds: Int, meters: Int) {
                 val at = System.currentTimeMillis()
-                connection.reportTracking(trip, true, TrackingLocation(frame.latitude, frame.longitude, at, true, demo.routeId, 0),
-                    TrackingNavigation("READY", 3, demo.routeId, next.latitude, next.longitude, frame.seconds, frame.meters, at))
+                connection.reportTracking(trip, true, TrackingLocation(next.latitude - .003, next.longitude - .004 + longitudeOffset, at, true, movingRoute, 0),
+                    TrackingNavigation("READY", 3, movingRoute, next.latitude, next.longitude, seconds, meters, at))
             }
-            transmit(); val firstPoint = guardian().getJSONObject("location")
-            demoClock = 45_000; transmit(); val movingView = guardian()
+            transmit(0.0, 90, 800); val firstPoint = guardian().getJSONObject("location")
+            transmit(0.002, 45, 400); val movingView = guardian()
             assertTrue(movingView.getJSONObject("location").getDouble("longitude") > firstPoint.getDouble("longitude"))
-            if (next.id == own.id) {
-                assertEquals("SIMULATED_NAVI_ESTIMATE", movingView.getJSONObject("eta").getString("kind"))
-                assertTrue(movingView.getJSONObject("eta").getString("label").contains("모의"))
-            } else assertTrue(movingView.isNull("eta"))
-            demo.pause(); val paused = demo.sample(); demoClock += 30_000; assertEquals(paused, demo.sample())
-            demo.stop(); assertNull(demo.sample())
+            if (next.id == own.id) assertEquals("SIMULATED_NAVI_ESTIMATE", movingView.getJSONObject("eta").getString("kind"))
+            else assertTrue(movingView.isNull("eta"))
             // Stopping removes the observation; an obsolete queued generation cannot republish it.
             connection.reportTracking(trip, true, null)
             connection.reportTracking(trip, true, fix, native, stillCurrent = { false })

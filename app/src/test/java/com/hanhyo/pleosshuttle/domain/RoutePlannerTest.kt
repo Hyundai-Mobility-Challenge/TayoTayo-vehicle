@@ -56,9 +56,9 @@ class RoutePlannerTest {
     }
 
     @Test fun `허용되지 않은 지점과 중복 지점은 수동 순서에 적용하지 않는다`() {
-        val engine = ShuttleEngine()
+        val engine = ShuttleEngine(SampleTrip.create())
         val time = 1_000L
-        fun <T> obs(value: T) = Observation(value, Source.SIMULATED, time, ResultStatus.TARGET_OBSERVED)
+        fun <T> obs(value: T) = Observation(value, Source.SDK, time, ResultStatus.TARGET_OBSERVED)
         engine.updateVehicle(VehicleSnapshot(true, obs(0.0), obs(Gear.PARK), obs(true), obs(true)), time)
         assertFalse(engine.reorderStops(listOf("forest", "museum", "unknown"), time))
         assertFalse(engine.reorderStops(listOf("forest", "forest", "park"), time))
@@ -66,9 +66,9 @@ class RoutePlannerTest {
     }
 
     @Test fun `계산 뒤 기준을 바꾸면 이전 미리보기를 적용하지 않는다`() {
-        val engine = ShuttleEngine()
+        val engine = ShuttleEngine(SampleTrip.create())
         val time = 1_000L
-        fun <T> obs(value: T) = Observation(value, Source.SIMULATED, time, ResultStatus.TARGET_OBSERVED)
+        fun <T> obs(value: T) = Observation(value, Source.SDK, time, ResultStatus.TARGET_OBSERVED)
         engine.updateVehicle(VehicleSnapshot(true, obs(0.0), obs(Gear.PARK), obs(true), obs(true)), time)
         assertTrue(engine.calculateRoute(time))
         val previous = engine.state.routeProposal!!

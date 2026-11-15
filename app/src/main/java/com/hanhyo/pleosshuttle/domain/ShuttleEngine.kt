@@ -1,14 +1,14 @@
 package com.hanhyo.pleosshuttle.domain
 
 /** Single-owner domain state. Call on the ViewModel owner thread; adapters only deliver observations. */
-class ShuttleEngine(initial: TripState = SampleTrip.create()) {
+class ShuttleEngine(initial: TripState = NoTrip.state()) {
     var state: TripState = initial
         private set
     var vehicle: VehicleSnapshot = VehicleSnapshot()
         private set
     var surroundings: Surroundings = Surroundings()
         private set
-    var lastMessage: String = "가상의 명단과 공개 장소로 하원 흐름을 체험합니다."
+    var lastMessage: String = "운행을 준비해 주세요."
         private set
     private var safetyRevision = 0L
     private var sequence = 0L
@@ -91,15 +91,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         lastMessage = "진행 중 운행을 복원했습니다. 센서와 확인 절차는 다시 확인합니다."
         return true
     }
-    fun setIntegrationMode(mode: IntegrationMode, now: Long): Boolean {
-        if (state.phase == TripPhase.ENDED) return reject("종료된 운행의 연동 모드는 변경할 수 없습니다.")
-        if (state.unlockAttempt?.completedAtMillis == null && state.unlockAttempt != null) return reject("문 요청 결과를 기다리는 중입니다.")
-        if (state.phase != TripPhase.PREPARING && stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
-        invalidate(now, "실제·모의 모드 전환")
-        vehicle = VehicleSnapshot(connectionGeneration = vehicle.connectionGeneration + 1)
-        surroundings = Surroundings()
-        return update(state.copy(integrationMode = mode, unlockAttempt = null), "${mode.label}로 전환했습니다. 새 관측이 필요합니다.")
-    }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun setRoutePolicy(objective: RouteObjective?, returnToOrigin: Boolean, now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("방문 순서 기준은 운행 준비에서 정합니다.")
         if (vehicle.connected && stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
@@ -119,15 +111,15 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         else if (vehicle.gear.value != Gear.PARK) add("운행 기록은 정차 후 P 기어에서 확인해 주세요")
         if (state.integrationMode == IntegrationMode.SDK &&
             (vehicle.speedKph.source !in REAL_SOURCES || vehicle.gear.source !in REAL_SOURCES))
-            add("모의 정보로 운행 기록을 확인할 수 없음 · 실제 차량 속도·기어 필요")
+            add("차량에서 받은 속도·기어가 아니어서 운행 기록을 확인할 수 없음")
     }
     /** Kept separate: no ordinary attendance or route operation may inherit this condition. */
     fun doorStationaryBlockers(now: Long): List<String> = buildList {
         addAll(stationaryBlockers(now))
         if (vehicle.parkingBrakeSupported && (!vehicle.parkingBrake.isFresh(now) || vehicle.parkingBrake.value != true))
-            add("문 제어 시험은 지원되는 주차 브레이크 체결 확인이 필요함")
+            add("문 잠금 해제는 지원되는 주차 브레이크 체결 확인이 필요함")
         if (state.integrationMode == IntegrationMode.SDK && vehicle.parkingBrakeSupported && vehicle.parkingBrake.source !in REAL_SOURCES)
-            add("모의 주차 정보로 실제 문 제어를 할 수 없음")
+            add("차량에서 받은 주차 정보가 아니어서 문 잠금 해제를 할 수 없음")
     }
     fun unlockBlockers(now: Long, requireLocked: Boolean = true): List<String> = buildList {
         if (state.phase != TripPhase.ALIGHTING) add("운전자의 명시적 하차 선택이 필요함")
@@ -140,7 +132,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         if (requireLocked) {
             if (!vehicle.doorLocked.isFresh(now)) add("문 잠금 현재값 미확인 또는 오래된 정보")
             else if (vehicle.doorLocked.value != true) add("현재 잠금 상태가 아니므로 추가 해제 요청하지 않음")
-            if (state.integrationMode == IntegrationMode.SDK && vehicle.doorLocked.source !in REAL_SOURCES) add("모의 문 상태로 실제 SDK 제어를 할 수 없음")
+            if (state.integrationMode == IntegrationMode.SDK && vehicle.doorLocked.source !in REAL_SOURCES) add("차량에서 받은 문 상태가 아니어서 문 잠금 해제를 할 수 없음")
         }
     }
     fun tick(now: Long): Boolean {
@@ -261,7 +253,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         return true
     }
 
-    /** 뺀 정류장 다시 넣기(선생님). 운행 준비·정차 중에만. 지나온 지점 뒤 가장 가까운 위치에 넣는다. */
+    /** 뺀 정류장 다시 넣기(선생님). 운행 준비·정차 중에만. 고정 구간(지나온·정차 중인 지점) 뒤, 원래 서버 정류장 순서(seq) 자리에 넣는다. */
     fun includeStop(stopId: String, now: Long): Boolean {
         manualRouteBlockers(now).firstOrNull()?.let { return reject(it) }
         if (stopId !in state.excludedStops) return reject("뺀 정류장이 아닙니다.")
@@ -367,7 +359,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         tick(now)
         val blockers = unlockBlockers(now)
         if (blockers.isNotEmpty()) return reject(blockers.joinToString(" · "))
-        if (state.unlockAttempt != null) return reject("이 하차 절차에서는 문 해제 시험을 한 번만 요청합니다. 결과를 확인하세요.")
+        if (state.unlockAttempt != null) return reject("이 하차 절차에서는 문 잠금 해제를 한 번만 요청합니다. 결과를 확인하세요.")
         if (state.unlockConfirmation != null) return reject("최종 확인이 이미 준비되어 있습니다.")
         return update(state.copy(unlockConfirmation = UnlockConfirmation(id("unlock", now), now, now + CONFIRMATION_TTL, safetyRevision, vehicle.connectionGeneration, state.integrationMode)), "최종 확인 준비. 버튼을 누르면 현재 모드로 한 번 요청합니다.")
     }
@@ -445,7 +437,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     /**
      * V-21 보호자 미도착 · 동승 유지(하원). 메인 인계 단계(인계 확인 전)에서만, 정차 확인(V-11) 중에만.
      * 아이는 탑승(ONBOARD) 그대로 두고 사유 코드(고정 선택지)만 표시한다. 이 지점은 이 아이의 하차 없이 완료할 수 있다.
-     * 원장에 출결 기록(stayOnboard=true)을 남겨 서버에 GUARDIAN_NO_SHOW로 보낸다(D35 기관 쪽 자동 기록). 모의 모드는 기기 기록만.
+     * 원장에 출결 기록(stayOnboard=true)을 남겨 서버에 GUARDIAN_NO_SHOW로 보낸다(D35 기관 쪽 자동 기록).
      */
     fun markStayOnboard(childId: String, reasonCode: String, now: Long): Boolean {
         // 등원 기관 담당자 부재 시 처리(OQ-29·D32)는 미확정이라 등원에서는 동승 유지를 기록하지 않는다.
@@ -504,15 +496,17 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         }
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태를 먼저 확인하세요.")
         if (surroundings.kind == SurroundingKind.WARNING) return reject("주변 위험 경고를 먼저 확인하세요.")
-        if (state.unlockAttempt?.let { it.completedAtMillis == null } == true) return reject("별도 문 시험의 응답을 기다리고 있습니다.")
+        if (state.unlockAttempt?.let { it.completedAtMillis == null } == true) return reject("문 잠금 해제 요청의 응답을 기다리고 있습니다.")
         diagnostic(DiagnosticEntry(now, "지점 기록 완료", ResultStatus.TARGET_OBSERVED,
-            "현재 지점의 인계·하차 기록 완료로 다음 목적지 표시. 차량 출발 승인 또는 문·주변 안전 확인이 아님. 주변=${surroundings.kind}, 문시험=${state.unlockAttempt?.status}"))
+            "현재 지점의 인계·하차 기록 완료로 다음 목적지 표시. 차량 출발 승인 또는 문·주변 안전 확인이 아님. 주변=${surroundings.kind}, 문요청=${state.unlockAttempt?.status}"))
         invalidate(now, "지점 기록 완료 후 다음 목적지 표시")
         return update(state.copy(phase = TripPhase.DRIVING, currentStopIndex = state.currentStopIndex + 1, handoverChildIds = emptySet()),
             if (state.isPickup) (if (state.currentStopIndex + 1 >= state.routeOrder.size) "정류장 탑승 기록 완료 · 기관으로 출발합니다." else "정류장 탑승 기록 완료 · 다음 지점을 안내합니다.") else "하차 기록 완료 · 다음 지점을 안내합니다.")
     }
     fun startOperationalTrip(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("이미 운행을 시작했습니다.")
+        // 예시 순서(routeIsExample)일 때만 자동 계산 순서를 적용한다. 기관 운행은 createTrip·복원(StoredTrips.serverOrder)에서
+        // routeIsExample=false라 서버 정류장 순서를 그대로 쓴다. 자동 계산은 서버 route-revisions 차량 허용 후 재연결 예정.
         if (state.routeIsExample) {
             if (!calculateRoute(now) || !applyRouteProposal(now)) return false
         }
@@ -701,11 +695,13 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
             pickupAction = PickupActions.INSTITUTION_HANDOVER)
     }
 
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun previewRoute(proposal: RouteProposal): Boolean {
         if (state.phase != TripPhase.PREPARING || proposal.routeVersion != state.routeVersion) return reject("현재 운행 준비에 맞는 경로 계산이 아닙니다.")
         if (!validOrder(proposal.stopOrder)) return reject("승인된 지점 전체만 재정렬할 수 있습니다.")
         return update(state.copy(routeProposal = proposal), "합성 비용 계산 결과 미리보기. 적용 전 순서를 확인하세요.")
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun applyRoute(order: List<String>, now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("운행 중 방문 순서를 변경하지 않습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태 확인 후 순서를 적용하세요.")
@@ -716,18 +712,21 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
         clearDriverCheckIfChanged(before, "방문 순서 변경", now)
         return true
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun applyPreview(now: Long): Boolean {
         val proposal = state.routeProposal ?: return reject("적용할 계산 결과가 없습니다.")
         if (proposal.routeVersion != state.routeVersion) return reject("계산 후 경로 조건이 바뀌었습니다. 다시 계산하세요.")
         return applyRoute(proposal.stopOrder, now)
     }
-    fun switchMode(mode: IntegrationMode, now: Long): Boolean = setIntegrationMode(mode, now)
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun calculateRoute(now: Long): Boolean {
         if (state.phase != TripPhase.PREPARING) return reject("운행 준비에서만 순서를 계산할 수 있습니다.")
         if (stationaryBlockers(now).isNotEmpty()) return reject("정차 상태 확인 후 계산하세요.")
         return try { previewRoute(RoutePlanner.plan(state)) } catch (error: IllegalArgumentException) { reject(error.message ?: "비용 행렬을 확인하세요.") }
     }
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun applyRouteProposal(now: Long): Boolean = applyPreview(now)
+    // 서버 route-revisions 차량 허용 후 재연결 예정: 지금은 UI·ViewModel에서 호출하지 않는다(차량에서 바꾼 순서는 서버에 전달되지 않음).
     fun reorderStops(order: List<String>, now: Long): Boolean = applyRoute(order, now)
 
     /** 순서 바꾸기에서 고정할 앞부분 길이. 정차 중이면 이미 방문한 지점과 지금 정류장까지 그대로 둔다. */
@@ -739,6 +738,7 @@ class ShuttleEngine(initial: TripState = SampleTrip.create()) {
     }
 
     /**
+     * 서버 route-revisions 차량 허용 후 재연결 예정(지금은 UI·ViewModel에서 호출하지 않음).
      * 선생님이 정한 방문 순서를 RouteObjective.FIXED로 반영한다. 운행 전에는 previewRoute/applyRoute를 거치고,
      * 정차 중에는 남은 지점만 바꾼다. 내비는 다음 목적지로 넘어갈 때 새 순서의 다음 지점을 받는다.
      */

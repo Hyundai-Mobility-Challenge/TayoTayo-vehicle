@@ -4,6 +4,7 @@ import java.io.ObjectInputStream
 import java.io.ObjectStreamClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -66,5 +67,8 @@ class SerialVersionUidPinTest {
         assertEquals(null, state.excludedStopIds)
         assertTrue(state.excludedStops.isEmpty())
         assertTrue(state.ledger.none { it.isStopExclusionRecord })
+        // 이 파일은 이전 빌드의 모의 운행이다. 읽기(역직렬화)는 성공하지만 앱은 이어서 쓰지 않고 "운행 없음"으로 시작한다.
+        assertTrue(StoredTrips.isLegacySimulation(state))
+        assertNull(StoredTrips.restorable(state))
     }
 }

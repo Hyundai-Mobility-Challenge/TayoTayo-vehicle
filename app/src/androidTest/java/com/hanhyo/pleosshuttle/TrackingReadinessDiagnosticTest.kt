@@ -10,8 +10,8 @@ class TrackingReadinessDiagnosticTest {
   val t=TripStore(c).load()
   val i=InstitutionConnection(c)
   val enabled=c.getSharedPreferences("simulation-settings",0).getBoolean("trackingEnabled",false)
-  val recoverable=t!=null && canArchiveLocalTrackingDemo(BuildConfig.DEBUG,i.connected,t.tripId==i.boundTrip,t.integrationMode,t.tripId,true,false)
-  val status="TRACKING_READINESS connected=${i.connected} bound=${t?.tripId==i.boundTrip} phase=${t?.phase} mode=${t?.integrationMode} onboard=${t?.onboardChildren?.size} hasStop=${t?.currentStop!=null} enabled=$enabled archiveLocalDemoAllowed=$recoverable"
+  val legacy=t!=null && com.hanhyo.pleosshuttle.domain.StoredTrips.isLegacySimulation(t)
+  val status="TRACKING_READINESS connected=${i.connected} bound=${t?.tripId==i.boundTrip} phase=${t?.phase} mode=${t?.integrationMode} onboard=${t?.onboardChildren?.size} hasStop=${t?.currentStop!=null} enabled=$enabled legacySimulation=$legacy"
   InstrumentationRegistry.getInstrumentation().sendStatus(0,android.os.Bundle().apply { putString("readiness",status) })
  }
 }

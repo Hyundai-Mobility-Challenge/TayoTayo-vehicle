@@ -3,7 +3,6 @@ package com.hanhyo.pleosshuttle.sdk
 import ai.pleos.playground.vehicle.Vehicle
 import ai.pleos.playground.vehicle.api.model.area.DoorArea
 import ai.pleos.playground.vehicle.api.model.area.SeatArea
-import ai.pleos.playground.vehicle.api.model.capability.AccessType
 import ai.pleos.playground.vehicle.api.model.telltale.Telltales
 import ai.pleos.playground.vehicle.constant.telltale.TelltaleState
 import ai.pleos.playground.vehicle.constant.telltale.TelltaleType
@@ -12,13 +11,11 @@ import ai.pleos.playground.vehicle.listener.DoorLockStateListener
 import ai.pleos.playground.vehicle.listener.SeatBeltBuckledStateListener
 import ai.pleos.playground.vehicle.listener.TelltaleInfoListener
 import android.car.Car
-import android.car.VehicleGear
 import android.car.VehiclePropertyIds
 import android.car.drivingstate.CarUxRestrictionsManager
 import android.car.hardware.CarPropertyValue
 import android.car.hardware.property.CarPropertyManager
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -26,7 +23,7 @@ import android.os.SystemClock
 import java.io.File
 import java.util.concurrent.Executors
 
-/** Only public SDK APIs. This class has no entry point for simulated sensor inputs. */
+/** Only public SDK APIs, read-only: observes speed·gear·parking brake·door lock·belts. Never writes vehicle state (no door control). */
 class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapshot) -> Unit) {
     private val app = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
@@ -40,10 +37,7 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
     private var running = false
     private var closed = false
     private var epoch = 0L
-    private var revision = 0L
     private var subscriptionSerial = 0L
-    private var token: UnlockConfirmation? = null
-    private var doorWritable = false
     private var selectedDoorCapability: ExactSupportedArea<DoorArea>? = null
     private var doorListener: DoorLockStateListener? = null
     private var telltaleListener: TelltaleInfoListener? = null
@@ -62,29 +56,18 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
     )
     private var pendingAaosRead: PendingAaosRead? = null
     private val aaosReadPending: Boolean get() = pendingAaosRead != null
-    private var doorAttemptInProgress = false
-    private var doorFailureLatch: String? = null
-    private var doorCallback: ((SdkObservation<Boolean>) -> Unit)? = null
     private var snapshot = VehicleSnapshot(parkingBrakeSupported = capabilityPreferences.getBoolean("parking_brake_supported", false), versions = mapOf(
-        "Vehicle SDK" to "2.3.2", "Vehicle Service" to packageVersion("ai.pleos.playground.service.vehicle"),
+        "Vehicle SDK" to com.hanhyo.pleosshuttle.BuildConfig.PLEOS_VEHICLE_SDK, "Vehicle Service" to packageVersion("ai.pleos.playground.service.vehicle"),
         "Android" to "${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT}",
         "Build fingerprint" to Build.FINGERPRINT, "Hardware" to Build.HARDWARE,
     ))
     val current: VehicleSnapshot get() = snapshot
-
-    // Exact identity read from emulator-5556 Pleos_Connect_v2.1.0 on 2026-10-30. No UI/runtime override.
-    private fun isVerifiedEmulator(): Boolean = UnlockSafetyPolicy.isVerifiedEmulator(
-        app.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
-        Build.FINGERPRINT, Build.HARDWARE, Build.PRODUCT,
-        VERIFIED_PLEOS_FINGERPRINTS, VERIFIED_PLEOS_PRODUCTS,
-    )
 
     fun initialize() = onStart()
     fun onStart() {
         if (closed || running) return
         running = true
         val startEpoch = ++epoch
-        snapshot = snapshot.copy(emulatorGuard = isVerifiedEmulator())
         try {
             val v = Vehicle(app)
             vehicle = v
@@ -109,7 +92,6 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
                             readyUxManager?.registerListener { restrictions -> handler.post {
                                 if (running && epoch == startEpoch && aaosConnection.generation == readyGeneration && properties === readyProperties && uxManager === readyUxManager) {
                                     val restricted = restrictions.isRequiresDistractionOptimization
-                                    if (snapshot.uxRestricted.value != restricted) invalidateConfirmation("주행 UX 제한 상태 변경")
                                     snapshot = snapshot.copy(uxRestricted = observed(restricted, "AAOS UX 제한"), activeUxRestrictions = restrictions.activeRestrictions)
                                     publish()
                                 }
@@ -131,7 +113,6 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
     private val tick = object : Runnable {
         override fun run() {
             if (!running) return
-            if (token != null && (SystemClock.elapsedRealtime() - token!!.createdElapsed > CONFIRMATION_TTL || motionBlock() != null)) invalidateConfirmation("입력 만료 또는 상태 변화")
             refresh()
             handler.postDelayed(this, 2_000)
         }
@@ -168,15 +149,13 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
                 if (!running || epoch != startEpoch) return@post
                 val supported = exactSupportedAreas(areas) { it.values.map { value -> value.name } }
                 val selected = selectExactArea(supported, DoorValue.ROW_2_RIGHT.name)
-                if (selectedDoorCapability?.key != selected?.key) invalidateConfirmation("SDK 문 그룹 범위 변경")
                 selectedDoorCapability = selected
-                doorWritable = config.accessType == AccessType.READ_WRITE
                 snapshot = snapshot.copy(supportedDoorAreas = supported.map { it.key }, selectedDoorArea = selected?.key)
                 log("Door capability access=${config.accessType} originalAreas=$areas exactGroups=${supported.map { it.key }}; selectedExactGroup=${selected?.key}; all members of selected group share the request")
                 if (selected != null) registerDoor(startEpoch, selected)
                 else snapshot = snapshot.copy(doorLocked = SdkObservation(outcome = SdkOutcome.UNSUPPORTED, error = "ROW_2_RIGHT를 포함하는 원본 SDK Area 미지원"))
                 refresh()
-            } }, onFailed = { e -> handler.post { if (running && epoch == startEpoch) { doorWritable = false; snapshot = snapshot.copy(doorLocked = failure(e, "Vehicle capability")); log("Door capability ERROR $e") } } })
+            } }, onFailed = { e -> handler.post { if (running && epoch == startEpoch) { snapshot = snapshot.copy(doorLocked = failure(e, "Vehicle capability")); log("Door capability ERROR $e") } } })
             // V-07 삭제(D39): 좌석 점유(checkSeatOccupancyCapabilities/registerSeatOccupancy)는 구독하지 않는다.
             v.getSeat().checkSeatBeltBuckledCapabilities(onComplete = { _, areas -> handler.post {
                 if (!running || epoch != startEpoch) return@post
@@ -230,13 +209,11 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
 
     private fun clearAaosConnection(reason: String) {
         aaosConnection.replace(null)
-        invalidateConfirmation(reason)
         snapshot = snapshot.copy(connected = false, speedMetersPerSecond = unavailable(reason), gear = unavailable(reason), parkingBrake = unavailable(reason), uxRestricted = unavailable(reason), activeUxRestrictions = null)
         pendingAaosRead?.let { rejectAaosRead(it, reason) }
         val previousUx = uxManager
         uxManager = null
         runCatching { previousUx?.unregisterListener() }.onFailure { log("UX listener cleanup ERROR $it") }
-        if (doorAttemptInProgress) finishDoor(SdkObservation(outcome = SdkOutcome.UNVERIFIED, error = "$reason · 이미 보낸 문 요청의 최종 상태 미확인"), "AAOS 연결 변경 중 문 요청: 반복 요청 차단")
         log("AAOS connection generation=${aaosConnection.generation} invalidated: $reason")
     }
 
@@ -260,9 +237,8 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
         pendingAaosRead = read
         handler.postDelayed({
             if (!read.completed) {
-                rejectAaosRead(read, "AAOS 실제 재조회 4초 시간 초과 · 문 요청 전송 안 함")
+                rejectAaosRead(read, "AAOS 실제 재조회 4초 시간 초과")
                 if (running && epoch == read.epoch && aaosConnection.accepts(read.capture)) {
-                    invalidateConfirmation("AAOS 실제 재조회 시간 초과")
                     snapshot = snapshot.copy(connected = false, speedMetersPerSecond = unavailable("AAOS 조회 시간 초과"), gear = unavailable("AAOS 조회 시간 초과"), parkingBrake = unavailable("AAOS 조회 시간 초과"))
                     log("AAOS read timeout generation=${read.capture.generation}; late result discarded")
                 }
@@ -276,15 +252,13 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
             handler.post {
                 if (read.completed) return@post
                 if (!running || read.epoch != epoch || pendingAaosRead !== read || !aaosConnection.accepts(read.capture) || car?.isConnected != true) {
-                    rejectAaosRead(read, "AAOS 연결 세대 또는 manager 변경 · 이전 조회 폐기 · 문 요청 전송 안 함")
+                    rejectAaosRead(read, "AAOS 연결 세대 또는 manager 변경 · 이전 조회 폐기")
                     return@post
                 }
                 read.completed = true
                 pendingAaosRead = null
-                if (snapshot.speedMetersPerSecond.value != speed.value || snapshot.gear.value != gear.value || snapshot.parkingBrake.value != park.value || snapshot.speedMetersPerSecond.outcome != speed.outcome || snapshot.gear.outcome != gear.outcome) invalidateConfirmation("차량 운행 상태 변경")
                 if (parkingSupported && !snapshot.parkingBrakeSupported) {
                     capabilityPreferences.edit().putBoolean("parking_brake_supported", true).apply()
-                    invalidateConfirmation("주차 브레이크 지원 확인 · 최신 값 필요")
                 }
                 snapshot = snapshot.copy(speedMetersPerSecond = speed, gear = gear, parkingBrake = park, parkingBrakeSupported = parkingSupported, connected = speed.value != null || gear.value != null)
                 recordObservation("AAOS.speed", speed); recordObservation("AAOS.gear", gear); recordObservation("AAOS.parkingBrake", park)
@@ -306,101 +280,21 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
         }
     } catch (e: Exception) { failure(e, "AAOS property=$id") }
 
-    /** Call only when entering the explicit driver's final-confirmation screen. */
-    fun prepareUnlockConfirmation(confirmedAreaKey: String? = null): UnlockConfirmation? {
-        if (confirmedAreaKey == null || confirmedAreaKey != selectedDoorCapability?.key) {
-            token = null
-            log("Unlock prepare blocked: 표시한 원본 SDK 문 그룹 전체의 명시적 확인 필요; selected=${selectedDoorCapability?.key}")
-            return null
-        }
-        val reason = unlockBlock()
-        if (reason != null) { log("Unlock prepare blocked: $reason"); return null }
-        return UnlockConfirmation(System.nanoTime(), revision, SystemClock.elapsedRealtime(), confirmedAreaKey).also { token = it }
-    }
-
-    /** Consumes one token. Never retries, re-locks, or accepts synthetic safety inputs. */
-    fun requestUnlock(confirmation: UnlockConfirmation, callback: (SdkObservation<Boolean>) -> Unit) {
-        if (!UnlockSafetyPolicy.confirmationIsCurrent(confirmation, token, revision, SystemClock.elapsedRealtime())) {
-            callback(SdkObservation(outcome = SdkOutcome.ERROR, error = "최종 확인 만료 또는 무효화")); return
-        }
-        val reason = unlockBlock()
-        if (reason != null || aaosReadPending) { token = null; callback(SdkObservation(outcome = SdkOutcome.ERROR, error = reason ?: "실제 상태 재조회 중 · 다시 확인 필요")); return }
-        refreshAaos(onRejected = { reason ->
-            token = null
-            callback(SdkObservation(outcome = SdkOutcome.UNVERIFIED, source = "AAOS 최종 실제 조회", error = reason))
-        }) {
-            val selected = selectedDoorCapability
-            if (selected == null || confirmation.areaKey != selected.key || !UnlockSafetyPolicy.confirmationIsCurrent(confirmation, token, revision, SystemClock.elapsedRealtime()) || unlockBlock() != null) {
-                token = null; callback(SdkObservation(outcome = SdkOutcome.ERROR, error = "최종 확인 뒤 상태 변경·만료: ${unlockBlock()}")); return@refreshAaos
-            }
-            token = null
-            doorAttemptInProgress = true
-            doorCallback = callback
-            val currentEpoch = epoch
-            val before = snapshot.doorLocked.value
-            snapshot = snapshot.copy(doorRequest = SdkObservation(before, snapshot.doorLocked.observedAtMillis, "실제 SDK 요청 전 관측", SdkOutcome.UNVERIFIED))
-            log("Door ONE-SHOT pre=$before request=false exactGroup=${selected.key} speed=${snapshot.speedMetersPerSecond.value} gear=${snapshot.gear.value} park=${snapshot.parkingBrake.value}")
-            try {
-                vehicle!!.getDoor().setDoorLock(selected.original, false, onComplete = { _, requested -> dispatch(currentEpoch) {
-                    if (!doorAttemptInProgress) return@dispatch
-                    snapshot = snapshot.copy(doorRequest = SdkObservation(snapshot.doorLocked.value, snapshot.doorLocked.observedAtMillis, "실제 SDK 요청 수락 · 값은 마지막 별도 관측", SdkOutcome.ACCEPTED))
-                    log("Door request ACCEPTED requested=$requested; actual=${snapshot.doorLocked.value}")
-                    callback(snapshot.doorRequest)
-                    refresh()
-                } }, onFailed = { e -> dispatch(currentEpoch) {
-                    finishDoor(failure(e, "실제 SDK 문 요청"), "요청 오류 이후 자동 재시도 없음")
-                } })
-                handler.postDelayed({
-                    if (running && epoch == currentEpoch && doorAttemptInProgress) finishDoor(SdkObservation(snapshot.doorLocked.value, snapshot.doorLocked.observedAtMillis, "실제 SDK 사후 관측", SdkOutcome.TIMEOUT, "요청 후 해제 상태 미관측; 마지막=${snapshot.doorLocked.value}"), "목표 상태 미관측: 반복 요청 차단")
-                }, 6_000)
-            } catch (e: Exception) { finishDoor(failure(e, "실제 SDK 문 요청"), "요청 오류 이후 자동 재시도 없음") }
-        }
-    }
-
     private fun updateDoor(result: SdkObservation<Boolean>) {
         recordObservation("Vehicle.door.${snapshot.selectedDoorArea}", result)
-        if (snapshot.doorLocked.value != result.value || result.outcome != SdkOutcome.TARGET_OBSERVED) invalidateConfirmation("문 상태 변경 또는 미확인")
         snapshot = snapshot.copy(doorLocked = result)
-        if (doorAttemptInProgress && result.value == false && result.isFresh()) finishDoor(result.copy(outcome = SdkOutcome.TARGET_OBSERVED), null)
         publish()
     }
-    private fun finishDoor(result: SdkObservation<Boolean>, latch: String?) {
-        doorAttemptInProgress = false
-        if (latch != null) doorFailureLatch = latch
-        snapshot = snapshot.copy(doorRequest = result)
-        log("Door final=${result.outcome} observed=${result.value} error=${result.error}")
-        val callback = doorCallback; doorCallback = null; callback?.invoke(result)
-    }
-    fun invalidateConfirmation(reason: String) {
-        revision++
-        if (token != null) { token = null; log("Unlock confirmation invalidated: $reason") }
-    }
-    private fun motionBlock(): String? = UnlockSafetyPolicy.motionBlock(
-        snapshot, running, System.currentTimeMillis(), VehicleGear.GEAR_PARK,
-    )
-    private fun unlockBlock(): String? = when {
-        !isVerifiedEmulator() -> "확인된 Pleos 에뮬레이터의 디버그 앱에서만 시험 가능"
-        properties == null || car?.isConnected != true -> "AAOS 현재 연결 미확인 · 실제 manager 재연결 필요"
-        doorAttemptInProgress -> "문 요청 처리 중 · 중복 요청 금지"
-        doorFailureLatch != null -> doorFailureLatch
-        !doorWritable -> "문 영역 읽기·쓰기 지원 미확인"
-        selectedDoorCapability == null -> "지원하는 원본 SDK 문 그룹 미확인"
-        !snapshot.doorLocked.isFresh() -> "문 상태 미확인 또는 오래된 값"
-        snapshot.doorLocked.value != true -> "현재 잠금 상태가 true로 관측되지 않음"
-        else -> motionBlock()
-    }
-
     fun onStop() {
         if (!running) return
         val stoppedEpoch = epoch
         running = false; epoch++
         handler.removeCallbacks(tick)
         clearAaosConnection("앱 백그라운드 전환")
-        if (doorAttemptInProgress) finishDoor(SdkObservation(outcome = SdkOutcome.UNVERIFIED, error = "앱 비활성화: 이미 보낸 요청의 최종 상태 미확인"), "문 요청 중 비활성화: 반복 요청 차단")
         val cleanupCount = cleanups.size
         var cleanupFailures = 0
         cleanups.forEach { cleanup -> runCatching(cleanup).onFailure { cleanupFailures++; log("Listener cleanup ERROR $it") } }; cleanups.clear()
-        doorListener = null; telltaleListener = null; telltaleWatched = false; selectedDoorCapability = null; beltAreas.clear(); inflight.clear(); doorWritable = false
+        doorListener = null; telltaleListener = null; telltaleWatched = false; selectedDoorCapability = null; beltAreas.clear(); inflight.clear()
         runCatching { uxManager?.unregisterListener() }.onFailure { log("UX listener cleanup ERROR $it") }; uxManager = null
         runCatching { car?.disconnect() }.onFailure { log("AAOS disconnect ERROR $it") }; car = null
         runCatching { vehicle?.release() }.onFailure { log("Vehicle release ERROR $it") }; vehicle = null
@@ -443,12 +337,6 @@ class RealVehicleAdapter(context: Context, private val onUpdate: (VehicleSnapsho
         publish()
     }
     private fun publish() {
-        snapshot = snapshot.copy(unlockBlockReason = unlockBlock() ?: "실제 데이터 조건 충족 · 주변 직접 확인과 운전자 최종 확인 별도")
         onUpdate(snapshot)
-    }
-    companion object {
-        private const val CONFIRMATION_TTL = UnlockSafetyPolicy.CONFIRMATION_TTL_MILLIS
-        private val VERIFIED_PLEOS_FINGERPRINTS = setOf("Pleos/crp_avd_arm64/crp_avd_arm64:14/RELEASE.release_connect_v2.1.0/release_connect_v2.1.0:user/test-keys")
-        private val VERIFIED_PLEOS_PRODUCTS = setOf("crp_avd_arm64")
     }
 }

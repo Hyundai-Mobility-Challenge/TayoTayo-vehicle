@@ -54,7 +54,7 @@ class RealNaviAdapter(context: Context, private val diagnosticsEnabled: Boolean 
     private var destination: DestinationInfo? = null
     private var destinationAt = 0L
     private var requestedAt = 0L
-    private var snapshot = NaviSnapshot(versions = mapOf("NaviHelper SDK" to "3.0.5", "Navi Service" to packageVersion("ai.pleos.playground.service.navi")))
+    private var snapshot = NaviSnapshot(versions = mapOf("NaviHelper SDK" to com.hanhyo.pleosshuttle.BuildConfig.PLEOS_NAVI_SDK, "Navi Service" to packageVersion("ai.pleos.playground.service.navi")))
     val current: NaviSnapshot get() = snapshot
 
     fun initialize() = onStart()
@@ -210,7 +210,7 @@ class RealNaviAdapter(context: Context, private val diagnosticsEnabled: Boolean 
     /** Explicit button only. Does not run on initialize, backgrounding, or close. */
     fun cancelOwnRoute() {
         if (!ownsRoute) { log("No route owned by this adapter; cancel not sent"); return }
-        try { helper?.cancelRoute(); snapshot = snapshot.copy(outcome = SdkOutcome.UNVERIFIED, message = "시험 경로 취소 전송 · 수락 이벤트/상태 미확인"); publish() }
+        try { helper?.cancelRoute(); snapshot = snapshot.copy(outcome = SdkOutcome.UNVERIFIED, message = "이 앱의 경로 안내 취소 전송 · 수락 이벤트/상태 미확인"); publish() }
         catch (e: Exception) { log("Cancel ERROR $e") }
     }
     fun onStop() {
