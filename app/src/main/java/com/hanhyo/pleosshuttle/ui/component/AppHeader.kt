@@ -37,9 +37,9 @@ import com.hanhyo.pleosshuttle.designsystem.theme.canvasDp
         Box(
             Modifier.size(if (compact) canvasDp(44) else AppSize.logo).background(AppTheme.colors.primary, RoundedCornerShape(AppRadius.card)),
             contentAlignment = Alignment.Center,
-        ) { Text("통", style = AppTheme.typography.titleBold, color = AppTheme.colors.onPrimary) }
+        ) { Text("타", style = AppTheme.typography.titleBold, color = AppTheme.colors.onPrimary) }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(canvasDp(2))) {
-            Text("통학메이트", style = AppTheme.typography.caption1Regular.copy(fontWeight = FontWeight.Medium), color = AppTheme.colors.textSecondary)
+            Text("타요타요", style = AppTheme.typography.caption1Regular.copy(fontWeight = FontWeight.Medium), color = AppTheme.colors.textSecondary)
             Text(runName, style = AppTheme.typography.head4Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(canvasDp(10)), verticalAlignment = Alignment.CenterVertically, content = trailing)
