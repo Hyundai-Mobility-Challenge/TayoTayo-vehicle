@@ -14,7 +14,7 @@ class InstitutionConnection(context: Context) {
     private val prefs = context.getSharedPreferences("institution", 0)
     /** 마지막 동기화 때 받은 보호자 호출 상태(tripChildId → 정보). 운행이 바뀌면 [bind]에서 비운다. */
     @Volatile var lastGuardianCalls: Map<String, GuardianCallInfo> = emptyMap(); private set
-    val base get() = prefs.getString("base", "http://10.0.2.2:8080")!!
+    val base get() = prefs.getString("base", DEFAULT_BASE)!!
     val name get() = InstitutionTrips.connectionLabel(connected, prefs.getString("name", null))
     val connected get() = prefs.contains("credential")
     /** VS-02: 선생님이 고른 방향. 한 번도 고르지 않았으면 시간대 기본값(TripDirections.defaultFor). */
@@ -137,6 +137,8 @@ class InstitutionConnection(context: Context) {
         else InstitutionTrips.unsentLifecycleKeys(trip) { key -> prefs.getBoolean("$boundTrip:$key", false) }.size
 
     companion object {
+        /** 처음 설치했을 때 연결 화면에 채워 두는 서버 주소(데모 서버). 연결 화면에서 바꿀 수 있고, 바꾼 값은 저장된다. */
+        const val DEFAULT_BASE = "https://api-demo-e677ea0e.up.railway.app"
         private val reportingLock = Any()
     }
     /**

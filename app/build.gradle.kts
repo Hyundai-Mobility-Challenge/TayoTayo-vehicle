@@ -13,8 +13,8 @@ android {
         applicationId = "com.hanhyo.pleosshuttle"
         minSdk = 28
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.0"
+        versionCode = 9
+        versionName = "1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 페어링 때 서버로 보내는 Pleos SDK 버전(InstitutionConnection.pair → pleosSdkVersion). 값은 libs.versions.toml 한곳에서 온다.
         buildConfigField("String", "PLEOS_VEHICLE_SDK", "\"${libs.versions.vehicleSdk.get()}\"")

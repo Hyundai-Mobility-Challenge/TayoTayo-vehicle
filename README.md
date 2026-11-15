@@ -7,7 +7,7 @@ Pleos 차량의 기어·차속 신호로 주행 중에는 내비만 보여 주�
 
 > 운행을 시작하면 Pleos 내비가 정류장 3곳을 경유지로 안내합니다. 2026-11-15 Pleos Connect 에뮬레이터에서 로컬 서버와 가상 아동 4명으로 진행한 하원 운행 화면입니다.
 
-**[⬇️ 차량 앱 v1.0.0 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)** (43.5MB · Pleos Connect, API 28 이상) · [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
+**[⬇️ 차량 앱 v1.0.1 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/%EA%BC%AC%EB%A7%88%EB%B2%84%EC%8A%A4_%ED%83%80%EC%9A%94%ED%83%80%EC%9A%94(%EC%B0%A8%EB%9F%89%EC%9A%A9)_release.apk)** (43.5MB · Pleos Connect, API 28 이상) · [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
 
 > [!NOTE]
 > 차량과 보호자 앱의 설치 및 배포 서버 연결 순서는 [시작하기](#시작하기)를 따라 주세요.
@@ -78,13 +78,13 @@ flowchart TD
 
 | 준비물 | 설치·접속 방법 |
 | --- | --- |
-| 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.0](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
+| 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.1](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/%EA%BC%AC%EB%A7%88%EB%B2%84%EC%8A%A4_%ED%83%80%EC%9A%94%ED%83%80%EC%9A%94(%EC%B0%A8%EB%9F%89%EC%9A%A9)_release.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
 | 보호자 앱 | Android 휴대폰 또는 에뮬레이터에 HTTPS 서버 설정을 지원하는 APK를 설치합니다. 공개 버전 `v0.2-invitations`에는 주소 입력 메뉴가 없습니다. HTTPS 지원 릴리스가 올라오기 전에는 팀이 전달한 HTTPS 지원 APK 또는 디버그 빌드를 사용하세요. [보호자 릴리스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases) · [디버그 빌드 방법](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent#시작하기) |
 | 기관 관리자·보호자 계정 | 두 계정의 비밀번호는 심사 안내와 함께 별도로 전달합니다. [서버 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database) |
 
 ### 2. 배포 서버에 연결하고 오늘 운행 만들기
 
-차량 앱과 보호자 앱에 입력할 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 주소 끝에 `/api/v1`을 붙이지 마세요. 서버와 MySQL은 이미 실행 중입니다.
+차량 앱과 보호자 앱에 입력할 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 차량 앱 v1.0.1은 이 주소가 처음부터 입력되어 있습니다. 주소 끝에 `/api/v1`을 붙이지 마세요. 서버와 MySQL은 이미 실행 중입니다.
 
 1. **PC에서 차량 연결 코드 발급.** [시연 서버 Swagger](https://api-demo-e677ea0e.up.railway.app/swagger-ui.html)에서 `POST /auth/login`을 열고 **Try it out**을 누릅니다. `email=orgs@example.com`, 전달받은 관리자 비밀번호, `clientType=ADMIN_WEB`을 입력하고 **Execute**를 누릅니다. 응답의 `accessToken` 값만 상단 **Authorize → BearerAuth**에 등록합니다. `POST /orgs/{orgId}/vehicles/{vehicleId}/pairing-codes`에서 두 ID에 각각 `1`, 본문에 `{"expiresIn":600}`을 넣으면 10분간 유효한 6자리 코드가 나옵니다.
 2. **차량 연결.** 차량 앱 **기관 · 차량 연결** 화면에 서버 주소와 6자리 코드를 입력하고 **차량 연결**을 누릅니다. 연결 완료를 확인합니다.
