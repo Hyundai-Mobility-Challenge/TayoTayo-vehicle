@@ -80,15 +80,27 @@ flowchart TD
 | --- | --- |
 | 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.1](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/TayoTayo-vehicle-1.0.1-release.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
 | 보호자 앱 | Android 9 이상 휴대폰 또는 에뮬레이터에 [보호자 APK 0.3-local-demo](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases/download/v0.3-local-demo/TayoTayo-parent-0.3-local-demo.apk)를 설치합니다. 첫 설치 시 시연 서버 주소가 기본값입니다. |
-| 기관 관리자·보호자 계정 | 두 계정의 비밀번호는 심사 안내와 함께 별도로 전달합니다. [서버 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database) |
+
+#### 시연용 로그인 계정
+
+| 로그인할 곳 | 이메일 |
+| --- | --- |
+| 기관 관리자 · Swagger (`ADMIN_WEB`) | `orgs@example.com` |
+| 보호자 앱 · 김하늘 보호자 | `pickup-judge@example.com` |
+
+두 시연 계정의 비밀번호는 참가팀의 심사 안내에서 확인하세요. 차량 연결 코드는 아래 절차에서 별도로 발급합니다.
+
+[시연 서버 연결 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database)
 
 ### 2. 배포 서버에 연결하고 오늘 운행 만들기
 
 차량 앱과 보호자 앱에 입력할 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 차량 앱 v1.0.1과 보호자 앱 0.3-local-demo는 처음 설치하면 이 주소가 기본값입니다. 주소 끝에 `/api/v1`을 붙이지 마세요. 서버와 MySQL은 이미 실행 중입니다.
 
-1. **PC에서 차량 연결 코드 발급.** [시연 서버 Swagger](https://api-demo-e677ea0e.up.railway.app/swagger-ui.html)에서 `POST /auth/login`을 열고 **Try it out**을 누릅니다. `email=orgs@example.com`, 전달받은 관리자 비밀번호, `clientType=ADMIN_WEB`을 입력하고 **Execute**를 누릅니다. 응답의 `accessToken` 값만 상단 **Authorize → BearerAuth**에 등록합니다. `POST /orgs/{orgId}/vehicles/{vehicleId}/pairing-codes`에서 두 ID에 각각 `1`, 본문에 `{"expiresIn":600}`을 넣으면 10분간 유효한 6자리 코드가 나옵니다.
+1. **PC에서 차량 연결 코드 발급.** [시연 서버 Swagger](https://api-demo-e677ea0e.up.railway.app/swagger-ui.html)에서 `POST /auth/login`을 열고 **Try it out**을 누릅니다. `email=orgs@example.com`, 심사 안내의 관리자 비밀번호, `clientType=ADMIN_WEB`을 입력하고 **Execute**를 누릅니다. 응답의 `accessToken` 값만 상단 **Authorize → BearerAuth**에 등록합니다. 따옴표와 `Bearer ` 접두사는 생략하세요. `POST /orgs/{orgId}/vehicles/{vehicleId}/pairing-codes`에서 두 ID에 각각 `1`, 본문에 `{"expiresIn":600}`을 넣으면 10분간 유효한 6자리 코드가 나옵니다.
 2. **차량 연결.** 차량 앱 **기관 · 차량 연결** 화면에 서버 주소와 6자리 코드를 입력하고 **차량 연결**을 누릅니다. 연결 완료를 확인합니다.
 3. **오늘 등원 운행 생성.** PC에서 [오늘 운행 만들기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md#차량-연결-후-오늘-운행-만들기)의 PowerShell 명령을 실행합니다. 출력된 JSON의 날짜가 한국 기준 오늘이고 방향이 `PICK_UP`인지 확인합니다. 이 JSON으로 Swagger의 `POST /orgs/{orgId}/trips` 본문 전체를 교체하고 `orgId=1`로 한 번 실행합니다. **차량 페어링이 끝난 뒤에** 생성해야 그 기기에 운행이 배정됩니다. 응답에서 운행 번호(`id`), `PREPARING`, 정류장 3곳과 원아 3명을 확인합니다.
+
+**연결했는데 명단이 비어 있나요?** 차량 연결 코드는 기기를 등록할 때 한 번만 사용합니다. 연결을 유지한 채 위 3단계에서 한국 기준 오늘의 `PICK_UP` 운행을 만들고, 차량 앱에서 **기관 연결 → 등원 → 배정 명단으로 운행 준비**를 다시 누르세요. 선택 목록에서는 방금 서버가 반환한 운행 번호를 고릅니다.
 
 ### 3. 등원 운행과 보호자 확인
 
