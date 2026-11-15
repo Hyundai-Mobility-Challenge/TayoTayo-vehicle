@@ -1,4 +1,24 @@
-# 통학메이트 차량 앱
+# 타요타요 — 대표 저장소 · 차량 앱
+
+이 저장소(`TayoTayo-vehicle`)는 타요타요 프로젝트의 대표 저장소입니다. 차량 앱 소스를 관리하며, 서버 소스는 별도 저장소를 `server/` Git submodule로 연결합니다.
+
+| 역할 | 저장소 | 소스 위치 |
+| --- | --- | --- |
+| 대표 저장소 · 차량 앱 | [TayoTayo-vehicle](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle) | 이 저장소의 `app/` |
+| 연동 서버 소스 | [TayoTayo-server](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server) | [`server/`](server) |
+
+## 전체 소스 내려받기
+
+```sh
+git clone --recurse-submodules https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle.git
+cd TayoTayo-vehicle
+```
+
+이미 차량용 저장소를 내려받았다면 저장소 루트에서 `git submodule update --init --recursive`를 실행합니다. 서버는 대표 저장소에 기록된 커밋으로 내려받으며, 서버 소스 수정은 `TayoTayo-server`에서 관리합니다. GitHub의 **Download ZIP**에는 서버 소스가 포함되지 않으므로 전체 소스는 위 명령으로 내려받으세요.
+
+서버 실행은 [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md), 앱과 서버 연결은 [전체 연결 순서](docs/INTEGRATION.md)를 참고하세요.
+
+## 차량 앱 소개
 
 Pleos 차량에서 동승 선생님의 탑승 기록, 정류장 안내, 보호자 인계, 하차 기록, 운행 종료 점검을 연결하는 Android 앱입니다. 기관 연결과 배정 명단, Pleos 내비/차량 관측을 이용한 위치 공유, 음성 안내 및 시험 음악을 포함합니다.
 
@@ -20,7 +40,7 @@ macOS/Linux: `./gradlew`를 사용합니다. SDK 경로는 Android Studio가 만
 
 ## 연결과 시연
 
-1. [서버](https://github.com/Hyundai-Mobility-Challenge/tonghak-server)를 실행하고 기관·차량·어린이를 등록합니다.
+1. [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md)의 안내에 따라 서버를 실행하고 기관·차량·어린이를 등록합니다.
 2. 차량의 **기관 · 배정 명단**에서 에뮬레이터는 `http://10.0.2.2:8080`, 실제 차량 기기는 `http://<PC의 LAN IPv4>:8080`과 기관에서 발급한 차량 페어링 코드를 입력합니다. 앱은 `/api/v1/vehicle/pair`를 호출해 차량 자격 증명을 저장합니다.
 3. 기관 웹/API에서 차량·경로·어린이 배정 후 오늘 운행을 미리 생성해야 합니다. 차량 앱에서 등원(`PICK_UP`) 또는 하원(`DROP_OFF`) 방향을 선택하고 해당 운행을 불러옵니다. 앱에서 새 운행이나 명단을 생성하지 않습니다.
 4. **배정 명단으로 운행 준비 → 탑승 기록 → 이 순서로 · 운행 시작**을 진행합니다. 진행 기록과 정류장 상태는 서버 API로 전송됩니다.
@@ -32,6 +52,7 @@ macOS/Linux: `./gradlew`를 사용합니다. SDK 경로는 Android Studio가 만
 ## 구조
 
 - `app/`: 차량 UI, 운행 상태, SDK, 오디오, 위치 공유와 테스트
+- `server/`: `TayoTayo-server` 저장소를 참조하는 서버 소스 submodule
 - `common/kotlin/`: 서버 API 클라이언트 사본
 - `docs/`: 원본 설계·시연 기록과 분리 안내
 - `scripts/`: 차량 SDK/오디오 검증 도구

@@ -1,14 +1,41 @@
-# 세 저장소 연결하기
+# 대표 저장소와 연동 소스 연결하기
 
 이 문서는 현재 Java Spring Boot + MySQL 서버의 `/api/v1` 계약을 기준으로 합니다. 과거 모노레포/Python 서버의 시연 문서는 이 연결 절차와 다를 수 있습니다.
 
 ## 저장소
 
-- [서버](https://github.com/Hyundai-Mobility-Challenge/tonghak-server): Java Spring Boot API, MySQL, FCM 발송
-- [차량](https://github.com/Hyundai-Mobility-Challenge/tonghak-vehicle): Pleos 차량 Android 앱
+- [대표 저장소 · 차량](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle): Pleos 차량 Android 앱, 전체 소스 진입점
+- [연동 서버 소스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server): Java Spring Boot API, MySQL, FCM 발송. 대표 저장소의 `server/` submodule로 연결
 - [보호자](https://github.com/Hyundai-Mobility-Challenge/tonghak-parent): Android 보호자 앱
 
-세 저장소는 각각 독립적으로 빌드/실행합니다. Git submodule이나 나란히 놓인 원본 저장소가 필요하지 않습니다. `common/kotlin`과 `common/web`은 각 저장소에 필요한 사본을 포함합니다. 공통 API 계약이나 렌더러를 수정할 때 관련 저장소에도 같은 변경을 반영하세요.
+차량 앱과 서버는 각각 독립적으로 빌드/실행하며, 실행 중에는 HTTP API로 통신합니다. 대표 저장소는 서버 코드를 복사하지 않고 서버 저장소의 특정 커밋을 참조합니다. `common/kotlin`과 `common/web`은 각 저장소에 필요한 사본을 포함합니다. 공통 API 계약이나 렌더러를 수정할 때 관련 저장소에도 같은 변경을 반영하세요.
+
+## 서버 소스 내려받기와 갱신
+
+처음에는 대표 저장소를 서버 소스와 함께 내려받습니다.
+
+```sh
+git clone --recurse-submodules https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle.git
+cd TayoTayo-vehicle
+```
+
+이미 내려받은 대표 저장소에서 서버 소스를 준비하거나, 대표 저장소를 갱신한 뒤 기록된 서버 버전을 맞출 때는 다음 명령을 실행합니다.
+
+```sh
+git submodule update --init --recursive
+```
+
+서버 담당자는 별도 `TayoTayo-server` 저장소에서 수정 사항을 커밋하고 푸시합니다. 대표 저장소에 서버 `main`의 최신 버전을 반영하려면, `server/`에 로컬 수정 사항이 없는 상태에서 다음 명령을 실행하고 변경 내용을 확인한 뒤 커밋합니다.
+
+```sh
+git submodule update --remote server
+git diff --submodule=log -- server
+git add server
+git commit -m "Update linked server source"
+git push
+```
+
+서버 `main`의 새 커밋은 대표 저장소에 자동 반영되지 않습니다. 대표 저장소에서 연결 커밋을 갱신해야 다른 사람도 같은 서버 버전을 내려받습니다. 서버 실행 절차는 [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md)를 참고하세요.
 
 ## 최초 연결
 

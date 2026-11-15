@@ -1,0 +1,4 @@
+[submodule "server"]
+	path = server
+	url = https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server.git
+	branch = main
