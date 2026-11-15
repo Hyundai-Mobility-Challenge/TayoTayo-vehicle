@@ -8,6 +8,14 @@
 | 연동 서버 소스 | [TayoTayo-server](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server) | [`server/`](server) |
 | 보호자 앱 | [TayoTayo-parent](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent) | [`parent/`](parent) |
 
+## 차량 앱 다운로드
+
+**[⬇️ 타요타요 차량 앱 v1.0.0 APK 내려받기](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.0/TayoTayo-1.0.0.apk)** (43.5MB)
+
+- 대상: Pleos Connect(Android Automotive, API 28 이상) · 버전 1.0.0
+- 릴리스 노트와 이전 버전: [Releases](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases)
+- 릴리스 APK는 **HTTPS 서버에만** 연결됩니다. 내부망 HTTP 서버(`http://10.0.2.2:8080` 등)로 시연할 때는 아래 [빌드](#빌드)의 디버그 APK를 사용하세요.
+
 ## 전체 소스 내려받기
 
 ```sh
@@ -21,7 +29,7 @@ cd TayoTayo-vehicle
 
 ## 차량 앱 소개
 
-Pleos 차량에서 동승 선생님의 탑승 기록, 정류장 안내, 보호자 인계, 하차 기록, 운행 종료 점검을 연결하는 Android 앱입니다. 기관 연결과 배정 명단, Pleos 내비/차량 관측을 이용한 위치 공유, 음성 안내 및 시험 음악을 포함합니다.
+Pleos 차량에서 동승 선생님의 탑승 기록, 정류장 안내, 보호자 인계, 하차 기록, 운행 종료 점검을 연결하는 Android 앱입니다. 기관 연결과 배정 명단, Pleos 내비/차량 관측을 이용한 위치·예상 도착 시간 공유, 음성 안내를 포함합니다.
 
 ## 빌드
 
