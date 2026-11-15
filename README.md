@@ -79,12 +79,12 @@ flowchart TD
 | 준비물 | 설치·접속 방법 |
 | --- | --- |
 | 차량 앱 | Pleos Connect 에뮬레이터에 [차량 APK v1.0.1](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle/releases/download/v1.0.1/TayoTayo-vehicle-1.0.1-release.apk)을 설치합니다. Virtual Console에서 기어와 차속을 조작합니다. |
-| 보호자 앱 | Android 휴대폰 또는 에뮬레이터에 HTTPS 서버 설정을 지원하는 APK를 설치합니다. 공개 버전 `v0.2-invitations`에는 주소 입력 메뉴가 없습니다. HTTPS 지원 릴리스가 올라오기 전에는 팀이 전달한 HTTPS 지원 APK 또는 디버그 빌드를 사용하세요. [보호자 릴리스](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases) · [디버그 빌드 방법](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent#시작하기) |
+| 보호자 앱 | Android 9 이상 휴대폰 또는 에뮬레이터에 [보호자 APK 0.3-local-demo](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent/releases/download/v0.3-local-demo/TayoTayo-parent-0.3-local-demo.apk)를 설치합니다. 첫 설치 시 시연 서버 주소가 기본값입니다. |
 | 기관 관리자·보호자 계정 | 두 계정의 비밀번호는 심사 안내와 함께 별도로 전달합니다. [서버 상태 확인](https://api-demo-e677ea0e.up.railway.app/health/database) |
 
 ### 2. 배포 서버에 연결하고 오늘 운행 만들기
 
-차량 앱과 보호자 앱에 입력할 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 차량 앱 v1.0.1은 이 주소가 처음부터 입력되어 있습니다. 주소 끝에 `/api/v1`을 붙이지 마세요. 서버와 MySQL은 이미 실행 중입니다.
+차량 앱과 보호자 앱에 입력할 주소는 `https://api-demo-e677ea0e.up.railway.app`입니다. 차량 앱 v1.0.1과 보호자 앱 0.3-local-demo는 처음 설치하면 이 주소가 기본값입니다. 주소 끝에 `/api/v1`을 붙이지 마세요. 서버와 MySQL은 이미 실행 중입니다.
 
 1. **PC에서 차량 연결 코드 발급.** [시연 서버 Swagger](https://api-demo-e677ea0e.up.railway.app/swagger-ui.html)에서 `POST /auth/login`을 열고 **Try it out**을 누릅니다. `email=orgs@example.com`, 전달받은 관리자 비밀번호, `clientType=ADMIN_WEB`을 입력하고 **Execute**를 누릅니다. 응답의 `accessToken` 값만 상단 **Authorize → BearerAuth**에 등록합니다. `POST /orgs/{orgId}/vehicles/{vehicleId}/pairing-codes`에서 두 ID에 각각 `1`, 본문에 `{"expiresIn":600}`을 넣으면 10분간 유효한 6자리 코드가 나옵니다.
 2. **차량 연결.** 차량 앱 **기관 · 차량 연결** 화면에 서버 주소와 6자리 코드를 입력하고 **차량 연결**을 누릅니다. 연결 완료를 확인합니다.
@@ -92,7 +92,7 @@ flowchart TD
 
 ### 3. 등원 운행과 보호자 확인
 
-1. **두 앱에서 명단 확인.** 차량 앱에서 **등원 → 배정 명단으로 운행 준비**를 누릅니다. 선택 목록이 뜨면 방금 만든 운행 번호의 **이 운행 준비**를 누릅니다. 보호자 앱에서는 같은 서버 주소를 설정하고 `pickup-judge@example.com`과 보호자 비밀번호로 로그인합니다. 김하늘이 이미 연결돼 있어 별도의 어린이 초대 코드는 필요하지 않습니다.
+1. **두 앱에서 명단 확인.** 차량 앱에서 **등원 → 배정 명단으로 운행 준비**를 누릅니다. 선택 목록이 뜨면 방금 만든 운행 번호의 **이 운행 준비**를 누릅니다. 보호자 앱에서는 기본 서버 주소로 `pickup-judge@example.com`과 보호자 비밀번호로 로그인합니다. 김하늘이 이미 연결돼 있어 별도의 어린이 초대 코드는 필요하지 않습니다. 이전 서버 주소가 저장된 경우 로그인 화면의 **서버 주소 설정 → 적용**에서 위 HTTPS 주소로 바꾸세요.
 2. **승차·기관 인계.** 차량에서 명단과 순서를 확인하고 출발합니다. **판교역 김하늘 → 야탑역 김바다 → 성남시청 이마음** 순서로 정차합니다. 각 정류장에서 기어 P·차속 0을 확인하고, 아이를 넘겨준 사람 유형을 고른 뒤 **인계받음 → 탑승 → 벨트 확인**을 누릅니다. 마지막에는 기관에 도착해 각 아이의 **기관 인계 확인 · 하차 기록**을 누르고, 실내 확인 후 운행을 종료합니다.
 3. **결과 확인.** 보호자 앱을 새로고침해 김하늘의 탑승·하차 기록을 확인합니다. 시연 서버는 휴대폰 푸시를 보내지 않습니다. 관리자 Swagger의 `GET /trips/{tripId}`에서 운행 번호로 조회하면 `COMPLETED`와 세 아이의 `DROPPED_OFF` 기록을 확인할 수 있습니다.
 
