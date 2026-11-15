@@ -2,3 +2,7 @@
 	path = server
 	url = https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server.git
 	branch = main
+[submodule "parent"]
+	path = parent
+	url = https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent.git
+	branch = main

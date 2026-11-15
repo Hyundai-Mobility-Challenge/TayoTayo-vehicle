@@ -1,11 +1,12 @@
 # 타요타요 — 대표 저장소 · 차량 앱
 
-이 저장소(`TayoTayo-vehicle`)는 타요타요 프로젝트의 대표 저장소입니다. 차량 앱 소스를 관리하며, 서버 소스는 별도 저장소를 `server/` Git submodule로 연결합니다.
+이 저장소(`TayoTayo-vehicle`)는 타요타요 프로젝트의 대표 저장소입니다. 차량 앱 소스를 관리하며, 서버와 보호자 앱 소스는 각각 `server/`와 `parent/` Git submodule로 연결합니다.
 
 | 역할 | 저장소 | 소스 위치 |
 | --- | --- | --- |
 | 대표 저장소 · 차량 앱 | [TayoTayo-vehicle](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-vehicle) | 이 저장소의 `app/` |
 | 연동 서버 소스 | [TayoTayo-server](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server) | [`server/`](server) |
+| 보호자 앱 | [TayoTayo-parent](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent) | [`parent/`](parent) |
 
 ## 전체 소스 내려받기
 
@@ -14,7 +15,7 @@ git clone --recurse-submodules https://github.com/Hyundai-Mobility-Challenge/Tay
 cd TayoTayo-vehicle
 ```
 
-이미 차량용 저장소를 내려받았다면 저장소 루트에서 `git submodule update --init --recursive`를 실행합니다. 서버는 대표 저장소에 기록된 커밋으로 내려받으며, 서버 소스 수정은 `TayoTayo-server`에서 관리합니다. GitHub의 **Download ZIP**에는 서버 소스가 포함되지 않으므로 전체 소스는 위 명령으로 내려받으세요.
+이미 차량용 저장소를 내려받았다면 저장소 루트에서 `git submodule update --init --recursive`를 실행합니다. 서버와 보호자 앱은 각각 대표 저장소에 기록된 커밋으로 내려받습니다. 소스 수정은 `TayoTayo-server`와 `TayoTayo-parent`에서 관리합니다. GitHub의 **Download ZIP**에는 두 submodule의 소스가 포함되지 않으므로 전체 소스는 위 명령으로 내려받으세요.
 
 서버 실행은 [서버 README](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-server/blob/main/README.md), 앱과 서버 연결은 [전체 연결 순서](docs/INTEGRATION.md)를 참고하세요.
 
@@ -53,10 +54,11 @@ macOS/Linux: `./gradlew`를 사용합니다. SDK 경로는 Android Studio가 만
 
 - `app/`: 차량 UI, 운행 상태, SDK, 오디오, 위치 공유와 테스트
 - `server/`: `TayoTayo-server` 저장소를 참조하는 서버 소스 submodule
+- `parent/`: `TayoTayo-parent` 저장소를 참조하는 보호자 앱 소스 submodule
 - `common/kotlin/`: 서버 API 클라이언트 사본
 - `docs/`: 원본 설계·시연 기록과 분리 안내
 - `scripts/`: 차량 SDK/오디오 검증 도구
 
 실제 센서 관측, 모의 입력, 선생님의 수동 기록을 구분합니다. 앱의 기록 완료가 실제 차량 출발 허가나 자동 인계 판정을 뜻하지 않습니다. 벨트 해제 알림은 좌석별 지원 확인과 별도 개발이 필요한 기획 항목입니다.
 
-[분리 기준](docs/SOURCE_SNAPSHOT.md) / [이번 검증 결과](docs/SPLIT_VALIDATION.md) / [보호자 앱](https://github.com/Hyundai-Mobility-Challenge/tonghak-parent)
+[분리 기준](docs/SOURCE_SNAPSHOT.md) / [이번 검증 결과](docs/SPLIT_VALIDATION.md) / [보호자 앱](https://github.com/Hyundai-Mobility-Challenge/TayoTayo-parent)
