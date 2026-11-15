@@ -68,7 +68,7 @@ private val SYNTHETIC_NOTE = "도착 시각은 지금 출발한다고 보고 직
     val manual = !trip.routeIsExample && trip.routeObjective == RouteObjective.FIXED
     Row(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalAlignment = Alignment.CenterVertically) {
         StatusChip(if (manual) "직접 바꾼 순서" else if (trip.routeIsExample) "자동 계산한 순서 · 직선거리 기준" else "적용한 순서", tone = if (manual) ChipTone.ACCENT else ChipTone.NEUTRAL)
-        Text("${if (trip.isPickup) "기관 도착" else "복귀"} ${clockText(timeline.endMinute)} · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
+        Text("${koreanClockText(timeline.endMinute)} ${if (trip.isPickup) "기관 도착" else "복귀"} 예정 · ${timeline.totalMinutes}분", style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.textSecondary)
     }
     RouteStrip(vm, order, timeline)
     StopExclusionSuggestions(vm)
@@ -91,15 +91,15 @@ private val SYNTHETIC_NOTE = "도착 시각은 지금 출발한다고 보고 직
         verticalArrangement = Arrangement.spacedBy(AppSpacing.md),
     ) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm), verticalArrangement = Arrangement.spacedBy(AppSpacing.sm)) {
-            StripItem("출", "${trip.origin.shortName} 출발", clockText(timeline.startMinute))
+            StripItem("출", trip.origin.shortName, departureClockText(timeline.startMinute))
             order.forEachIndexed { index, id ->
                 StripArrow()
                 val stop = trip.stops.first { it.id == id }
-                StripItem("${index + 1}", stop.shortName, "${timeline.arrivalOf(id)?.let(::clockText) ?: "-"} · ${ridersAt(trip, id).size}명")
+                StripItem("${index + 1}", stop.shortName, "${timeline.arrivalOf(id)?.let(::arrivalClockText) ?: "도착 시각 미정"} · ${ridersAt(trip, id).size}명")
             }
             StripArrow()
             // 등원은 마지막 정류장 뒤 기관으로 간다(출발지 복귀가 아님).
-            if (trip.isPickup) StripItem("기", "기관 도착", clockText(timeline.endMinute)) else StripItem("복", "복귀", clockText(timeline.endMinute))
+            if (trip.isPickup) StripItem("기", "기관", arrivalClockText(timeline.endMinute)) else StripItem("복", "복귀", arrivalClockText(timeline.endMinute))
         }
         Text(SYNTHETIC_NOTE, style = AppTheme.typography.caption1Regular, color = AppTheme.colors.textTertiary)
     }
@@ -245,7 +245,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
     Column(Modifier.fillMaxWidth().testTag("reorder"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         Text(if (locked == 0) "순서 바꾸기" else "남은 순서 바꾸기", style = AppTheme.typography.head3Bold)
         Text(if (locked == 0) "위·아래 버튼으로 한 칸씩 옮겨요. 출발과 ${if (trip.isPickup) "기관 도착" else "복귀"}은 고정이에요." else "지나온 정류장과 지금 정류장은 고정이에요. 다음 정류장부터 바뀌어요.", style = AppTheme.typography.body3Regular, color = AppTheme.colors.textSecondary)
-        LockedRow("출", "${trip.origin.shortName} 출발", clockText(timeline.startMinute))
+        LockedRow("출", trip.origin.shortName, departureClockText(timeline.startMinute))
         draft.order.forEachIndexed { index, id ->
             val stop = trip.stops.first { it.id == id }
             val movable = index >= locked
@@ -264,7 +264,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
                 onMove = { delta -> onChange(draft.copy(order = RouteTimelines.move(draft.order, index, delta), lastMoved = id)) },
             )
         }
-        if (trip.isPickup) LockedRow("기", "기관 도착", clockText(timeline.endMinute)) else LockedRow("복", "${trip.origin.shortName} 복귀", clockText(timeline.endMinute))
+        if (trip.isPickup) LockedRow("기", "기관", arrivalClockText(timeline.endMinute)) else LockedRow("복", "${trip.origin.shortName} 복귀", arrivalClockText(timeline.endMinute))
         RouteWarnings(warnings)
         if (blockers.isNotEmpty()) Text(blockers.joinToString(" · "), style = AppTheme.typography.body2SemiBold, color = AppTheme.colors.primaryContent)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(AppSpacing.md), verticalAlignment = Alignment.CenterVertically) {
@@ -317,8 +317,9 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
                 Text(riders, style = AppTheme.typography.body3Regular, color = colors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(arrival?.let(::clockText) ?: "-", style = AppTheme.typography.titleBold.copy(fontFeatureSettings = "tnum"))
-                if (original != null && original != arrival) Text(clockText(original), style = AppTheme.typography.caption1Regular.copy(textDecoration = TextDecoration.LineThrough), color = colors.textTertiary)
+                Text(arrival?.let(::koreanClockText) ?: "-", style = AppTheme.typography.titleBold.copy(fontFeatureSettings = "tnum"))
+                Text(if (arrival != null) "도착 예정" else "도착 시각 미정", style = AppTheme.typography.caption1Regular, color = colors.textSecondary)
+                if (original != null && original != arrival) Text(koreanClockText(original), style = AppTheme.typography.caption1Regular.copy(textDecoration = TextDecoration.LineThrough), color = colors.textTertiary)
             }
             if (lockedLabel != null) StatusChip(lockedLabel)
             else {
@@ -364,7 +365,7 @@ internal data class ReorderDraft(val base: List<String>, val order: List<String>
     val warnings = routeWarnings(timeline)
     Column(modifier.testTag("reorder-side"), verticalArrangement = Arrangement.spacedBy(AppSpacing.lg)) {
         SideTitle(if (vm.trip.isPickup) "기관 도착 예정" else "복귀 예정")
-        CompareRow(clockText(base.endMinute), clockText(timeline.endMinute), timeline.endMinute - base.endMinute)
+        CompareRow(koreanClockText(base.endMinute), koreanClockText(timeline.endMinute), timeline.endMinute - base.endMinute)
         SideTitle("총 소요")
         CompareRow("${base.totalMinutes}분", "${timeline.totalMinutes}분", timeline.totalMinutes - base.totalMinutes)
         StatusChip(if (warnings.isEmpty()) "확인할 점 없음" else "확인할 점 ${warnings.size}개", tone = if (warnings.isEmpty()) ChipTone.INFO else ChipTone.DANGER)

@@ -132,6 +132,22 @@ private fun pickupRouteChanges(trip: TripState): List<RouteChange> = buildList {
 
 internal fun clockText(minute: Int): String = RouteTimelines.formatClock(minute)
 
+/** 하루 중 분 → "오후 4시 5분", 정각이면 "오후 4시". 경로 화면에서 운전자·선생님이 바로 읽는 시각. */
+internal fun koreanClockText(minute: Int): String {
+    val normalized = ((minute % 1_440) + 1_440) % 1_440
+    val hour = normalized / 60
+    val min = normalized % 60
+    val half = if (hour < 12) "오전" else "오후"
+    val hour12 = if (hour % 12 == 0) 12 else hour % 12
+    return if (min == 0) "$half ${hour12}시" else "$half ${hour12}시 ${min}분"
+}
+
+/** "오후 4시 출발" */
+internal fun departureClockText(minute: Int): String = "${koreanClockText(minute)} 출발"
+
+/** "오후 4시 23분 도착 예정" */
+internal fun arrivalClockText(minute: Int): String = "${koreanClockText(minute)} 도착 예정"
+
 /** '+7분', '-3분', '같음' */
 internal fun minuteDiffText(diff: Int): String = when {
     diff > 0 -> "+${diff}분"
